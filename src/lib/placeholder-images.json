@@ -1,3 +1,40 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "hero-main",
+      "description": "Premium embroidery thread spool set",
+      "imageUrl": "https://picsum.photos/seed/stitch-hero/1200/800",
+      "imageHint": "embroidery threads"
+    },
+    {
+      "id": "design-floral",
+      "description": "Exquisite floral embroidery design",
+      "imageUrl": "https://picsum.photos/seed/design1/600/600",
+      "imageHint": "embroidery floral"
+    },
+    {
+      "id": "design-peacock",
+      "description": "Traditional Indian peacock motif",
+      "imageUrl": "https://picsum.photos/seed/design2/600/600",
+      "imageHint": "peacock motif"
+    },
+    {
+      "id": "thread-silk",
+      "description": "Vibrant silk embroidery thread",
+      "imageUrl": "https://picsum.photos/seed/thread1/400/400",
+      "imageHint": "silk thread"
+    },
+    {
+      "id": "fabric-linen",
+      "description": "Natural linen fabric for embroidery",
+      "imageUrl": "https://picsum.photos/seed/fabric1/400/400",
+      "imageHint": "linen fabric"
+    },
+    {
+      "id": "part-hoop",
+      "description": "Professional embroidery machine hoop",
+      "imageUrl": "https://picsum.photos/seed/tool1/400/400",
+      "imageHint": "embroidery hoop"
+    }
+  ]
 }
