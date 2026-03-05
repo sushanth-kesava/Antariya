@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { CURRENT_USER, MOCK_PRODUCTS } from "@/app/lib/mock-data";
 import { personalizedProductRecommendations } from "@/ai/flows/personalized-product-recommendations-flow";
 import { ProductCard } from "@/components/product-card";
+import Image from "next/image";
+import { Sparkles } from "lucide-react";
 
 export default async function CustomerPortal() {
   // Simulate fetching personalized AI recommendations
@@ -93,7 +95,7 @@ export default async function CustomerPortal() {
             </Card>
             <Card>
               <CardHeader className="pb-2">
-                <CardDescription>Loyalty Points</CardTitle>
+                <CardDescription>Loyalty Points</CardDescription>
                 <CardTitle className="text-4xl text-accent">1,250</CardTitle>
               </CardHeader>
               <CardContent>
@@ -195,6 +197,3 @@ export default async function CustomerPortal() {
     </div>
   );
 }
-
-import Image from "next/image";
-import { Sparkles } from "lucide-react";
