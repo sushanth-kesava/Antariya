@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ShoppingCart, Search, User as UserIcon, Menu, Bell, Heart, LogIn } from "lucide-react";
+import { ShoppingCart, Search, User as UserIcon, Menu, Bell, Heart, Palette, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -17,18 +17,14 @@ import { useState } from "react";
 import { CURRENT_USER } from "@/app/lib/mock-data";
 
 export function Navbar() {
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-  // For the purpose of this UI demo, we'll assume "logged out" state 
-  // can be toggled or simulated. For now, we'll keep the CURRENT_USER 
-  // but also show Login/Signup if needed.
-  const isLoggedIn = true; // Toggle this to false to see logged out state
+  const isLoggedIn = true; 
 
   return (
     <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto px-4 h-16 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-6">
+      <div className="container mx-auto px-4 h-20 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-8">
           <Link href="/" className="flex items-center gap-2 group">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white font-bold text-xl group-hover:rotate-12 transition-transform">
+            <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-white font-bold text-2xl group-hover:rotate-12 transition-all shadow-lg shadow-primary/20">
               S
             </div>
             <span className="font-headline text-2xl font-bold tracking-tight text-primary hidden sm:inline-block">
@@ -36,40 +32,42 @@ export function Navbar() {
             </span>
           </Link>
           
-          <div className="hidden md:flex items-center gap-1">
-            <Button variant="ghost" asChild>
+          <div className="hidden md:flex items-center gap-2">
+            <Button variant="ghost" asChild className="rounded-full px-5 font-bold">
               <Link href="/marketplace">Marketplace</Link>
             </Button>
-            <Button variant="ghost" asChild>
-              <Link href="/designs">Designs</Link>
+            <Button variant="ghost" asChild className="rounded-full px-5 font-bold text-primary bg-primary/5">
+              <Link href="/customize" className="flex items-center gap-2">
+                <Palette className="h-4 w-4" /> AI Studio
+              </Link>
             </Button>
-            <Button variant="ghost" asChild>
-              <Link href="/tools">Tools</Link>
+            <Button variant="ghost" asChild className="rounded-full px-5 font-bold">
+              <Link href="/shop/hoodies">Hoodies</Link>
             </Button>
           </div>
         </div>
 
         <div className="flex-1 max-w-md hidden lg:flex relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
-            className="pl-10 bg-muted/50 focus-visible:ring-primary border-none" 
-            placeholder="Search threads, designs, parts..." 
+            className="pl-11 h-11 bg-muted/50 focus-visible:ring-primary border-none rounded-2xl" 
+            placeholder="Search premium collections..." 
           />
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" className="lg:hidden">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" className="lg:hidden rounded-full">
             <Search className="h-5 w-5" />
           </Button>
           
-          <Button variant="ghost" size="icon" className="relative hidden sm:flex">
+          <Button variant="ghost" size="icon" className="relative hidden sm:flex rounded-full">
             <Heart className="h-5 w-5" />
           </Button>
 
           <Link href="/cart">
-            <Button variant="ghost" size="icon" className="relative">
+            <Button variant="ghost" size="icon" className="relative rounded-full">
               <ShoppingCart className="h-5 w-5" />
-              <Badge className="absolute -top-1 -right-1 h-4 w-4 flex items-center justify-center p-0 text-[10px]" variant="default">
+              <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-[10px] bg-secondary" variant="default">
                 3
               </Badge>
             </Button>
@@ -78,49 +76,40 @@ export function Navbar() {
           {isLoggedIn ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="rounded-full overflow-hidden border">
+                <Button variant="ghost" size="icon" className="rounded-full overflow-hidden border p-0 h-10 w-10">
                   <UserIcon className="h-5 w-5" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>
+              <DropdownMenuContent align="end" className="w-64 rounded-2xl p-2 mt-2">
+                <DropdownMenuLabel className="p-3">
                   <div className="flex flex-col">
-                    <span>{CURRENT_USER.name}</span>
+                    <span className="font-bold text-lg">{CURRENT_USER.name}</span>
                     <span className="text-xs font-normal text-muted-foreground">{CURRENT_USER.email}</span>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
+                <DropdownMenuItem asChild className="rounded-xl p-3 cursor-pointer">
                   <Link href="/portal/customer">My Portal</Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/portal/customer/orders">Orders</Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/portal/customer/downloads">Downloads</Link>
+                <DropdownMenuItem asChild className="rounded-xl p-3 cursor-pointer">
+                  <Link href="/customize" className="text-primary font-bold">AI Design Drafts</Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                {CURRENT_USER.role === 'customer' && (
-                  <DropdownMenuItem asChild>
-                    <Link href="/portal/dealer/register" className="text-primary font-medium">Become a Dealer</Link>
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-destructive">Logout</DropdownMenuItem>
+                <DropdownMenuItem className="text-destructive rounded-xl p-3 cursor-pointer font-bold">Logout</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" asChild className="hidden sm:flex">
+              <Button variant="ghost" size="sm" asChild className="hidden sm:flex rounded-full px-6">
                 <Link href="/login">Log In</Link>
               </Button>
-              <Button size="sm" asChild className="rounded-full px-5">
+              <Button size="sm" asChild className="rounded-full px-6 shadow-lg shadow-primary/20">
                 <Link href="/signup">Sign Up</Link>
               </Button>
             </div>
           )}
 
-          <Button variant="ghost" size="icon" className="md:hidden">
+          <Button variant="ghost" size="icon" className="md:hidden rounded-full">
             <Menu className="h-5 w-5" />
           </Button>
         </div>

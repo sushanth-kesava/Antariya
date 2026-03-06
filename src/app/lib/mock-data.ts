@@ -18,6 +18,7 @@ export interface Product {
   stock: number;
   fileDownloadLink?: string;
   rating: number;
+  customizable?: boolean;
 }
 
 export const CATEGORIES = [
@@ -28,7 +29,9 @@ export const CATEGORIES = [
   'Needles',
   'Hoops & Frames',
   'Spare Parts',
-  'Accessories'
+  'Accessories',
+  'Hoodies',
+  'Blouses'
 ];
 
 export const MOCK_PRODUCTS: Product[] = [
@@ -56,38 +59,28 @@ export const MOCK_PRODUCTS: Product[] = [
     rating: 4.5
   },
   {
-    id: '3',
-    name: 'Cotton Linen Blend - Off White',
-    description: 'Perfect weight for home decor embroidery projects.',
-    price: 15.50,
-    category: 'Fabrics',
+    id: 'h1',
+    name: 'Premium Cotton Hoodie - Jet Black',
+    description: 'Heavyweight 400GSM cotton hoodie, perfect for intricate embroidery work.',
+    price: 25.00,
+    category: 'Hoodies',
     dealerId: 'd2',
-    image: 'https://picsum.photos/seed/fabric1/400/400',
-    stock: 200,
-    rating: 4.2
+    image: 'https://picsum.photos/seed/hoodie1/600/600',
+    stock: 100,
+    rating: 4.7,
+    customizable: true
   },
   {
-    id: '4',
-    name: 'Precision Embroidery Hoop 150x150',
-    description: 'Compatible with major machine brands. High-grip surface.',
-    price: 28.00,
-    category: 'Hoops & Frames',
+    id: 'b1',
+    name: 'Silk Blend Blouse Piece',
+    description: 'Unstitched blouse piece in rich silk, ready for custom zardosi embroidery.',
+    price: 18.50,
+    category: 'Blouses',
     dealerId: 'd2',
-    image: 'https://picsum.photos/seed/tool1/400/400',
-    stock: 15,
-    rating: 4.9
-  },
-  {
-    id: '5',
-    name: 'Mandala Spirit Pattern',
-    description: 'Intricate spiritual geometric design. Digital download.',
-    price: 12.00,
-    category: 'Embroidery Designs',
-    dealerId: 'd3',
-    image: 'https://picsum.photos/seed/design2/600/600',
-    stock: 999,
-    fileDownloadLink: '/designs/mandala.zip',
-    rating: 5.0
+    image: 'https://picsum.photos/seed/blouse1/600/600',
+    stock: 150,
+    rating: 4.6,
+    customizable: true
   }
 ];
 
