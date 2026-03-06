@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ShoppingCart, Search, User as UserIcon, Menu, Bell, Heart, Palette, Sparkles } from "lucide-react";
+import { ShoppingCart, Search, User as UserIcon, Menu, Bell, Heart, Palette, Sparkles, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -32,17 +32,19 @@ export function Navbar() {
             </span>
           </Link>
           
-          <div className="hidden md:flex items-center gap-2">
+          <div className="hidden md:flex items-center gap-1">
             <Button variant="ghost" asChild className="rounded-full px-5 font-bold">
               <Link href="/marketplace">Marketplace</Link>
             </Button>
-            <Button variant="ghost" asChild className="rounded-full px-5 font-bold text-primary bg-primary/5">
+            <Button variant="ghost" asChild className="rounded-full px-5 font-bold">
+              <Link href="/shop" className="flex items-center gap-2">
+                <ShoppingBag className="h-4 w-4" /> Shop
+              </Link>
+            </Button>
+            <Button variant="ghost" asChild className="rounded-full px-5 font-bold text-primary hover:text-primary bg-primary/5 hover:bg-primary/10">
               <Link href="/customize" className="flex items-center gap-2">
                 <Palette className="h-4 w-4" /> AI Studio
               </Link>
-            </Button>
-            <Button variant="ghost" asChild className="rounded-full px-5 font-bold">
-              <Link href="/shop/hoodies">Hoodies</Link>
             </Button>
           </div>
         </div>
@@ -67,7 +69,7 @@ export function Navbar() {
           <Link href="/cart">
             <Button variant="ghost" size="icon" className="relative rounded-full">
               <ShoppingCart className="h-5 w-5" />
-              <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-[10px] bg-secondary" variant="default">
+              <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-[10px] bg-secondary border-2 border-background" variant="default">
                 3
               </Badge>
             </Button>
