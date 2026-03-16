@@ -18,6 +18,23 @@ The ultimate premium marketplace for embroidery designs, industrial threads, fab
 - **AI**: [Genkit](https://firebase.google.com/docs/genkit) with Google Gemini
 - **Language**: TypeScript
 
+## Git Troubleshooting
+
+If you see `error: remote origin already exists` or `Permission denied (publickey)`, follow these steps to switch to HTTPS:
+
+### 1. Update the remote URL to HTTPS
+Run this command in your terminal:
+```bash
+git remote set-url origin https://github.com/sushanth-kesava/StitchMart.git
+```
+
+### 2. Push your code
+Then, push your changes to GitHub:
+```bash
+git push -u origin main
+```
+*Note: You may be asked for your GitHub username and a Personal Access Token (PAT). You can generate a PAT in your GitHub settings.*
+
 ## Getting Started
 
 1. **Configure Environment**: Add your Firebase configuration keys to a `.env` file.
@@ -29,28 +46,3 @@ The ultimate premium marketplace for embroidery designs, industrial threads, fab
    ```bash
    npm run dev
    ```
-
-## Git Setup Instructions
-
-If you encountered a `Permission denied (publickey)` error, follow these steps to use HTTPS instead:
-
-### 1. Change remote to HTTPS
-```bash
-git remote set-url origin https://github.com/sushanth-kesava/StitchMart.git
-```
-
-### 2. Push your code
-```bash
-git push -u origin main
-```
-*Note: You may be asked for your GitHub username and a Personal Access Token (PAT). You can generate a PAT in your GitHub settings.*
-
-### Initial Setup (If starting fresh)
-```bash
-git init
-git add .
-git commit -m "Initial commit: StitchMart Embroidery Marketplace"
-git branch -M main
-git remote add origin https://github.com/sushanth-kesava/StitchMart.git
-git push -u origin main
-```# StitchMart
