@@ -32,13 +32,25 @@ The ultimate premium marketplace for embroidery designs, industrial threads, fab
 
 ## Git Setup Instructions
 
-To push this project to your GitHub repository, run the following commands in your local terminal:
+If you encountered a `Permission denied (publickey)` error, follow these steps to use HTTPS instead:
 
+### 1. Change remote to HTTPS
+```bash
+git remote set-url origin https://github.com/sushanth-kesava/StitchMart.git
+```
+
+### 2. Push your code
+```bash
+git push -u origin main
+```
+*Note: You may be asked for your GitHub username and a Personal Access Token (PAT). You can generate a PAT in your GitHub settings.*
+
+### Initial Setup (If starting fresh)
 ```bash
 git init
 git add .
 git commit -m "Initial commit: StitchMart Embroidery Marketplace"
 git branch -M main
-git remote add origin git@github.com:sushanth-kesava/StitchMart.git
+git remote add origin https://github.com/sushanth-kesava/StitchMart.git
 git push -u origin main
 ```
