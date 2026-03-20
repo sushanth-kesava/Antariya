@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Navbar } from "@/components/navbar";
@@ -6,7 +7,7 @@ import { Product } from "@/app/lib/mock-data";
 import { Search, RefreshCw, Sparkles, Filter } from "lucide-react";
 import { useState, useMemo } from "react";
 import { useFirestore, useCollection } from "@/firebase";
-import { collection, query, where, orderBy } from "firebase/firestore";
+import { collection, query, where } from "firebase/firestore";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 
@@ -14,21 +15,24 @@ export default function ShoppingPage() {
   const db = useFirestore();
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Fetch all customizable products for the Shop
+  // Simplified query to avoid index errors: remove orderBy when using where
   const shopQuery = useMemo(() => {
     return query(
       collection(db, "products"), 
-      where("customizable", "==", true),
-      orderBy("createdAt", "desc")
+      where("customizable", "==", true)
     );
   }, [db]);
 
   const { data: products, loading } = useCollection<Product>(shopQuery);
 
-  const filteredProducts = products?.filter(p => 
-    p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    p.description.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredProducts = useMemo(() => {
+    if (!products) return [];
+    return products
+      .filter(p => 
+        p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        p.description.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+  }, [products, searchQuery]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -72,7 +76,7 @@ export default function ShoppingPage() {
             
             <div className="flex flex-1 max-w-xl w-full gap-3">
               <div className="relative flex-1">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <input 
                   className="w-full pl-12 h-14 rounded-2xl bg-muted/50 border-none text-lg focus:outline-none focus:ring-2 focus:ring-primary" 
                   placeholder="Search hoodies, blouses..." 

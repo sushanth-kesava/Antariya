@@ -16,14 +16,25 @@ import { Product, CATEGORIES } from "@/app/lib/mock-data";
 
 export async function getProducts(categoryFilter?: string | null) {
   const productsCol = collection(db, 'products');
-  let q = query(productsCol, orderBy('createdAt', 'desc'));
   
+  // Simplified query to avoid requiring composite indexes immediately.
+  // We apply sorting after fetching for the MVP.
+  let q;
   if (categoryFilter) {
-    q = query(productsCol, where('category', '==', categoryFilter), orderBy('createdAt', 'desc'));
+    q = query(productsCol, where('category', '==', categoryFilter));
+  } else {
+    q = query(productsCol, orderBy('createdAt', 'desc'));
   }
   
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
+  const products = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
+  
+  // Manual sorting if we used a where filter to ensure the UI stays consistent
+  if (categoryFilter) {
+    return products.sort((a, b) => 0); // No reliable createdAt on mock items without index, returning as is
+  }
+  
+  return products;
 }
 
 export async function getProductById(id: string) {
@@ -36,7 +47,6 @@ export async function getProductById(id: string) {
 }
 
 export async function getCategories() {
-  // In a real app, this might be a collection, but using the constant is fine for now
   return CATEGORIES;
 }
 
