@@ -34,6 +34,13 @@ const EmbroideryDesignVisualizerOutputSchema = z.object({
     .describe(
       "A base64 data URI of the AI-generated image of the embroidery design rendered on the specified fabric. Expected format: 'data:<mimetype>;base64,<encoded_data>'"
     ),
+  fallbackUsed: z
+    .boolean()
+    .describe('Whether the response used a local fallback instead of AI generation.'),
+  message: z
+    .string()
+    .optional()
+    .describe('Optional informational message about fallback behavior.'),
 });
 export type EmbroideryDesignVisualizerOutput = z.infer<
   typeof EmbroideryDesignVisualizerOutputSchema
@@ -46,34 +53,49 @@ const embroideryDesignVisualizerFlow = ai.defineFlow(
     outputSchema: EmbroideryDesignVisualizerOutputSchema,
   },
   async input => {
-    // Extract MIME type from the data URI for the media part
-    const mimeMatch = input.embroideryDesignImage.match(/^data:(.*?);base64,/);
-    const contentType = mimeMatch ? mimeMatch[1] : 'image/png'; // Default to image/png if not found
+    try {
+      // Extract MIME type from the data URI for the media part
+      const mimeMatch = input.embroideryDesignImage.match(/^data:(.*?);base64,/);
+      const contentType = mimeMatch ? mimeMatch[1] : 'image/png'; // Default to image/png if not found
 
-    const {media} = await ai.generate({
-      model: googleAI.model('gemini-2.5-flash-image'), // Use the image-to-image model
-      prompt: [
-        {
-          media: {url: input.embroideryDesignImage, contentType: contentType},
+      const {media} = await ai.generate({
+        model: googleAI.model('gemini-2.5-flash-image'), // Use the image-to-image model
+        prompt: [
+          {
+            media: {url: input.embroideryDesignImage, contentType: contentType},
+          },
+          {
+            text: `Render this embroidery design on a ${input.fabricColor} ${input.fabricType} fabric. Ensure the embroidery design is clearly visible and integrated naturally onto the fabric texture, respecting the fabric's texture and drape. The fabric should look realistic, and the embroidery should appear stitched onto it.`,
+          },
+        ],
+        config: {
+          responseModalities: ['TEXT', 'IMAGE'], // As per guidance, must provide both TEXT and IMAGE.
         },
-        {
-          text: `Render this embroidery design on a ${input.fabricColor} ${input.fabricType} fabric. Ensure the embroidery design is clearly visible and integrated naturally onto the fabric texture, respecting the fabric's texture and drape. The fabric should look realistic, and the embroidery should appear stitched onto it.`,
-        },
-      ],
-      config: {
-        responseModalities: ['TEXT', 'IMAGE'], // As per guidance, must provide both TEXT and IMAGE.
-      },
-    });
+      });
 
-    if (!media) {
-      throw new Error(
-        'Failed to generate visual preview: No media output from AI model.'
-      );
+      if (!media) {
+        return {
+          visualizedImage: input.embroideryDesignImage,
+          fallbackUsed: true,
+          message: 'AI preview is temporarily unavailable. Showing original design image instead.',
+        };
+      }
+
+      return {
+        visualizedImage: media.url,
+        fallbackUsed: false,
+      };
+    } catch (error: any) {
+      const quotaExceeded = String(error?.message || '').includes('RESOURCE_EXHAUSTED');
+
+      return {
+        visualizedImage: input.embroideryDesignImage,
+        fallbackUsed: true,
+        message: quotaExceeded
+          ? 'Gemini quota exceeded. Add billing or try again later. Showing original design image.'
+          : 'AI preview failed. Showing original design image as fallback.',
+      };
     }
-
-    return {
-      visualizedImage: media.url,
-    };
   }
 );
 

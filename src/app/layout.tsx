@@ -1,7 +1,6 @@
 
 import type {Metadata} from 'next';
 import './globals.css';
-import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { Toaster } from '@/components/ui/toaster';
 
 export const metadata: Metadata = {
@@ -25,10 +24,8 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased selection:bg-primary selection:text-white">
         <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "YOUR_GOOGLE_CLIENT_ID"}>
-          <FirebaseClientProvider>
-            {children}
-            <Toaster />
-          </FirebaseClientProvider>
+          {children}
+          <Toaster />
         </GoogleOAuthProvider>
       </body>
     </html>

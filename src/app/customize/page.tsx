@@ -16,6 +16,7 @@ export default function CustomizePage() {
   const [selectedDesign, setSelectedDesign] = useState<Product | null>(null);
   const [visualizing, setVisualizing] = useState(false);
   const [visualizedImg, setVisualizedImg] = useState<string | null>(null);
+  const [visualizationMessage, setVisualizationMessage] = useState<string | null>(null);
   const [apparel, setApparel] = useState<Product[]>([]);
   const [designs, setDesigns] = useState<Product[]>([]);
 
@@ -39,6 +40,7 @@ export default function CustomizePage() {
   const handleVisualize = async () => {
     if (!selectedGarment || !selectedDesign) return;
     setVisualizing(true);
+    setVisualizationMessage(null);
     try {
       const result = await embroideryDesignVisualizer({
         embroideryDesignImage: selectedDesign.image,
@@ -48,8 +50,12 @@ export default function CustomizePage() {
       if (result.visualizedImage) {
         setVisualizedImg(result.visualizedImage);
       }
+      if (result.fallbackUsed) {
+        setVisualizationMessage(result.message || "AI preview is currently unavailable. Showing fallback image.");
+      }
     } catch (error) {
       console.error("AI Visualization failed", error);
+      setVisualizationMessage("AI preview failed unexpectedly. Please try again in a few minutes.");
     } finally {
       setVisualizing(false);
     }
@@ -136,6 +142,11 @@ export default function CustomizePage() {
 
             {/* Preview Column */}
             <div className="lg:col-span-8">
+              {visualizationMessage && (
+                <div className="mb-4 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900 text-sm font-medium">
+                  {visualizationMessage}
+                </div>
+              )}
               <Card className="rounded-[40px] overflow-hidden border-none shadow-2xl bg-muted/30 relative aspect-[4/3] flex items-center justify-center">
                 {visualizedImg ? (
                   <div className="relative w-full h-full">

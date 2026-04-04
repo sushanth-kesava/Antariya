@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Filter, Search, ChevronDown, RefreshCw, Sparkles, Palette, ShoppingBag, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { getProducts } from "@/lib/firebase/services";
+import { getProductsFromBackend } from "@/lib/api/products";
 
 export default function Marketplace() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -22,7 +22,7 @@ export default function Marketplace() {
     async function fetchData() {
       setLoading(true);
       try {
-        const data = await getProducts(selectedCategory);
+        const data = await getProductsFromBackend({ category: selectedCategory || undefined });
         setProducts(data);
       } catch (error) {
         console.error("Failed to fetch products:", error);

@@ -9,8 +9,7 @@ import { Button } from "@/components/ui/button";
 import { ChevronRight, Zap, ShieldCheck, Truck, RefreshCcw, Database } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { getProducts } from "@/lib/firebase/services";
-import { runSeeding } from "./actions/seed";
+import { getProductsFromBackend, seedProductsOnBackend } from "@/lib/api/products";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Home() {
@@ -21,7 +20,7 @@ export default function Home() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const data = await getProducts();
+        const data = await getProductsFromBackend();
         setFeaturedProducts(data.slice(0, 4));
       } catch (error) {
         console.error("Failed to load products", error);
@@ -33,13 +32,13 @@ export default function Home() {
   }, []);
 
   const handleSeed = async () => {
-    const res = await runSeeding();
+    const res = await seedProductsOnBackend();
     toast({
       title: res.success ? "Success" : "Info",
       description: res.message,
     });
     // Refresh data
-    const data = await getProducts();
+    const data = await getProductsFromBackend();
     setFeaturedProducts(data.slice(0, 4));
   };
 
