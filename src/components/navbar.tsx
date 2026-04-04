@@ -16,25 +16,63 @@ import { Badge } from "@/components/ui/badge";
 import { useState, useEffect } from "react";
 import { googleLogout } from '@react-oauth/google';
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000/api";
+
+function clearLocalSession() {
+  localStorage.removeItem('app_auth_token');
+  localStorage.removeItem('google_auth_user');
+  localStorage.removeItem('user_role');
+}
+
 export function Navbar() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  // Read saved pseudo-session from localStorage on mount
+  // Validate session against backend on mount.
   useEffect(() => {
-    const savedUser = localStorage.getItem('google_auth_user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
-    setLoading(false);
+    const loadUser = async () => {
+      const token = localStorage.getItem('app_auth_token');
+
+      if (!token) {
+        clearLocalSession();
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/auth/me`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data?.success || !data?.user) {
+          clearLocalSession();
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+
+        setUser(data.user);
+        localStorage.setItem('google_auth_user', JSON.stringify(data.user));
+      } catch (error) {
+        clearLocalSession();
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void loadUser();
   }, []);
 
   const handleLogout = () => {
     googleLogout();
     setUser(null);
-    localStorage.removeItem('app_auth_token');
-    localStorage.removeItem('google_auth_user');
-    localStorage.removeItem('user_role');
+    clearLocalSession();
   };
 
   return (

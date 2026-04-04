@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/navbar";
 import { useFirestore, useCollection } from "@/firebase";
 import { collection, addDoc, serverTimestamp, query, where, deleteDoc, doc } from "firebase/firestore";
@@ -10,8 +11,13 @@ import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { LayoutDashboard, PlusCircle, PackageCheck, AlertCircle, Loader2, Trash2 } from "lucide-react";
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000/api";
+
 export default function AdminPortal() {
+  const router = useRouter();
   const db = useFirestore();
+  const [authChecked, setAuthChecked] = useState(false);
+  const [adminUser, setAdminUser] = useState<any>(null);
   const catalogQuery = useMemo(() => query(collection(db, "products"), where("dealerId", "==", "admin-1")), [db]);
   const { data: catalog, loading: loadingCatalog } = useCollection<any>(catalogQuery);
   const [loading, setLoading] = useState(false);
@@ -28,6 +34,60 @@ export default function AdminPortal() {
     customizable: false,
     rating: "0",
   });
+
+  useEffect(() => {
+    const validateAdminSession = async () => {
+      const token = localStorage.getItem("app_auth_token");
+
+      if (!token) {
+        localStorage.removeItem("google_auth_user");
+        localStorage.removeItem("user_role");
+        router.replace("/login");
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/auth/me`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data?.success || !data?.user) {
+          localStorage.removeItem("app_auth_token");
+          localStorage.removeItem("google_auth_user");
+          localStorage.removeItem("user_role");
+          router.replace("/login");
+          return;
+        }
+
+        if (data.user.role !== "admin") {
+          router.replace("/");
+          return;
+        }
+
+        setAdminUser(data.user);
+        setAuthChecked(true);
+      } catch (err) {
+        localStorage.removeItem("app_auth_token");
+        localStorage.removeItem("google_auth_user");
+        localStorage.removeItem("user_role");
+        router.replace("/login");
+      }
+    };
+
+    void validateAdminSession();
+  }, [router]);
+
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen bg-gray-50/50 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,7 +158,7 @@ export default function AdminPortal() {
               </div>
               <div>
                 <p className="font-bold text-lg leading-tight">Admin Portal</p>
-                <p className="text-sm font-medium text-primary-foreground/80 mt-1">Super Administrator</p>
+                <p className="text-sm font-medium text-primary-foreground/80 mt-1">{adminUser?.displayName || "Super Administrator"}</p>
               </div>
             </div>
             <div className="space-y-1 pt-4 border-t border-white/20">

@@ -30,11 +30,7 @@ export default function LoginPage() {
         localStorage.setItem("google_auth_user", JSON.stringify(result.user));
         localStorage.setItem("user_role", result.user.role);
 
-        if (role === "admin") {
-          router.push("/portal/admin");
-        } else {
-          router.push("/portal/customer");
-        }
+        router.push("/");
         
       } catch (error) {
         console.error("Login Error:", error);

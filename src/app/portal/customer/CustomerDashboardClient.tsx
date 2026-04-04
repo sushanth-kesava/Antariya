@@ -3,21 +3,72 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { Package, Heart, Download, Settings, Star, LayoutDashboard, Sparkles, ShoppingBag, ArrowRight } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MOCK_PRODUCTS } from "@/app/lib/mock-data";
 
-export default function CustomerDashboardClient({ user, recommendations }: any) {
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000/api";
+
+export default function CustomerDashboardClient({ recommendations }: any) {
+  const router = useRouter();
+  const [user, setUser] = useState<any>({ name: "Customer", email: "", role: "customer" });
   const [orders, setOrders] = useState<any[]>([]);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
-    const savedOrders = JSON.parse(localStorage.getItem('stitchmart_orders') || '[]');
-    setOrders(savedOrders);
-  }, []);
+    const loadSession = async () => {
+      setMounted(true);
+
+      const savedOrders = JSON.parse(localStorage.getItem('stitchmart_orders') || '[]');
+      setOrders(savedOrders);
+
+      const token = localStorage.getItem("app_auth_token");
+
+      if (token) {
+        try {
+          const response = await fetch(`${API_BASE_URL}/auth/me`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+
+          const data = await response.json();
+
+          if (response.ok && data?.success && data?.user) {
+            const mappedUser = {
+              id: data.user.id,
+              name: data.user.displayName || "Customer",
+              email: data.user.email || "",
+              role: data.user.role || "customer",
+            };
+
+            setUser(mappedUser);
+            localStorage.setItem("google_auth_user", JSON.stringify(data.user));
+            return;
+          }
+
+          localStorage.removeItem("app_auth_token");
+          localStorage.removeItem("google_auth_user");
+          localStorage.removeItem("user_role");
+          router.replace("/login");
+          return;
+        } catch (error) {
+          localStorage.removeItem("app_auth_token");
+          localStorage.removeItem("google_auth_user");
+          localStorage.removeItem("user_role");
+          router.replace("/login");
+          return;
+        }
+      }
+
+      router.replace("/login");
+    };
+
+    void loadSession();
+  }, [router]);
 
   if (!mounted) return null; // Avoid hydration mismatch
 
