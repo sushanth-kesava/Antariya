@@ -19,9 +19,14 @@ export function initializeFirebase(): { app: FirebaseApp; db: Firestore; auth: A
 
   const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
   const db = getFirestore(app);
-  const auth = getAuth(app);
+  let auth: any = null;
+  try {
+    auth = getAuth(app);
+  } catch (e) {
+    console.warn("Firebase Auth bypassed or invalid key");
+  }
 
-  return { app, db, auth };
+  return { app, db, auth: auth as Auth };
 }
 
 export * from './provider';

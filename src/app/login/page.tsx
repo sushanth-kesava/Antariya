@@ -1,113 +1,109 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
-import { Navbar } from "@/components/navbar";
+import { useGoogleLogin } from "@react-oauth/google";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Sparkles, ArrowRight } from "lucide-react";
+import { Sparkles, ArrowRight, Loader2, Store, User } from "lucide-react";
+import Link from "next/link";
+import { Navbar } from "@/components/navbar";
 
 export default function LoginPage() {
-  const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [role, setRole] = useState<"customer" | "admin">("customer");
 
-  async function onSubmit(event: React.SyntheticEvent) {
-    event.preventDefault();
-    setIsLoading(true);
-    // Add login logic here
-    setTimeout(() => setIsLoading(false), 2000);
-  }
+  const login = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      try {
+        setLoading(true);
+        const userInfo = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+          headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+        }).then((res) => res.json());
+
+        const googleUser = {
+          displayName: userInfo.name,
+          email: userInfo.email,
+          photoURL: userInfo.picture,
+        };
+        
+        // Save the session and force the selected role via login override
+        localStorage.setItem("google_auth_user", JSON.stringify(googleUser));
+        localStorage.setItem("user_role", role);
+
+        if (role === "admin") {
+          router.push("/portal/admin");
+        } else {
+          router.push("/portal/customer");
+        }
+        
+      } catch (error) {
+        console.error("Login Error:", error);
+      } finally {
+        setLoading(false);
+      }
+    },
+    onError: () => console.error("Login Failed"),
+  });
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-gray-50/50 flex flex-col font-sans">
       <Navbar />
-      <main className="flex-1 flex items-center justify-center p-4 relative overflow-hidden">
-        <div className="absolute inset-0 z-0 indian-motif-bg opacity-5" />
-        
-        <Card className="w-full max-w-md relative z-10 border-border/50 shadow-2xl rounded-3xl overflow-hidden">
-          <div className="h-2 bg-primary" />
-          <CardHeader className="space-y-2 text-center pt-8">
-            <div className="mx-auto w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary mb-2">
-              <Sparkles className="h-6 w-6" />
-            </div>
-            <CardTitle className="text-3xl font-bold font-headline">Welcome Back</CardTitle>
-            <CardDescription>
-              Login to access your designs, orders, and personalized recommendations.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={onSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
-                <Input 
-                  id="email" 
-                  placeholder="name@example.com" 
-                  type="email" 
-                  autoCapitalize="none" 
-                  autoComplete="email" 
-                  autoCorrect="off" 
-                  disabled={isLoading}
-                  className="h-12 rounded-xl"
-                  required
-                />
+      <div className="flex-1 flex flex-col items-center justify-center p-4">
+        <div className="w-full max-w-md bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-100">
+          <div className="p-8 space-y-8 bg-card">
+            <div className="text-center space-y-4">
+              <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto text-primary">
+                <Sparkles className="h-8 w-8" />
               </div>
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Password</Label>
-                  <Link 
-                    href="/forgot-password" 
-                    className="text-xs text-primary hover:underline font-medium"
-                  >
-                    Forgot password?
-                  </Link>
-                </div>
-                <Input 
-                  id="password" 
-                  type="password" 
-                  disabled={isLoading}
-                  className="h-12 rounded-xl"
-                  required
-                />
-              </div>
-              <Button 
-                className="w-full h-12 rounded-xl text-lg font-bold shadow-lg shadow-primary/20" 
-                type="submit" 
-                disabled={isLoading}
-              >
-                {isLoading ? "Signing in..." : "Sign In"}
-                {!isLoading && <ArrowRight className="ml-2 h-5 w-5" />}
-              </Button>
-            </form>
-            
-            <div className="relative my-6">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
+                <h1 className="text-3xl font-bold font-headline">Welcome Back</h1>
+                <p className="text-muted-foreground text-sm font-medium">Log in to your StitchMart account</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <Button variant="outline" className="h-12 rounded-xl border-border/50">
-                Google
-              </Button>
-              <Button variant="outline" className="h-12 rounded-xl border-border/50">
-                Facebook
-              </Button>
+            <div className="space-y-4">
+              <p className="text-sm font-bold text-center text-gray-700">Select your portal:</p>
+              <div className="grid grid-cols-2 gap-4">
+                <button 
+                  onClick={() => setRole("customer")}
+                  className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all ${role === "customer" ? "border-primary bg-primary/5 text-primary" : "border-gray-200 bg-white text-gray-500 hover:border-gray-300"}`}
+                >
+                  <User className="h-6 w-6 mb-2" />
+                  <span className="font-bold text-sm">Customer</span>
+                </button>
+                <button 
+                  onClick={() => setRole("admin")}
+                  className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all ${role === "admin" ? "border-primary bg-primary/5 text-primary" : "border-gray-200 bg-white text-gray-500 hover:border-gray-300"}`}
+                >
+                  <Store className="h-6 w-6 mb-2" />
+                  <span className="font-bold text-sm">Admin / Dealer</span>
+                </button>
+              </div>
             </div>
-          </CardContent>
-          <CardFooter className="flex flex-col space-y-4 pb-8">
-            <p className="text-sm text-center text-muted-foreground">
+
+            <Button 
+              onClick={() => login()} 
+              disabled={loading}
+              className="w-full h-14 rounded-full text-lg font-bold shadow-lg shadow-primary/20 hover:scale-105 transition-all text-white"
+            >
+              {loading ? (
+                <><Loader2 className="mr-3 h-5 w-5 animate-spin" /> Authenticating...</>
+              ) : (
+                "Sign in with Google"
+              )}
+            </Button>
+          </div>
+          <div className="p-6 bg-muted/40 border-t border-border/50 text-center">
+            <p className="text-sm text-muted-foreground font-medium">
               Don't have an account?{" "}
-              <Link href="/signup" className="text-primary font-bold hover:underline">
-                Register now
+              <Link href="/signup" className="text-primary font-bold hover:underline inline-flex items-center">
+                Sign up here <ArrowRight className="h-4 w-4 ml-1" />
               </Link>
             </p>
-          </CardFooter>
-        </Card>
-      </main>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

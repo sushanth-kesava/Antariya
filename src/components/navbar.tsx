@@ -13,11 +13,30 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
-import { CURRENT_USER } from "@/app/lib/mock-data";
+import { useState, useEffect } from "react";
+import { useGoogleLogin, googleLogout } from '@react-oauth/google';
+import { jwtDecode } from "jwt-decode";
+import { Loader2 } from "lucide-react";
 
 export function Navbar() {
-  const isLoggedIn = true; 
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Read saved pseudo-session from localStorage on mount
+  useEffect(() => {
+    const savedUser = localStorage.getItem('google_auth_user');
+    if (savedUser) {
+      setUser(JSON.parse(savedUser));
+    }
+    setLoading(false);
+  }, []);
+
+  const handleLogout = () => {
+    googleLogout();
+    setUser(null);
+    localStorage.removeItem('google_auth_user');
+    localStorage.removeItem('user_role');
+  };
 
   return (
     <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -75,18 +94,22 @@ export function Navbar() {
             </Button>
           </Link>
 
-          {isLoggedIn ? (
+          {!loading && user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="rounded-full overflow-hidden border p-0 h-10 w-10">
-                  <UserIcon className="h-5 w-5" />
+                  {user.photoURL ? (
+                    <img src={user.photoURL} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    <UserIcon className="h-5 w-5" />
+                  )}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-64 rounded-2xl p-2 mt-2">
                 <DropdownMenuLabel className="p-3">
                   <div className="flex flex-col">
-                    <span className="font-bold text-lg">{CURRENT_USER.name}</span>
-                    <span className="text-xs font-normal text-muted-foreground">{CURRENT_USER.email}</span>
+                    <span className="font-bold text-lg">{user.displayName || "User"}</span>
+                    <span className="text-xs font-normal text-muted-foreground">{user.email || "No email"}</span>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
@@ -97,18 +120,20 @@ export function Navbar() {
                   <Link href="/customize" className="text-primary font-bold">AI Design Drafts</Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-destructive rounded-xl p-3 cursor-pointer font-bold">Logout</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleLogout} className="text-destructive rounded-xl p-3 cursor-pointer font-bold">Logout</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          ) : (
+          ) : !loading ? (
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" asChild className="hidden sm:flex rounded-full px-6">
+              <Button asChild variant="ghost" size="sm" className="hidden sm:flex rounded-full px-6">
                 <Link href="/login">Log In</Link>
               </Button>
-              <Button size="sm" asChild className="rounded-full px-6 shadow-lg shadow-primary/20">
+              <Button asChild size="sm" className="rounded-full px-6 shadow-lg shadow-primary/20">
                 <Link href="/signup">Sign Up</Link>
               </Button>
             </div>
+          ) : (
+            <div className="w-20 h-10 animate-pulse bg-muted rounded-full"></div>
           )}
 
           <Button variant="ghost" size="icon" className="md:hidden rounded-full">

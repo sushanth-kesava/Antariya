@@ -57,9 +57,11 @@ export function ProductCard({ product }: ProductCardProps) {
       </CardContent>
       
       <CardFooter className="p-4 pt-0">
-        <Button className="w-full gap-2 rounded-full font-semibold shadow-sm hover:shadow-md transition-all active:scale-95" variant="default">
-          <ShoppingCart className="h-4 w-4" />
-          Add to Cart
+        <Button className="w-full gap-2 rounded-full font-semibold shadow-sm hover:shadow-md transition-all active:scale-95" variant="default" asChild>
+          <Link href="/cart">
+            <ShoppingCart className="h-4 w-4" />
+            Add to Cart
+          </Link>
         </Button>
       </CardFooter>
     </Card>

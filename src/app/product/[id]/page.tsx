@@ -27,7 +27,7 @@ export default function ProductDetails({ params }: { params: Promise<{ id: strin
   const { id } = use(params);
   const db = useFirestore();
   
-  const productRef = useMemo(() => doc(db, "products", id), [db, id]);
+  const productRef = useMemo(() => doc(db, "products", id) as any, [db, id]);
   const { data: product, loading, error } = useDoc<Product>(productRef);
 
   const [visualizing, setVisualizing] = useState(false);
@@ -147,10 +147,17 @@ export default function ProductDetails({ params }: { params: Promise<{ id: strin
 
             <div className="p-8 rounded-[32px] bg-card border border-border/50 shadow-sm space-y-8">
               <div className="flex flex-col sm:flex-row gap-4">
-                <Button size="lg" className="flex-1 h-14 rounded-2xl text-lg font-bold shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all">
-                  <ShoppingCart className="mr-2 h-6 w-6" /> Add to Cart
+                <Button asChild size="lg" variant="outline" className="flex-1 h-14 rounded-2xl text-lg font-bold border-primary/40 text-primary hover:bg-primary/5 transition-all">
+                  <Link href="/cart">
+                    <ShoppingCart className="mr-2 h-5 w-5" /> Add to Cart
+                  </Link>
                 </Button>
-                <Button size="lg" variant="outline" className="h-14 rounded-2xl border-primary text-primary hover:bg-primary/5 px-8">
+                <Button asChild size="lg" className="flex-1 h-14 rounded-2xl text-lg font-bold shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all">
+                  <Link href="/cart">
+                    Buy Now
+                  </Link>
+                </Button>
+                <Button size="lg" variant="outline" className="h-14 rounded-2xl border-primary/20 text-primary hover:bg-primary/5 px-6">
                   <Heart className="h-6 w-6" />
                 </Button>
               </div>
