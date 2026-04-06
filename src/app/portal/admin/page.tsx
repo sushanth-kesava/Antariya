@@ -7,8 +7,41 @@ import { CATEGORIES, Product } from "@/app/lib/mock-data";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
-import { LayoutDashboard, PlusCircle, PackageCheck, AlertCircle, Loader2, Trash2 } from "lucide-react";
-import { createProductOnBackend, deleteProductOnBackend, getProductsFromBackend } from "@/lib/api/products";
+import {
+  LayoutDashboard,
+  PlusCircle,
+  PackageCheck,
+  AlertCircle,
+  Loader2,
+  MessageSquareWarning,
+  ShieldCheck,
+  ShieldX,
+  Flag,
+  History,
+  Trash2,
+  DollarSign,
+  Users,
+  ShoppingCart,
+  ClipboardCheck,
+  Heart,
+} from "lucide-react";
+import {
+  createProductOnBackend,
+  deleteProductOnBackend,
+  getProductsFromBackend,
+  getReviewModerationActivityFromBackend,
+  getReviewModerationQueueFromBackend,
+  ModerationActivityItem,
+  ModerationReview,
+  ReviewModerationStatus,
+  updateReviewModerationOnBackend,
+} from "@/lib/api/products";
+import {
+  AdminDashboardPayload,
+  getAdminDashboardFromBackend,
+  updateAdminOrderStatusOnBackend,
+} from "@/lib/api/orders";
+import { createAccessRequestOnBackend, SuperadminRequestType } from "@/lib/api/superadmin";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5001/api";
 
@@ -19,6 +52,29 @@ export default function AdminPortal() {
   const [authToken, setAuthToken] = useState("");
   const [catalog, setCatalog] = useState<Product[]>([]);
   const [loadingCatalog, setLoadingCatalog] = useState(true);
+  const [moderationQueue, setModerationQueue] = useState<ModerationReview[]>([]);
+  const [loadingModeration, setLoadingModeration] = useState(false);
+  const [moderationStatus, setModerationStatus] = useState<ReviewModerationStatus | "all">("pending");
+  const [moderationSearch, setModerationSearch] = useState("");
+  const [moderationError, setModerationError] = useState<string | null>(null);
+  const [moderatingReviewId, setModeratingReviewId] = useState<string | null>(null);
+  const [moderationActivity, setModerationActivity] = useState<ModerationActivityItem[]>([]);
+  const [loadingModerationActivity, setLoadingModerationActivity] = useState(false);
+  const [moderationActivityError, setModerationActivityError] = useState<string | null>(null);
+  const [dashboardData, setDashboardData] = useState<AdminDashboardPayload | null>(null);
+  const [loadingDashboard, setLoadingDashboard] = useState(false);
+  const [dashboardError, setDashboardError] = useState<string | null>(null);
+  const [orderStatusFilter, setOrderStatusFilter] = useState<"all" | "Processing" | "Shipped" | "Delivered" | "Cancelled">("all");
+  const [orderSearch, setOrderSearch] = useState("");
+  const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
+  const [requestType, setRequestType] = useState<SuperadminRequestType>("feature_request");
+  const [requestTargetEmail, setRequestTargetEmail] = useState("");
+  const [requestTargetName, setRequestTargetName] = useState("");
+  const [requestTitle, setRequestTitle] = useState("");
+  const [requestMessage, setRequestMessage] = useState("");
+  const [requestScopes, setRequestScopes] = useState("");
+  const [submittingRequest, setSubmittingRequest] = useState(false);
+  const [requestSuccess, setRequestSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -64,7 +120,7 @@ export default function AdminPortal() {
           return;
         }
 
-        if (data.user.role !== "admin") {
+        if (data.user.role !== "admin" && data.user.role !== "superadmin") {
           setLoadingCatalog(false);
           router.replace("/");
           return;
@@ -72,8 +128,34 @@ export default function AdminPortal() {
 
         setAuthToken(token);
         setAdminUser(data.user);
-        const products = await getProductsFromBackend({ dealerId: data.user.id });
+        const [products, adminDashboard] = await Promise.all([
+          getProductsFromBackend({ dealerId: data.user.id }),
+          getAdminDashboardFromBackend(token),
+        ]);
         setCatalog(products);
+        setDashboardData(adminDashboard);
+        try {
+          setLoadingModeration(true);
+          const reviews = await getReviewModerationQueueFromBackend(token, { status: "pending" });
+          setModerationQueue(reviews);
+        } catch (moderationLoadError) {
+          console.error("Failed to preload moderation queue", moderationLoadError);
+          setModerationError("Moderation queue could not be loaded right now. You can retry below.");
+        } finally {
+          setLoadingModeration(false);
+        }
+
+        try {
+          setLoadingModerationActivity(true);
+          const activity = await getReviewModerationActivityFromBackend(token, 20);
+          setModerationActivity(activity);
+        } catch (activityLoadError) {
+          console.error("Failed to preload moderation activity", activityLoadError);
+          setModerationActivityError("Moderation activity could not be loaded right now.");
+        } finally {
+          setLoadingModerationActivity(false);
+        }
+
         setLoadingCatalog(false);
         setAuthChecked(true);
       } catch (err) {
@@ -87,6 +169,129 @@ export default function AdminPortal() {
 
     void validateAdminSession();
   }, [router]);
+
+  const loadModerationQueue = async (status = moderationStatus, search = moderationSearch) => {
+    if (!authToken) {
+      return;
+    }
+
+    try {
+      setModerationError(null);
+      setLoadingModeration(true);
+      const reviews = await getReviewModerationQueueFromBackend(authToken, {
+        status,
+        search,
+      });
+      setModerationQueue(reviews);
+    } catch (err) {
+      setModerationError(err instanceof Error ? err.message : "Failed to load moderation queue.");
+    } finally {
+      setLoadingModeration(false);
+    }
+  };
+
+  const loadDashboard = async () => {
+    if (!authToken) {
+      return;
+    }
+
+    try {
+      setDashboardError(null);
+      setLoadingDashboard(true);
+      const payload = await getAdminDashboardFromBackend(authToken);
+      setDashboardData(payload);
+    } catch (err) {
+      setDashboardError(err instanceof Error ? err.message : "Failed to load admin dashboard.");
+    } finally {
+      setLoadingDashboard(false);
+    }
+  };
+
+  const handleOrderStatusUpdate = async (orderId: string, status: "Processing" | "Shipped" | "Delivered" | "Cancelled") => {
+    if (!authToken) {
+      return;
+    }
+
+    try {
+      setUpdatingOrderId(orderId);
+      const updatedOrder = await updateAdminOrderStatusOnBackend(authToken, orderId, status);
+
+      setDashboardData((current) => {
+        if (!current) {
+          return current;
+        }
+
+        const updatedRecentOrders = current.recentOrders.map((order) => (order.id === orderId ? updatedOrder : order));
+
+        const nextBreakdown = { ...current.statusBreakdown };
+        const previousOrder = current.recentOrders.find((order) => order.id === orderId);
+
+        if (previousOrder) {
+          nextBreakdown[previousOrder.status as keyof typeof nextBreakdown] = Math.max(
+            0,
+            (nextBreakdown[previousOrder.status as keyof typeof nextBreakdown] || 0) - 1
+          );
+        }
+
+        nextBreakdown[status] = (nextBreakdown[status] || 0) + 1;
+
+        return {
+          ...current,
+          recentOrders: updatedRecentOrders,
+          statusBreakdown: nextBreakdown,
+        };
+      });
+    } catch (err) {
+      setDashboardError(err instanceof Error ? err.message : "Failed to update order status.");
+    } finally {
+      setUpdatingOrderId(null);
+    }
+  };
+
+  const loadModerationActivity = async () => {
+    if (!authToken) {
+      return;
+    }
+
+    try {
+      setModerationActivityError(null);
+      setLoadingModerationActivity(true);
+      const activity = await getReviewModerationActivityFromBackend(authToken, 20);
+      setModerationActivity(activity);
+    } catch (err) {
+      setModerationActivityError(err instanceof Error ? err.message : "Failed to load moderation activity.");
+    } finally {
+      setLoadingModerationActivity(false);
+    }
+  };
+
+  const handleModerationAction = async (reviewId: string, moderationStatus: ReviewModerationStatus) => {
+    if (!authToken) {
+      return;
+    }
+
+    try {
+      setModerationError(null);
+      setModeratingReviewId(reviewId);
+
+      const wantsNote = moderationStatus === "hidden" || moderationStatus === "flagged";
+      const moderationNote = wantsNote
+        ? window.prompt("Optional moderation note (visible to admins only):", "")?.trim() || undefined
+        : undefined;
+
+      await updateReviewModerationOnBackend(authToken, reviewId, {
+        moderationStatus,
+        moderationNote,
+      });
+
+      await loadModerationQueue();
+      await loadModerationActivity();
+    } catch (err) {
+      setModerationError(err instanceof Error ? err.message : "Failed to update moderation status.");
+    } finally {
+      setModeratingReviewId(null);
+    }
+  };
 
   if (!authChecked) {
     return (
@@ -150,6 +355,61 @@ export default function AdminPortal() {
     }
   };
 
+  const handleSubmitRequest = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!authToken) {
+      return;
+    }
+
+    try {
+      setSubmittingRequest(true);
+      setRequestSuccess(null);
+      setError(null);
+
+      const requestedScopes = requestScopes
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean);
+
+      await createAccessRequestOnBackend(authToken, {
+        requestType,
+        title: requestTitle,
+        message: requestMessage,
+        targetEmail: requestTargetEmail.trim() || undefined,
+        targetName: requestTargetName.trim() || undefined,
+        requestedScopes,
+      });
+
+      setRequestSuccess("Request submitted to the superadmin queue.");
+      setRequestType("feature_request");
+      setRequestTargetEmail("");
+      setRequestTargetName("");
+      setRequestTitle("");
+      setRequestMessage("");
+      setRequestScopes("");
+      setTimeout(() => setRequestSuccess(null), 5000);
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "Failed to submit request.");
+    } finally {
+      setSubmittingRequest(false);
+    }
+  };
+
+  const visibleOrders = (dashboardData?.recentOrders || []).filter((order) => {
+    const matchesStatus = orderStatusFilter === "all" ? true : order.status === orderStatusFilter;
+    const searchValue = orderSearch.trim().toLowerCase();
+    const matchesSearch =
+      searchValue.length === 0
+        ? true
+        : [order.id, order.userEmail || "", order.status, ...(order.items || []).map((item) => item.name || "")]
+            .join(" ")
+            .toLowerCase()
+            .includes(searchValue);
+
+    return matchesStatus && matchesSearch;
+  });
+
   return (
     <div className="min-h-screen bg-gray-50/50 flex flex-col font-sans">
       <Navbar />
@@ -183,6 +443,283 @@ export default function AdminPortal() {
 
         {/* Main Content Area */}
         <main className="flex-1 max-w-3xl">
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold font-headline tracking-tight text-gray-900 mb-4">Superadmin Request Center</h2>
+            <Card className="rounded-[32px] border-gray-100 shadow-sm bg-white">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-xl">
+                  <ShieldCheck className="h-5 w-5 text-primary" /> Request Approval
+                </CardTitle>
+                <CardDescription>
+                  Submit admin account approvals, superadmin access requests, or feature requests for review.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {requestSuccess ? (
+                  <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                    {requestSuccess}
+                  </div>
+                ) : null}
+
+                <form className="space-y-4" onSubmit={handleSubmitRequest}>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2">Request Type</label>
+                      <select
+                        title="Request Type"
+                        aria-label="Request Type"
+                        value={requestType}
+                        onChange={(e) => setRequestType(e.target.value as SuperadminRequestType)}
+                        className="w-full h-11 rounded-xl border border-gray-200 bg-gray-50 px-3 text-sm outline-none focus:ring-2 focus:ring-primary"
+                      >
+                        <option value="feature_request">Feature request</option>
+                        <option value="admin_approval">Admin account approval</option>
+                        <option value="superadmin_access">Superadmin access request</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2">Target Email</label>
+                      <Input
+                        placeholder="person@example.com"
+                        value={requestTargetEmail}
+                        onChange={(e) => setRequestTargetEmail(e.target.value)}
+                        className="h-11 rounded-xl border-gray-200 bg-gray-50"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2">Target Name</label>
+                      <Input
+                        placeholder="Display name"
+                        value={requestTargetName}
+                        onChange={(e) => setRequestTargetName(e.target.value)}
+                        className="h-11 rounded-xl border-gray-200 bg-gray-50"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2">Requested Scopes</label>
+                      <Input
+                        placeholder="portal:admin, orders:review"
+                        value={requestScopes}
+                        onChange={(e) => setRequestScopes(e.target.value)}
+                        className="h-11 rounded-xl border-gray-200 bg-gray-50"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">Title</label>
+                    <Input
+                      required
+                      placeholder="Reason for the request"
+                      value={requestTitle}
+                      onChange={(e) => setRequestTitle(e.target.value)}
+                      className="h-11 rounded-xl border-gray-200 bg-gray-50"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">Message</label>
+                    <textarea
+                      required
+                      rows={4}
+                      placeholder="Describe why this access or feature is needed"
+                      value={requestMessage}
+                      onChange={(e) => setRequestMessage(e.target.value)}
+                      className="w-full rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm outline-none focus:ring-2 focus:ring-primary"
+                    />
+                  </div>
+
+                  <Button type="submit" className="rounded-full" disabled={submittingRequest}>
+                    {submittingRequest ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Send to Superadmin
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold font-headline tracking-tight text-gray-900 mb-4">Operations Overview</h2>
+            <Card className="rounded-[32px] border-gray-100 shadow-sm bg-white">
+              <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                <div>
+                  <CardTitle className="text-xl">Live Business Snapshot</CardTitle>
+                  <CardDescription>Admin metrics inspired by customer dashboard depth, focused on store operations.</CardDescription>
+                </div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="h-10 rounded-xl"
+                  onClick={() => loadDashboard()}
+                  disabled={loadingDashboard}
+                >
+                  {loadingDashboard ? <Loader2 className="h-4 w-4 animate-spin" /> : "Refresh"}
+                </Button>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {dashboardError ? (
+                  <div className="p-3 rounded-xl border border-red-200 bg-red-50 text-red-700 text-sm">{dashboardError}</div>
+                ) : null}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                  <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4">
+                    <p className="text-xs uppercase tracking-wide text-emerald-700 font-semibold">Revenue</p>
+                    <p className="text-2xl font-black text-emerald-900 mt-1 flex items-center gap-2">
+                      <DollarSign className="h-5 w-5" />
+                      {Number(dashboardData?.summary.totalRevenue || 0).toFixed(2)}
+                    </p>
+                    <p className="text-sm text-emerald-700 mt-1">AOV ${Number(dashboardData?.summary.averageOrderValue || 0).toFixed(2)}</p>
+                  </div>
+
+                  <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
+                    <p className="text-xs uppercase tracking-wide text-blue-700 font-semibold">Orders</p>
+                    <p className="text-2xl font-black text-blue-900 mt-1 flex items-center gap-2">
+                      <ShoppingCart className="h-5 w-5" />
+                      {dashboardData?.summary.totalOrders || 0}
+                    </p>
+                    <p className="text-sm text-blue-700 mt-1">{dashboardData?.summary.todayOrders || 0} placed today</p>
+                  </div>
+
+                  <div className="rounded-2xl border border-violet-100 bg-violet-50/70 p-4">
+                    <p className="text-xs uppercase tracking-wide text-violet-700 font-semibold">Customers</p>
+                    <p className="text-2xl font-black text-violet-900 mt-1 flex items-center gap-2">
+                      <Users className="h-5 w-5" />
+                      {dashboardData?.summary.customers || 0}
+                    </p>
+                    <p className="text-sm text-violet-700 mt-1">Active shopper accounts</p>
+                  </div>
+
+                  <div className="rounded-2xl border border-rose-100 bg-rose-50/70 p-4">
+                    <p className="text-xs uppercase tracking-wide text-rose-700 font-semibold">Attention Needed</p>
+                    <p className="text-2xl font-black text-rose-900 mt-1 flex items-center gap-2">
+                      <ClipboardCheck className="h-5 w-5" />
+                      {(dashboardData?.summary.lowStockProducts || 0) + (dashboardData?.summary.pendingReviews || 0)}
+                    </p>
+                    <p className="text-sm text-rose-700 mt-1">
+                      {dashboardData?.summary.lowStockProducts || 0} low stock, {dashboardData?.summary.pendingReviews || 0} pending reviews
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+                  <div className="xl:col-span-2 rounded-2xl border border-gray-100 bg-gray-50/60 p-4">
+                    <div className="flex flex-col gap-3 mb-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm font-semibold text-gray-800">Recent Orders</p>
+                        <span className="text-xs text-gray-500">Latest 8</span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                        <select
+                          title="Order status filter"
+                          aria-label="Order status filter"
+                          value={orderStatusFilter}
+                          onChange={(event) => setOrderStatusFilter(event.target.value as typeof orderStatusFilter)}
+                          className="w-full h-10 rounded-xl border border-gray-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary"
+                        >
+                          <option value="all">All statuses</option>
+                          <option value="Processing">Processing</option>
+                          <option value="Shipped">Shipped</option>
+                          <option value="Delivered">Delivered</option>
+                          <option value="Cancelled">Cancelled</option>
+                        </select>
+                        <Input
+                          placeholder="Search by order, customer, item"
+                          value={orderSearch}
+                          onChange={(event) => setOrderSearch(event.target.value)}
+                          className="h-10 rounded-xl border-gray-200 bg-white"
+                        />
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          className="h-10 rounded-xl"
+                          onClick={() => {
+                            setOrderStatusFilter("all");
+                            setOrderSearch("");
+                          }}
+                        >
+                          Clear Filters
+                        </Button>
+                      </div>
+                    </div>
+
+                    {!dashboardData?.recentOrders?.length ? (
+                      <p className="text-sm text-muted-foreground">No orders yet.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {visibleOrders.slice(0, 5).map((order) => (
+                          <div key={order.id} className="rounded-xl border border-white bg-white px-3 py-2 flex items-center justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-semibold text-gray-900">{order.userEmail || "Customer"}</p>
+                              <p className="text-xs text-gray-500">{new Date(order.createdAt).toLocaleString()} • {order.items?.length || 0} items</p>
+                            </div>
+                            <div className="flex flex-col items-end gap-2 text-right">
+                              <div>
+                                <p className="text-sm font-bold text-gray-900">${Number(order.total || 0).toFixed(2)}</p>
+                                <p className="text-xs text-gray-500">{order.status}</p>
+                              </div>
+                              <select
+                                title={`Update order ${order.id} status`}
+                                aria-label={`Update order ${order.id} status`}
+                                value={order.status}
+                                onChange={(event) => handleOrderStatusUpdate(order.id, event.target.value as any)}
+                                disabled={updatingOrderId === order.id}
+                                className="h-9 rounded-lg border border-gray-200 bg-white px-2 text-xs outline-none focus:ring-2 focus:ring-primary"
+                              >
+                                <option value="Processing">Processing</option>
+                                <option value="Shipped">Shipped</option>
+                                <option value="Delivered">Delivered</option>
+                                <option value="Cancelled">Cancelled</option>
+                              </select>
+                            </div>
+                          </div>
+                        ))}
+                        {visibleOrders.length === 0 ? (
+                          <div className="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-6 text-sm text-muted-foreground text-center">
+                            No orders match the current filters.
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="rounded-2xl border border-gray-100 bg-gray-50/60 p-4 space-y-3">
+                    <p className="text-sm font-semibold text-gray-800">Order Status Mix</p>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center justify-between rounded-lg bg-white px-3 py-2 border border-gray-100">
+                        <span>Processing</span>
+                        <span className="font-bold">{dashboardData?.statusBreakdown.Processing || 0}</span>
+                      </div>
+                      <div className="flex items-center justify-between rounded-lg bg-white px-3 py-2 border border-gray-100">
+                        <span>Shipped</span>
+                        <span className="font-bold">{dashboardData?.statusBreakdown.Shipped || 0}</span>
+                      </div>
+                      <div className="flex items-center justify-between rounded-lg bg-white px-3 py-2 border border-gray-100">
+                        <span>Delivered</span>
+                        <span className="font-bold">{dashboardData?.statusBreakdown.Delivered || 0}</span>
+                      </div>
+                      <div className="flex items-center justify-between rounded-lg bg-white px-3 py-2 border border-gray-100">
+                        <span>Cancelled</span>
+                        <span className="font-bold">{dashboardData?.statusBreakdown.Cancelled || 0}</span>
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-dashed border-gray-300 bg-white px-3 py-3">
+                      <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Customer Intent</p>
+                      <p className="text-lg font-black text-gray-900 mt-1 flex items-center gap-2">
+                        <Heart className="h-4 w-4 text-rose-500" />
+                        {dashboardData?.summary.wishlistItems || 0}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">Products currently wishlisted</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
           <Card className="rounded-[32px] border-gray-100 shadow-xl overflow-hidden bg-white">
             <CardHeader className="bg-gray-50/50 border-b border-gray-100 p-8">
               <CardTitle className="text-3xl font-black font-headline tracking-tight text-gray-900">Add New Product</CardTitle>
@@ -362,6 +899,171 @@ export default function AdminPortal() {
                 </div>
               )}
             </div>
+          </div>
+
+          <div className="mt-8">
+            <h2 className="text-2xl font-bold font-headline tracking-tight text-gray-900 mb-4">Review Moderation</h2>
+            <Card className="rounded-[32px] border-gray-100 shadow-sm bg-white">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-xl">
+                  <MessageSquareWarning className="h-5 w-5 text-amber-600" />
+                  Moderation Queue
+                </CardTitle>
+                <CardDescription>Approve, hide, or flag customer reviews to keep your catalog trustworthy.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <select
+                    title="Review status filter"
+                    aria-label="Review status filter"
+                    value={moderationStatus}
+                    onChange={(e) => setModerationStatus(e.target.value as ReviewModerationStatus | "all")}
+                    className="w-full h-11 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <option value="all">All statuses</option>
+                    <option value="pending">Pending</option>
+                    <option value="approved">Approved</option>
+                    <option value="hidden">Hidden</option>
+                    <option value="flagged">Flagged</option>
+                  </select>
+                  <Input
+                    placeholder="Search by title, review text, or user"
+                    value={moderationSearch}
+                    onChange={(e) => setModerationSearch(e.target.value)}
+                    className="h-11 rounded-xl border-gray-200 bg-gray-50 focus:bg-white"
+                  />
+                  <Button
+                    type="button"
+                    onClick={() => loadModerationQueue()}
+                    disabled={loadingModeration}
+                    className="h-11 rounded-xl"
+                    variant="secondary"
+                  >
+                    {loadingModeration ? <Loader2 className="h-4 w-4 animate-spin" /> : "Refresh Queue"}
+                  </Button>
+                </div>
+
+                {moderationError ? (
+                  <div className="p-3 rounded-xl border border-red-200 bg-red-50 text-red-700 text-sm">{moderationError}</div>
+                ) : null}
+
+                {loadingModeration ? (
+                  <div className="p-6 text-center text-muted-foreground">
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" /> Loading reviews...
+                  </div>
+                ) : moderationQueue.length === 0 ? (
+                  <div className="p-6 text-center text-muted-foreground border border-dashed rounded-xl">No reviews found for this filter.</div>
+                ) : (
+                  <div className="space-y-3">
+                    {moderationQueue.map((review) => (
+                      <div key={review.id} className="border border-gray-200 rounded-2xl p-4 bg-gray-50/40">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm text-gray-500">{review.productName} • {review.productCategory || "General"}</p>
+                            <h3 className="font-bold text-gray-900">{review.title}</h3>
+                            <p className="text-sm text-gray-500">By {review.userName} ({review.userEmail}) • {new Date(review.createdAt).toLocaleDateString()}</p>
+                          </div>
+                          <span className="text-xs px-2 py-1 rounded-full bg-gray-200 text-gray-700 font-semibold uppercase">{review.moderationStatus}</span>
+                        </div>
+                        <p className="text-sm text-gray-700 mt-2">{review.comment}</p>
+
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            className="rounded-lg"
+                            onClick={() => handleModerationAction(review.id, "approved")}
+                            disabled={moderatingReviewId === review.id}
+                          >
+                            <ShieldCheck className="h-4 w-4 mr-1" /> Approve
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            className="rounded-lg"
+                            onClick={() => handleModerationAction(review.id, "hidden")}
+                            disabled={moderatingReviewId === review.id}
+                          >
+                            <ShieldX className="h-4 w-4 mr-1" /> Hide
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            className="rounded-lg"
+                            onClick={() => handleModerationAction(review.id, "flagged")}
+                            disabled={moderatingReviewId === review.id}
+                          >
+                            <Flag className="h-4 w-4 mr-1" /> Flag
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="mt-8">
+            <h2 className="text-2xl font-bold font-headline tracking-tight text-gray-900 mb-4">Moderation Activity</h2>
+            <Card className="rounded-[32px] border-gray-100 shadow-sm bg-white">
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between gap-3 text-xl">
+                  <span className="flex items-center gap-2">
+                    <History className="h-5 w-5 text-slate-700" /> Recent Actions
+                  </span>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="h-9 rounded-xl"
+                    onClick={() => loadModerationActivity()}
+                    disabled={loadingModerationActivity}
+                  >
+                    {loadingModerationActivity ? <Loader2 className="h-4 w-4 animate-spin" /> : "Refresh"}
+                  </Button>
+                </CardTitle>
+                <CardDescription>Audit trail of the latest review moderation changes.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {moderationActivityError ? (
+                  <div className="p-3 rounded-xl border border-red-200 bg-red-50 text-red-700 text-sm">{moderationActivityError}</div>
+                ) : null}
+
+                {loadingModerationActivity ? (
+                  <div className="p-6 text-center text-muted-foreground">
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" /> Loading moderation activity...
+                  </div>
+                ) : moderationActivity.length === 0 ? (
+                  <div className="p-6 text-center text-muted-foreground border border-dashed rounded-xl">No moderation activity yet.</div>
+                ) : (
+                  moderationActivity.map((item) => (
+                    <div key={`${item.id}-${item.moderatedAt || item.createdAt}`} className="rounded-2xl border border-gray-200 bg-gray-50/40 p-4">
+                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                        <div>
+                          <p className="font-semibold text-gray-900">{item.productName}</p>
+                          <p className="text-sm text-gray-500">Review: {item.title}</p>
+                        </div>
+                        <span className="text-xs px-2 py-1 rounded-full bg-gray-200 text-gray-700 font-semibold uppercase">
+                          {item.moderationStatus}
+                        </span>
+                      </div>
+                      <div className="mt-2 text-sm text-gray-600">
+                        <p>
+                          Action by <span className="font-semibold text-gray-800">{item.moderatorName}</span>{" "}
+                          on {new Date(item.moderatedAt || item.createdAt).toLocaleString()}
+                        </p>
+                        {item.moderationNote ? (
+                          <p className="mt-1 rounded-lg bg-white px-3 py-2 border border-gray-200">Note: {item.moderationNote}</p>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
           </div>
 
         </main>

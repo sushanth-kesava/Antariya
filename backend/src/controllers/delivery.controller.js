@@ -17,6 +17,8 @@ function mapDelhiveryResponse(data, requestedPincode) {
   const prepaidSupported = postal.pre_paid === "Y" || postal.pre_paid === true;
   const district = postal.district || postal.city || "Unknown";
   const state = postal.state_code || postal.state || "Unknown";
+  const dispatchDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  const returnEligible = codSupported || prepaidSupported;
 
   return {
     success: true,
@@ -29,6 +31,9 @@ function mapDelhiveryResponse(data, requestedPincode) {
     prepaidSupported,
     eta: "2-7 business days",
     shipping: "Shipping calculated at checkout",
+    estimatedDispatchDate: dispatchDate,
+    lastMilePartner: "Delhivery",
+    returnEligible,
   };
 }
 

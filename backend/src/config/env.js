@@ -10,6 +10,22 @@ const env = {
   jwtSecret: process.env.JWT_SECRET,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN,
   frontendUrl: process.env.FRONTEND_URL || "http://localhost:9002",
+  adminAllowedEmails: String(process.env.ADMIN_ALLOWED_EMAILS || "")
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean),
+  superAdminAllowedEmails: (process.env.SUPERADMIN_ALLOWED_EMAILS
+    ? String(process.env.SUPERADMIN_ALLOWED_EMAILS)
+    : [
+        "2300030795cseird@gmail.com",
+        "sushanthkesava@gmail.com",
+        "annabathulasarath@gmail.com",
+        "abhijnavinjamuri@gmail.com",
+        "lakshmisnehitha52@gmail.com",
+      ].join(","))
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean),
   googleUserInfoUrl: process.env.GOOGLE_USERINFO_URL || "https://www.googleapis.com/oauth2/v3/userinfo",
   delhiveryApiKey: process.env.DELHIVERY_API_KEY,
   delhiveryBaseUrl: process.env.DELHIVERY_BASE_URL || "https://track.delhivery.com",

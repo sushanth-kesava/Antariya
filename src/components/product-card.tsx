@@ -7,9 +7,10 @@ import { Button } from "@/components/ui/button";
 import { ShoppingCart, Heart, Star, Download } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { addProductToCart, ProductCustomization } from "@/lib/cart";
+import { getWishlistFromBackend, setWishlistItemOnBackend } from "@/lib/api/wishlist";
 import {
   Dialog,
   DialogContent,
@@ -31,6 +32,8 @@ export function ProductCard({ product }: ProductCardProps) {
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const isDesign = product.category === 'Embroidery Designs';
   const isCustomizable = Boolean(product.customizable);
+  const [isWishlisted, setIsWishlisted] = useState(false);
+  const [wishlistLoading, setWishlistLoading] = useState(false);
   const [openCustomizer, setOpenCustomizer] = useState(false);
   const [referencePreview, setReferencePreview] = useState<string | null>(null);
   const [referenceFileName, setReferenceFileName] = useState<string | null>(null);
@@ -45,11 +48,52 @@ export function ProductCard({ product }: ProductCardProps) {
     notes: "",
   });
   const [quantity, setQuantity] = useState(1);
+  const lowStockThreshold = 10;
+  const isLowStock = product.stock > 0 && product.stock <= lowStockThreshold;
 
   const symbols = ["Lotus Mandala", "Peacock Crest", "Floral Vine", "Royal Monogram", "Om Motif"];
   const threadColors = ["Gold", "Silver", "Ruby Red", "Emerald", "Royal Blue", "Ivory"];
   const fabricColors = ["Black", "Navy", "White", "Maroon", "Forest Green", "Beige"];
   const placements = ["Left Chest", "Center Chest", "Sleeve", "Back", "Pocket"];
+
+  useEffect(() => {
+    const loadWishlistState = async () => {
+      const token = localStorage.getItem("app_auth_token");
+
+      if (!token) {
+        setIsWishlisted(false);
+        return;
+      }
+
+      try {
+        const items = await getWishlistFromBackend(token);
+        setIsWishlisted(items.some((item) => item.productId === product.id));
+      } catch (wishlistError) {
+        console.error("Failed to load wishlist state", wishlistError);
+      }
+    };
+
+    void loadWishlistState();
+  }, [product.id]);
+
+  const handleWishlistToggle = async () => {
+    const token = localStorage.getItem("app_auth_token");
+
+    if (!token) {
+      router.push("/login");
+      return;
+    }
+
+    try {
+      setWishlistLoading(true);
+      const result = await setWishlistItemOnBackend(token, product.id, !isWishlisted);
+      setIsWishlisted(result.saved);
+    } catch (wishlistError) {
+      console.error("Failed to update wishlist", wishlistError);
+    } finally {
+      setWishlistLoading(false);
+    }
+  };
 
   const handleReferenceUpload = (file: File | undefined) => {
     if (!file) {
@@ -109,9 +153,31 @@ export function ProductCard({ product }: ProductCardProps) {
             </Badge>
           </div>
         )}
-        <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Button variant="secondary" size="icon" className="h-8 w-8 rounded-full bg-white/90 backdrop-blur shadow-sm">
-            <Heart className="h-4 w-4 text-secondary" />
+        {product.stock === 0 ? (
+          <div className="absolute top-2 left-2">
+            <Badge className="bg-red-500/90 text-white border-none shadow-sm">Out of stock</Badge>
+          </div>
+        ) : isLowStock ? (
+          <div className="absolute top-2 left-2">
+            <Badge className="bg-amber-500/90 text-white border-none shadow-sm">Only {product.stock} left</Badge>
+          </div>
+        ) : null}
+        <div className="absolute bottom-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button
+            type="button"
+            variant="secondary"
+            size="icon"
+            className={`h-8 w-8 rounded-full bg-white/90 backdrop-blur shadow-sm ${isWishlisted ? "text-rose-600" : ""}`}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              void handleWishlistToggle();
+            }}
+            disabled={wishlistLoading}
+            aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
+            title={isWishlisted ? "Saved to wishlist" : "Save to wishlist"}
+          >
+            <Heart className={`h-4 w-4 ${isWishlisted ? "fill-current" : "text-secondary"}`} />
           </Button>
         </div>
       </Link>

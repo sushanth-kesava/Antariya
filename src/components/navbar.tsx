@@ -15,6 +15,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useState, useEffect } from "react";
 import { googleLogout } from '@react-oauth/google';
+import { CART_UPDATED_EVENT, getCartItemCount } from "@/lib/cart";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5001/api";
 
@@ -27,6 +28,7 @@ function clearLocalSession() {
 export function Navbar() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [cartCount, setCartCount] = useState(0);
 
   // Validate session against backend on mount.
   useEffect(() => {
@@ -67,6 +69,21 @@ export function Navbar() {
     };
 
     void loadUser();
+  }, []);
+
+  useEffect(() => {
+    const syncCartCount = () => {
+      setCartCount(getCartItemCount());
+    };
+
+    syncCartCount();
+    window.addEventListener(CART_UPDATED_EVENT, syncCartCount);
+    window.addEventListener("storage", syncCartCount);
+
+    return () => {
+      window.removeEventListener(CART_UPDATED_EVENT, syncCartCount);
+      window.removeEventListener("storage", syncCartCount);
+    };
   }, []);
 
   const handleLogout = () => {
@@ -126,7 +143,7 @@ export function Navbar() {
             <Button variant="ghost" size="icon" className="relative rounded-full">
               <ShoppingCart className="h-5 w-5" />
               <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-[10px] bg-secondary border-2 border-background" variant="default">
-                3
+                {cartCount}
               </Badge>
             </Button>
           </Link>

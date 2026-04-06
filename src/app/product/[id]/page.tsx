@@ -1,10 +1,12 @@
 "use client";
 
+import Head from "next/head";
 import { Navbar } from "@/components/navbar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { 
   ShoppingCart, 
   Heart, 
@@ -15,20 +17,70 @@ import {
   Sparkles,
   RefreshCw,
   AlertCircle,
-  Upload
+  Upload,
+  MapPin,
+  Clock3,
+  Wallet,
+  LocateFixed,
+  Ruler,
+  Maximize2,
+  ChevronLeft,
+  ChevronRight,
+  CalendarDays,
+  RotateCcw
 } from "lucide-react";
 import Image from "next/image";
-import { useRef, useState, use, useEffect } from "react";
+import { useRef, useState, use, useEffect, useMemo } from "react";
 import { embroideryDesignVisualizer } from "@/ai/flows/embroidery-design-visualizer";
 import { Product } from "@/app/lib/mock-data";
 import Link from "next/link";
-import { getProductByIdFromBackend } from "@/lib/api/products";
+import { useRouter } from "next/navigation";
+import {
+  addProductReviewOnBackend,
+  getProductByIdFromBackend,
+  getProductReviewsFromBackend,
+  ProductReview,
+  ProductReviewTag,
+} from "@/lib/api/products";
 import { addProductToCart, ProductCustomization } from "@/lib/cart";
 import { checkDeliveryByPincode } from "@/lib/api/delivery";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
+import { getWishlistFromBackend, setWishlistItemOnBackend } from "@/lib/api/wishlist";
+
+const LAST_SUCCESSFUL_PINCODE_KEY = "antariya_last_successful_pincode";
+const APPAREL_CATEGORIES = new Set(["Hoodies", "Blouses"]);
+
+type ReviewTag = "All" | "Quality" | "Fit" | "Delivery" | "Customization";
+
+function getSizeChart(category: string) {
+  if (category === "Hoodies") {
+    return [
+      { size: "Small", chest: "88-95 cm", bodyLength: "66 cm" },
+      { size: "Medium", chest: "96-103 cm", bodyLength: "69 cm" },
+      { size: "Large", chest: "104-111 cm", bodyLength: "72 cm" },
+    ] as const;
+  }
+
+  return [
+    { size: "Small", chest: "82-88 cm", bodyLength: "36 cm" },
+    { size: "Medium", chest: "89-95 cm", bodyLength: "38 cm" },
+    { size: "Large", chest: "96-102 cm", bodyLength: "40 cm" },
+  ] as const;
+}
+
+function recommendSize(chestCm: number, preference: "Regular" | "Relaxed" | "Slim", category: string) {
+  const chart = getSizeChart(category);
+
+  const adjustedChest = preference === "Relaxed" ? chestCm + 3 : preference === "Slim" ? chestCm - 2 : chestCm;
+
+  if (adjustedChest <= Number(chart[0].chest.split("-")[1].replace(" cm", ""))) return "Small";
+  if (adjustedChest <= Number(chart[1].chest.split("-")[1].replace(" cm", ""))) return "Medium";
+  return "Large";
+}
 
 type DeliveryResult =
   | {
@@ -48,6 +100,9 @@ type DeliveryResult =
       shipping: string;
       codSupported: boolean;
       prepaidSupported: boolean;
+      estimatedDispatchDate: string;
+      lastMilePartner: string;
+      returnEligible: boolean;
     }
   | {
       status: "unavailable";
@@ -103,6 +158,8 @@ function getCareNotes(productCategory: string) {
 
 export default function ProductDetails({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const router = useRouter();
+  const { toast } = useToast();
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
@@ -133,6 +190,25 @@ export default function ProductDetails({ params }: { params: Promise<{ id: strin
   const [referencePreview, setReferencePreview] = useState<string | null>(null);
   const [referenceFileName, setReferenceFileName] = useState<string | null>(null);
   const [deliveryPincode, setDeliveryPincode] = useState("");
+  const [locatingPincode, setLocatingPincode] = useState(false);
+  const [reviewFilter, setReviewFilter] = useState<ReviewTag>("All");
+  const [reviews, setReviews] = useState<ProductReview[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(true);
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [reviewForm, setReviewForm] = useState({
+    rating: 5,
+    title: "",
+    comment: "",
+    tags: [] as ProductReviewTag[],
+  });
+  const [openSizeGuide, setOpenSizeGuide] = useState(false);
+  const [openFullscreenGallery, setOpenFullscreenGallery] = useState(false);
+  const [selectedGalleryImage, setSelectedGalleryImage] = useState<string | null>(null);
+  const [zoomOrigin, setZoomOrigin] = useState("50% 50%");
+  const [wishlistLoading, setWishlistLoading] = useState(false);
+  const [isWishlisted, setIsWishlisted] = useState(false);
+  const [bodyChestCm, setBodyChestCm] = useState(96);
+  const [fitPreference, setFitPreference] = useState<"Regular" | "Relaxed" | "Slim">("Regular");
   const [deliveryResult, setDeliveryResult] = useState<DeliveryResult>({
     status: "idle",
     message: "Check delivery availability by entering your 6-digit pincode.",
@@ -152,6 +228,148 @@ export default function ProductDetails({ params }: { params: Promise<{ id: strin
   const threadColors = ["Gold", "Silver", "Ruby Red", "Emerald", "Royal Blue", "Ivory"];
   const fabricColors = ["Black", "Navy", "White", "Maroon", "Forest Green", "Beige"];
   const placements = ["Left Chest", "Center Chest", "Sleeve", "Back", "Pocket"];
+  const isApparelProduct = APPAREL_CATEGORIES.has(product?.category || "");
+  const galleryImages = useMemo(() => {
+    if (!product) {
+      return [] as string[];
+    }
+
+    const images = Array.isArray(product.galleryImages) ? product.galleryImages : [];
+    const normalized = images.filter((entry) => typeof entry === "string" && entry.trim().length > 0);
+
+    if (!normalized.includes(product.image)) {
+      normalized.unshift(product.image);
+    }
+
+    return normalized.length > 0 ? normalized : [product.image];
+  }, [product]);
+
+  const activeImage = selectedGalleryImage || galleryImages[0] || product?.image;
+  const displayImage = visualizedImg || activeImage || product?.image || "";
+  const lowStockThreshold = 10;
+  const isLowStock = Boolean(product && product.stock > 0 && product.stock <= lowStockThreshold);
+  const stockBadgeLabel = product?.stock === 0 ? "Out of stock" : isLowStock ? `Only ${product?.stock} left` : `In stock: ${product?.stock}`;
+  const expectedDeliveryRange = useMemo(() => {
+    if (deliveryResult.status === "available") {
+      return deliveryResult.eta;
+    }
+
+    return isApparelProduct ? "2-7 business days" : "3-6 business days";
+  }, [deliveryResult, isApparelProduct]);
+  const productSeoTitle = product ? `${product.name} | Antariya` : "Antariya | Premium Embroidery Marketplace";
+  const productSeoDescription = product
+    ? `${product.name} from Antariya. ${product.description} Delivered with live pincode checks, customizable options, and trusted delivery updates.`
+    : "Antariya premium embroidery marketplace.";
+  const structuredData = product
+    ? {
+        "@context": "https://schema.org",
+        "@type": "Product",
+        name: product.name,
+        description: product.description,
+        image: galleryImages,
+        sku: product.id,
+        brand: { "@type": "Brand", name: "Antariya" },
+        offers: {
+          "@type": "Offer",
+          url: `${typeof window !== "undefined" ? window.location.origin : ""}/product/${product.id}`,
+          priceCurrency: "INR",
+          price: product.price,
+          availability: product.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+        },
+        aggregateRating: product.rating
+          ? {
+              "@type": "AggregateRating",
+              ratingValue: product.rating,
+              reviewCount: reviews.length || 1,
+            }
+          : undefined,
+      }
+    : null;
+
+  useEffect(() => {
+    if (galleryImages.length > 0) {
+      setSelectedGalleryImage(galleryImages[0]);
+    }
+  }, [galleryImages]);
+
+  const filteredReviews = useMemo(() => {
+    if (reviewFilter === "All") {
+      return reviews;
+    }
+
+    return reviews.filter((review) => review.tags.includes(reviewFilter as ProductReviewTag));
+  }, [reviewFilter, reviews]);
+
+  const averageRating = useMemo(() => {
+    if (reviews.length === 0) return "0.0";
+    const total = reviews.reduce((sum, review) => sum + review.rating, 0);
+    return (total / reviews.length).toFixed(1);
+  }, [reviews]);
+
+  const recommendedSize = useMemo(() => {
+    if (!isApparelProduct || !product) {
+      return null;
+    }
+
+    return recommendSize(bodyChestCm, fitPreference, product.category);
+  }, [bodyChestCm, fitPreference, isApparelProduct, product]);
+
+  useEffect(() => {
+    const savedPincode = localStorage.getItem(LAST_SUCCESSFUL_PINCODE_KEY);
+
+    if (savedPincode && /^\d{6}$/.test(savedPincode)) {
+      setDeliveryPincode(savedPincode);
+      setDeliveryResult({
+        status: "idle",
+        message: `Last used pincode ${savedPincode} restored. Click Check to refresh live availability.`,
+      });
+    }
+  }, []);
+
+  const persistSuccessfulPincode = (pincode: string) => {
+    localStorage.setItem(LAST_SUCCESSFUL_PINCODE_KEY, pincode);
+  };
+
+  useEffect(() => {
+    const loadReviews = async () => {
+      setReviewsLoading(true);
+
+      try {
+        const reviewData = await getProductReviewsFromBackend(id);
+        setReviews(reviewData);
+      } catch (reviewError) {
+        console.error("Failed to load reviews", reviewError);
+      } finally {
+        setReviewsLoading(false);
+      }
+    };
+
+    void loadReviews();
+  }, [id]);
+
+  useEffect(() => {
+    const loadWishlistState = async () => {
+      if (!product) {
+        return;
+      }
+
+      const token = localStorage.getItem("app_auth_token");
+
+      if (!token) {
+        setIsWishlisted(false);
+        return;
+      }
+
+      try {
+        const items = await getWishlistFromBackend(token);
+        setIsWishlisted(items.some((item) => item.productId === product.id));
+      } catch (wishlistError) {
+        console.error("Failed to load wishlist state", wishlistError);
+      }
+    };
+
+    void loadWishlistState();
+  }, [product]);
 
   const handleReferenceUpload = (file: File | undefined) => {
     if (!file) {
@@ -187,6 +405,128 @@ export default function ProductDetails({ params }: { params: Promise<{ id: strin
     setQuantity(1);
     setReferencePreview(null);
     setReferenceFileName(null);
+    toast({
+      title: "Customized item added",
+      description: `${product.name} was added to your cart with selected options.`,
+    });
+  };
+
+  const handleAddToCart = () => {
+    if (!product) return;
+
+    addProductToCart(product, 1);
+    toast({
+      title: "Added to cart",
+      description: `${product.name} has been added.`,
+    });
+  };
+
+  const handleWishlistToggle = async () => {
+    if (!product || wishlistLoading) {
+      return;
+    }
+
+    const token = localStorage.getItem("app_auth_token");
+
+    if (!token) {
+      toast({
+        title: "Login required",
+        description: "Please login to save wishlist items.",
+      });
+      router.push("/login");
+      return;
+    }
+
+    try {
+      setWishlistLoading(true);
+      const result = await setWishlistItemOnBackend(token, product.id, !isWishlisted);
+      setIsWishlisted(result.saved);
+      toast({
+        title: result.saved ? "Saved to wishlist" : "Removed from wishlist",
+        description: result.saved ? `${product.name} has been added to your wishlist.` : `${product.name} has been removed from your wishlist.`,
+      });
+    } catch (wishlistError: any) {
+      toast({
+        title: "Wishlist update failed",
+        description: wishlistError?.message || "Please try again.",
+      });
+    } finally {
+      setWishlistLoading(false);
+    }
+  };
+
+  const handleBuyNow = () => {
+    if (!product) return;
+
+    addProductToCart(product, 1);
+    router.push("/cart");
+  };
+
+  const handleTagToggle = (tag: ProductReviewTag) => {
+    setReviewForm((prev) => {
+      const exists = prev.tags.includes(tag);
+      if (exists) {
+        return { ...prev, tags: prev.tags.filter((entry) => entry !== tag) };
+      }
+
+      return { ...prev, tags: [...prev.tags, tag] };
+    });
+  };
+
+  const handleSubmitReview = async () => {
+    if (!product) return;
+
+    const token = localStorage.getItem("app_auth_token");
+
+    if (!token) {
+      toast({
+        title: "Login required",
+        description: "Please login to submit a review.",
+      });
+      router.push("/login");
+      return;
+    }
+
+    if (!reviewForm.title.trim() || !reviewForm.comment.trim()) {
+      toast({
+        title: "Missing review details",
+        description: "Add a title and comment before submitting.",
+      });
+      return;
+    }
+
+    try {
+      setSubmittingReview(true);
+      await addProductReviewOnBackend(token, product.id, {
+        rating: reviewForm.rating,
+        title: reviewForm.title.trim(),
+        comment: reviewForm.comment.trim(),
+        tags: reviewForm.tags,
+      });
+
+      const [reviewData, updatedProduct] = await Promise.all([
+        getProductReviewsFromBackend(product.id),
+        getProductByIdFromBackend(product.id),
+      ]);
+
+      setReviews(reviewData);
+      if (updatedProduct) {
+        setProduct(updatedProduct);
+      }
+
+      setReviewForm({ rating: 5, title: "", comment: "", tags: [] });
+      toast({
+        title: "Review submitted",
+        description: "Thanks for your feedback.",
+      });
+    } catch (submitError: any) {
+      toast({
+        title: "Review submission failed",
+        description: submitError?.message || "Please try again.",
+      });
+    } finally {
+      setSubmittingReview(false);
+    }
   };
 
   const handleDeliveryCheck = async () => {
@@ -221,12 +561,96 @@ export default function ProductDetails({ params }: { params: Promise<{ id: strin
         shipping: result.shipping || "Shipping calculated at checkout",
         codSupported: Boolean(result.codSupported),
         prepaidSupported: Boolean(result.prepaidSupported),
+        estimatedDispatchDate: result.estimatedDispatchDate || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        lastMilePartner: result.lastMilePartner || "Delhivery",
+        returnEligible: Boolean(result.returnEligible),
       });
+      persistSuccessfulPincode(normalized);
     } catch (checkError: any) {
       setDeliveryResult({
         status: "unavailable",
         message: checkError?.message || "Unable to verify delivery right now. Please try again.",
       });
+    }
+  };
+
+  const handleUseCurrentLocation = async () => {
+    if (!navigator.geolocation) {
+      setDeliveryResult({
+        status: "unavailable",
+        message: "Geolocation is not supported in this browser. Enter pincode manually.",
+      });
+      return;
+    }
+
+    try {
+      setLocatingPincode(true);
+      setDeliveryResult({ status: "checking", message: "Detecting your location and pincode..." });
+
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: false,
+          timeout: 12000,
+          maximumAge: 300000,
+        });
+      });
+
+      const lat = position.coords.latitude;
+      const lon = position.coords.longitude;
+
+      const reverseResponse = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(String(lat))}&lon=${encodeURIComponent(String(lon))}&addressdetails=1`
+      );
+
+      if (!reverseResponse.ok) {
+        throw new Error("Could not map your location to a pincode.");
+      }
+
+      const reverseData = await reverseResponse.json();
+      const detectedPincode = String(reverseData?.address?.postcode || "").replace(/\D/g, "").slice(0, 6);
+
+      if (!/^\d{6}$/.test(detectedPincode)) {
+        throw new Error("Pincode could not be detected from your location.");
+      }
+
+      setDeliveryPincode(detectedPincode);
+
+      const result = await checkDeliveryByPincode(detectedPincode);
+
+      if (!result.available) {
+        setDeliveryResult({
+          status: "unavailable",
+          message: result.message || "Delivery is not currently available for this pincode.",
+        });
+        return;
+      }
+
+      setDeliveryResult({
+        status: "available",
+        message: result.message || "Delivery is available for this pincode.",
+        district: result.district || "Unknown",
+        state: result.state || "Unknown",
+        eta: result.eta || "2-7 business days",
+        shipping: result.shipping || "Shipping calculated at checkout",
+        codSupported: Boolean(result.codSupported),
+        prepaidSupported: Boolean(result.prepaidSupported),
+        estimatedDispatchDate: result.estimatedDispatchDate || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        lastMilePartner: result.lastMilePartner || "Delhivery",
+        returnEligible: Boolean(result.returnEligible),
+      });
+      persistSuccessfulPincode(detectedPincode);
+    } catch (locationError: any) {
+      const fallbackMessage =
+        locationError?.code === 1
+          ? "Location permission denied. Please allow location access or enter pincode manually."
+          : locationError?.message || "Unable to fetch pincode from your location right now.";
+
+      setDeliveryResult({
+        status: "unavailable",
+        message: fallbackMessage,
+      });
+    } finally {
+      setLocatingPincode(false);
     }
   };
 
@@ -286,6 +710,23 @@ export default function ProductDetails({ params }: { params: Promise<{ id: strin
 
   return (
     <div className="min-h-screen bg-background">
+      <Head>
+        <title>{productSeoTitle}</title>
+        <meta name="description" content={productSeoDescription} />
+        <meta property="og:type" content="product" />
+        <meta property="og:title" content={productSeoTitle} />
+        <meta property="og:description" content={productSeoDescription} />
+        {product ? <meta property="og:image" content={galleryImages[0] || product.image} /> : null}
+        {product ? <meta property="product:price:amount" content={String(product.price)} /> : null}
+        {product ? <meta property="product:price:currency" content="INR" /> : null}
+        <link rel="canonical" href={`/product/${product?.id || id}`} />
+      </Head>
+      {structuredData ? (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+        />
+      ) : null}
       <Navbar />
       
       <main className="container mx-auto px-4 py-12">
@@ -293,11 +734,28 @@ export default function ProductDetails({ params }: { params: Promise<{ id: strin
           {/* Image Display */}
           <div className="space-y-6">
             <div className="relative aspect-square rounded-[40px] overflow-hidden bg-muted border shadow-2xl group">
+              <button
+                type="button"
+                aria-label="Open fullscreen gallery"
+                title="Open fullscreen gallery"
+                onClick={() => setOpenFullscreenGallery(true)}
+                className="absolute right-4 top-4 z-20 rounded-full bg-black/50 p-2 text-white backdrop-blur hover:bg-black/65 transition-colors"
+              >
+                <Maximize2 className="h-4 w-4" />
+              </button>
               <Image 
-                src={visualizedImg || product.image} 
+                src={displayImage} 
                 alt={product.name} 
                 fill 
-                className="object-cover transition-transform duration-700 group-hover:scale-105"
+                onMouseMove={(event) => {
+                  const rect = event.currentTarget.getBoundingClientRect();
+                  const x = ((event.clientX - rect.left) / rect.width) * 100;
+                  const y = ((event.clientY - rect.top) / rect.height) * 100;
+                  setZoomOrigin(`${x}% ${y}%`);
+                }}
+                onMouseLeave={() => setZoomOrigin("50% 50%")}
+                style={{ transformOrigin: zoomOrigin }}
+                className="object-cover transition-transform duration-500 group-hover:scale-125"
               />
               {visualizedImg && (
                 <div className="absolute top-6 left-6">
@@ -309,14 +767,17 @@ export default function ProductDetails({ params }: { params: Promise<{ id: strin
             </div>
             
             <div className="grid grid-cols-4 gap-4">
-              {[product.image, "https://picsum.photos/seed/alt1/600/600", "https://picsum.photos/seed/alt2/600/600"].map((img, i) => (
+              {galleryImages.map((img, i) => (
                 <button 
-                  key={i}
+                  key={`${img}-${i}`}
                   type="button"
                   title={`Preview image ${i + 1}`}
                   aria-label={`Preview image ${i + 1}`}
-                  onClick={() => setVisualizedImg(null)}
-                  className="relative aspect-square rounded-2xl overflow-hidden border-2 border-transparent hover:border-primary transition-all opacity-80 hover:opacity-100"
+                  onClick={() => {
+                    setVisualizedImg(null);
+                    setSelectedGalleryImage(img);
+                  }}
+                  className={`relative aspect-square rounded-2xl overflow-hidden border-2 transition-all ${activeImage === img ? "border-primary opacity-100" : "border-transparent opacity-80 hover:border-primary hover:opacity-100"}`}
                 >
                   <Image src={img} alt={`${product.name} ${i}`} fill className="object-cover" />
                 </button>
@@ -342,6 +803,16 @@ export default function ProductDetails({ params }: { params: Promise<{ id: strin
                 <span className="text-4xl font-bold text-primary">₹{(product.price * 80).toLocaleString()}</span>
                 <Badge className="bg-green-500/10 text-green-600 border-none px-4 py-1 text-sm font-bold">In Stock: {product.stock}</Badge>
               </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {product.stock === 0 ? (
+                  <Badge className="rounded-full bg-red-500/10 text-red-700 border-none px-4 py-1 font-bold">Out of stock</Badge>
+                ) : isLowStock ? (
+                  <Badge className="rounded-full bg-amber-500/10 text-amber-700 border-none px-4 py-1 font-bold">Only {product.stock} left</Badge>
+                ) : null}
+                <Badge variant="outline" className="rounded-full px-4 py-1 font-medium">
+                  Expected delivery: {expectedDeliveryRange}
+                </Badge>
+              </div>
               
               <p className="text-xl text-muted-foreground leading-relaxed">{product.description}</p>
             </div>
@@ -349,34 +820,36 @@ export default function ProductDetails({ params }: { params: Promise<{ id: strin
             <div className="p-8 rounded-[32px] bg-card border border-border/50 shadow-sm space-y-8">
               <div className="flex flex-col sm:flex-row gap-4">
                 <Button
-                  asChild
                   size="lg"
                   variant="outline"
                   className="flex-1 h-14 rounded-2xl text-lg font-bold border-primary/40 text-primary hover:bg-primary/5 transition-all"
+                  onClick={handleAddToCart}
                 >
-                  <Link
-                    href="/cart"
-                    onClick={() => {
-                      addProductToCart(product, 1);
-                    }}
-                  >
-                    <ShoppingCart className="mr-2 h-5 w-5" /> Add to Cart
-                  </Link>
+                  <ShoppingCart className="mr-2 h-5 w-5" /> Add to Cart
                 </Button>
-                <Button asChild size="lg" className="flex-1 h-14 rounded-2xl text-lg font-bold shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all">
-                  <Link
-                    href="/cart"
-                    onClick={() => {
-                      addProductToCart(product, 1);
-                    }}
-                  >
-                    Buy Now
-                  </Link>
+                <Button size="lg" className="flex-1 h-14 rounded-2xl text-lg font-bold shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all" onClick={handleBuyNow}>
+                  Buy Now
                 </Button>
-                <Button size="lg" variant="outline" className="h-14 rounded-2xl border-primary/20 text-primary hover:bg-primary/5 px-6">
-                  <Heart className="h-6 w-6" />
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className={`h-14 rounded-2xl border-primary/20 px-6 ${isWishlisted ? "text-rose-600 bg-rose-50 hover:bg-rose-100" : "text-primary hover:bg-primary/5"}`}
+                  onClick={handleWishlistToggle}
+                  disabled={wishlistLoading}
+                >
+                  <Heart className={`h-6 w-6 ${isWishlisted ? "fill-current" : ""}`} />
                 </Button>
               </div>
+
+              {isApparelProduct && (
+                <Button
+                  variant="outline"
+                  className="w-full h-12 rounded-2xl"
+                  onClick={() => setOpenSizeGuide(true)}
+                >
+                  <Ruler className="mr-2 h-4 w-4" /> Size Guide & Fit Recommendation
+                </Button>
+              )}
 
               {product.category === 'Embroidery Designs' && (
                 <Button 
@@ -402,9 +875,12 @@ export default function ProductDetails({ params }: { params: Promise<{ id: strin
               )}
 
               <div className="rounded-3xl border border-border/50 bg-muted/20 p-5 space-y-4">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
                   <Truck className="h-5 w-5 text-primary" />
-                  <h3 className="font-bold text-lg">Delivery Check</h3>
+                    <h3 className="font-bold text-lg">Delivery Availability</h3>
+                  </div>
+                  <Badge variant="outline" className="rounded-full">Live Delhivery Check</Badge>
                 </div>
                 <p className="text-sm text-muted-foreground">
                   Check whether we can deliver this product to your area and see the estimated timeline before placing the order.
@@ -418,41 +894,133 @@ export default function ProductDetails({ params }: { params: Promise<{ id: strin
                     placeholder="Enter 6-digit pincode"
                     aria-label="Delivery pincode"
                     className="h-12 rounded-2xl"
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        void handleDeliveryCheck();
+                      }
+                    }}
                   />
-                  <Button className="h-12 rounded-2xl px-6" onClick={handleDeliveryCheck}>
-                    Check
+                  <Button className="h-12 rounded-2xl px-6" onClick={handleDeliveryCheck} disabled={deliveryResult.status === "checking"}>
+                    {deliveryResult.status === "checking" ? (
+                      <>
+                        <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> Checking
+                      </>
+                    ) : (
+                      "Check"
+                    )}
                   </Button>
                 </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-11 rounded-2xl w-full sm:w-auto"
+                  onClick={handleUseCurrentLocation}
+                  disabled={locatingPincode || deliveryResult.status === "checking"}
+                >
+                  {locatingPincode ? (
+                    <>
+                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> Detecting location
+                    </>
+                  ) : (
+                    <>
+                      <LocateFixed className="mr-2 h-4 w-4" /> Use my current location
+                    </>
+                  )}
+                </Button>
 
                 <div className={`rounded-2xl border px-4 py-3 text-sm ${deliveryResult.status === "available" ? "border-green-200 bg-green-50 text-green-800" : deliveryResult.status === "unavailable" || deliveryResult.status === "invalid" ? "border-amber-200 bg-amber-50 text-amber-900" : "border-border bg-background text-muted-foreground"}`}>
                   <p className="font-medium">{deliveryResult.message}</p>
                   {deliveryResult.status === "available" && (
-                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
-                      <div>
-                        <p className="text-xs uppercase tracking-wider opacity-70">Coverage</p>
-                        <p className="font-semibold">{deliveryResult.district}, {deliveryResult.state}</p>
+                    <div className="mt-3 space-y-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                        <div className="rounded-xl bg-white/60 px-3 py-2">
+                          <p className="text-xs uppercase tracking-wider opacity-70 flex items-center gap-1">
+                            <MapPin className="h-3 w-3" /> Coverage
+                          </p>
+                          <p className="font-semibold">{deliveryResult.district}, {deliveryResult.state}</p>
+                        </div>
+                        <div className="rounded-xl bg-white/60 px-3 py-2">
+                          <p className="text-xs uppercase tracking-wider opacity-70 flex items-center gap-1">
+                            <Clock3 className="h-3 w-3" /> ETA
+                          </p>
+                          <p className="font-semibold">{deliveryResult.eta}</p>
+                        </div>
+                        <div className="rounded-xl bg-white/60 px-3 py-2">
+                          <p className="text-xs uppercase tracking-wider opacity-70 flex items-center gap-1">
+                            <Wallet className="h-3 w-3" /> Shipping
+                          </p>
+                          <p className="font-semibold">{deliveryResult.shipping}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-wider opacity-70">ETA</p>
-                        <p className="font-semibold">{deliveryResult.eta}</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                        <div className="rounded-xl bg-white/60 px-3 py-2">
+                          <p className="text-xs uppercase tracking-wider opacity-70 flex items-center gap-1">
+                            <CalendarDays className="h-3 w-3" /> Dispatch
+                          </p>
+                          <p className="font-semibold">{new Date(deliveryResult.estimatedDispatchDate).toLocaleDateString()}</p>
+                        </div>
+                        <div className="rounded-xl bg-white/60 px-3 py-2">
+                          <p className="text-xs uppercase tracking-wider opacity-70 flex items-center gap-1">
+                            <Truck className="h-3 w-3" /> Partner
+                          </p>
+                          <p className="font-semibold">{deliveryResult.lastMilePartner}</p>
+                        </div>
+                        <div className="rounded-xl bg-white/60 px-3 py-2">
+                          <p className="text-xs uppercase tracking-wider opacity-70 flex items-center gap-1">
+                            <RotateCcw className="h-3 w-3" /> Returns
+                          </p>
+                          <p className="font-semibold">{deliveryResult.returnEligible ? "Eligible" : "Not eligible"}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-wider opacity-70">Shipping</p>
-                        <p className="font-semibold">{deliveryResult.shipping}</p>
+                      <div className="flex flex-wrap gap-2 text-xs">
+                        <span className={`rounded-full px-3 py-1 ${deliveryResult.codSupported ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-700"}`}>
+                          {deliveryResult.codSupported ? "COD available" : "COD unavailable"}
+                        </span>
+                        <span className={`rounded-full px-3 py-1 ${deliveryResult.prepaidSupported ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-700"}`}>
+                          {deliveryResult.prepaidSupported ? "Prepaid available" : "Prepaid unavailable"}
+                        </span>
                       </div>
-                    </div>
-                  )}
-                  {deliveryResult.status === "available" && (
-                    <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                      <span className={`rounded-full px-3 py-1 ${deliveryResult.codSupported ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-700"}`}>
-                        {deliveryResult.codSupported ? "COD available" : "COD unavailable"}
-                      </span>
-                      <span className={`rounded-full px-3 py-1 ${deliveryResult.prepaidSupported ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-700"}`}>
-                        {deliveryResult.prepaidSupported ? "Prepaid available" : "Prepaid unavailable"}
-                      </span>
                     </div>
                   )}
                 </div>
+
+                <Card className="rounded-[28px] border-border/50 bg-white shadow-sm">
+                  <CardContent className="p-5 space-y-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground">Cart Confidence</p>
+                        <h3 className="text-xl font-bold">Selected options and delivery summary</h3>
+                      </div>
+                      <Button variant="outline" size="sm" className="rounded-full" onClick={() => setOpenCustomizer(true)}>
+                        Edit options
+                      </Button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                      <div className="rounded-2xl bg-muted/30 p-4 space-y-2">
+                        <p className="font-semibold text-foreground">Customization summary</p>
+                        <div className="flex flex-wrap gap-2">
+                          <Badge variant="secondary" className="rounded-full">{customization.symbol}</Badge>
+                          <Badge variant="secondary" className="rounded-full">{customization.threadColor}</Badge>
+                          <Badge variant="secondary" className="rounded-full">{customization.fabricColor}</Badge>
+                          <Badge variant="secondary" className="rounded-full">{customization.size}</Badge>
+                          <Badge variant="secondary" className="rounded-full">{customization.placement}</Badge>
+                        </div>
+                        {customization.notes ? <p className="text-muted-foreground">Notes: {customization.notes}</p> : <p className="text-muted-foreground">No special notes added.</p>}
+                      </div>
+
+                      <div className="rounded-2xl bg-muted/30 p-4 space-y-2">
+                        <p className="font-semibold text-foreground">Delivery confidence</p>
+                        <p className="text-muted-foreground">Expected range: {expectedDeliveryRange}</p>
+                        {deliveryResult.status === "available" ? (
+                          <p className="text-muted-foreground">Dispatch: {new Date(deliveryResult.estimatedDispatchDate).toLocaleDateString()} via {deliveryResult.lastMilePartner}</p>
+                        ) : (
+                          <p className="text-muted-foreground">Check your pincode above for a live delivery estimate.</p>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
             </div>
 
@@ -583,26 +1151,167 @@ export default function ProductDetails({ params }: { params: Promise<{ id: strin
             <TabsContent value="reviews" className="space-y-6">
               <Card className="rounded-3xl border-border/50 shadow-sm">
                 <CardContent className="p-6 space-y-4">
-                  <h3 className="text-2xl font-bold">Customer feedback snapshot</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {[
-                      { label: "Finish", value: "Clean and premium" },
-                      { label: "Comfort", value: "Wearable all day" },
-                      { label: "Customization", value: "Easy to personalize" },
-                    ].map((item) => (
-                      <div key={item.label} className="rounded-2xl bg-muted/40 p-4">
-                        <p className="text-xs uppercase tracking-widest text-muted-foreground">{item.label}</p>
-                        <p className="text-lg font-semibold mt-1">{item.value}</p>
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <h3 className="text-2xl font-bold">Customer Reviews</h3>
+                    <div className="rounded-2xl bg-muted/40 px-4 py-2 text-sm">
+                      <span className="font-semibold text-lg text-foreground">{averageRating}</span>
+                      <span className="text-muted-foreground"> / 5 from {reviews.length} reviews</span>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-border/50 p-4 space-y-3">
+                    <h4 className="font-semibold">Write a Review</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="space-y-2 md:col-span-1">
+                        <Label>Rating</Label>
+                        <div className="flex gap-1">
+                          {Array.from({ length: 5 }).map((_, idx) => {
+                            const ratingValue = idx + 1;
+                            return (
+                              <Button
+                                key={ratingValue}
+                                type="button"
+                                variant={reviewForm.rating >= ratingValue ? "default" : "outline"}
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => setReviewForm((prev) => ({ ...prev, rating: ratingValue }))}
+                              >
+                                <Star className="h-4 w-4" />
+                              </Button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <div className="space-y-2 md:col-span-2">
+                        <Label htmlFor="review-title">Title</Label>
+                        <Input
+                          id="review-title"
+                          value={reviewForm.title}
+                          onChange={(e) => setReviewForm((prev) => ({ ...prev, title: e.target.value }))}
+                          placeholder="Summarize your experience"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="review-comment">Comment</Label>
+                      <Textarea
+                        id="review-comment"
+                        value={reviewForm.comment}
+                        onChange={(e) => setReviewForm((prev) => ({ ...prev, comment: e.target.value }))}
+                        placeholder="Tell others about quality, fit, customization, or delivery experience"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Tags</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {(["Quality", "Fit", "Delivery", "Customization"] as ProductReviewTag[]).map((tag) => (
+                          <Button
+                            key={tag}
+                            type="button"
+                            size="sm"
+                            variant={reviewForm.tags.includes(tag) ? "default" : "outline"}
+                            className="rounded-full"
+                            onClick={() => handleTagToggle(tag)}
+                          >
+                            {tag}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex justify-end">
+                      <Button onClick={handleSubmitReview} disabled={submittingReview}>
+                        {submittingReview ? "Submitting..." : "Submit Review"}
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {(["All", "Quality", "Fit", "Delivery", "Customization"] as ReviewTag[]).map((filter) => (
+                      <Button
+                        key={filter}
+                        type="button"
+                        size="sm"
+                        variant={reviewFilter === filter ? "default" : "outline"}
+                        className="rounded-full"
+                        onClick={() => setReviewFilter(filter)}
+                      >
+                        {filter}
+                      </Button>
+                    ))}
+                  </div>
+
+                  <div className="space-y-4">
+                    {reviewsLoading && (
+                      <div className="rounded-2xl border border-border/50 p-4 text-sm text-muted-foreground">
+                        Loading reviews...
+                      </div>
+                    )}
+                    {!reviewsLoading && filteredReviews.length === 0 && (
+                      <div className="rounded-2xl border border-dashed border-border p-6 text-sm text-muted-foreground">
+                        No reviews yet for this filter. Be the first to share your feedback.
+                      </div>
+                    )}
+                    {filteredReviews.map((review) => (
+                      <div key={review.id} className="rounded-2xl border border-border/50 p-4 space-y-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                          <div>
+                            <p className="font-semibold">{review.userName}</p>
+                            <p className="text-xs text-muted-foreground">{new Date(review.createdAt).toLocaleDateString()}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1 text-amber-500">
+                              {Array.from({ length: 5 }).map((_, idx) => (
+                                <Star key={idx} className={`h-4 w-4 ${idx < review.rating ? "fill-current" : "text-muted"}`} />
+                              ))}
+                            </div>
+                            {review.verified && <Badge variant="outline">Verified Purchase</Badge>}
+                          </div>
+                        </div>
+                        <p className="font-medium">{review.title}</p>
+                        <p className="text-sm text-muted-foreground">{review.comment}</p>
+                        <div className="flex flex-wrap gap-2">
+                          {review.tags.map((tag) => (
+                            <Badge key={tag} variant="secondary" className="rounded-full">{tag}</Badge>
+                          ))}
+                        </div>
                       </div>
                     ))}
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    This section is intentionally concise until live review data is connected.
-                  </p>
                 </CardContent>
               </Card>
             </TabsContent>
           </Tabs>
+
+          <div className="mt-12">
+            <Card className="rounded-3xl border-border/50 shadow-sm">
+              <CardContent className="p-6 space-y-4">
+                <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground">FAQ</p>
+                <h3 className="text-2xl font-bold">Quick answers before you order</h3>
+                <Accordion type="single" collapsible className="w-full">
+                  <AccordionItem value="fabric-care">
+                    <AccordionTrigger>How do I care for the fabric?</AccordionTrigger>
+                    <AccordionContent>Use a gentle wash cycle, avoid direct heat on embroidery, and dry in shade to preserve color and finish.</AccordionContent>
+                  </AccordionItem>
+                  <AccordionItem value="wash-instructions">
+                    <AccordionTrigger>What are the wash instructions?</AccordionTrigger>
+                    <AccordionContent>Wash inside out in cold water for hoodies and use a delicate hand wash or cycle for blouses. Do not iron directly on stitched areas.</AccordionContent>
+                  </AccordionItem>
+                  <AccordionItem value="custom-timeline">
+                    <AccordionTrigger>How long do custom orders take?</AccordionTrigger>
+                    <AccordionContent>Custom orders usually move to production quickly, then ship based on stock and pincode. Most orders dispatch within 24-48 hours and reach you in about 2-7 business days.</AccordionContent>
+                  </AccordionItem>
+                  <AccordionItem value="returns">
+                    <AccordionTrigger>What is the return policy?</AccordionTrigger>
+                    <AccordionContent>Return eligibility depends on the product and pincode serviceability. Live delivery checks show whether your order is return eligible before checkout.</AccordionContent>
+                  </AccordionItem>
+                  <AccordionItem value="upload-limits">
+                    <AccordionTrigger>Are there design upload limits?</AccordionTrigger>
+                    <AccordionContent>Upload one reference image per customization. PNG, JPG, and WEBP are supported, and clearer references help us match the final result better.</AccordionContent>
+                  </AccordionItem>
+                </Accordion>
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
         <Dialog open={openCustomizer} onOpenChange={setOpenCustomizer}>
@@ -770,6 +1479,133 @@ export default function ProductDetails({ params }: { params: Promise<{ id: strin
               </Button>
               <Button onClick={handleAddCustomizedItem}>Add Customized Item</Button>
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={openSizeGuide} onOpenChange={setOpenSizeGuide}>
+          <DialogContent className="sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Size Guide</DialogTitle>
+              <DialogDescription>
+                Compare your body measurement and get a quick recommendation before ordering.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="body-chest-cm">Your Chest (cm)</Label>
+                  <Input
+                    id="body-chest-cm"
+                    type="number"
+                    min={70}
+                    max={140}
+                    value={bodyChestCm}
+                    onChange={(e) => {
+                      const value = Number(e.target.value);
+                      setBodyChestCm(Number.isFinite(value) ? value : 96);
+                    }}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Fit Preference</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {(["Regular", "Relaxed", "Slim"] as const).map((fit) => (
+                      <Button
+                        key={fit}
+                        type="button"
+                        size="sm"
+                        variant={fitPreference === fit ? "default" : "outline"}
+                        onClick={() => setFitPreference(fit)}
+                      >
+                        {fit}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {isApparelProduct && recommendedSize && (
+                <div className="rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm">
+                  Recommended size for you: <span className="font-bold">{recommendedSize}</span>
+                </div>
+              )}
+
+              <div className="rounded-2xl border border-border/50 overflow-hidden">
+                <div className="grid grid-cols-3 bg-muted/40 px-4 py-3 text-sm font-semibold">
+                  <span>Size</span>
+                  <span>Chest Range</span>
+                  <span>Body Length</span>
+                </div>
+                {getSizeChart(product.category).map((row) => (
+                  <div key={row.size} className="grid grid-cols-3 px-4 py-3 text-sm border-t border-border/50">
+                    <span>{row.size}</span>
+                    <span>{row.chest}</span>
+                    <span>{row.bodyLength}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setOpenSizeGuide(false)}>Close</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={openFullscreenGallery} onOpenChange={setOpenFullscreenGallery}>
+          <DialogContent className="sm:max-w-5xl">
+            <DialogHeader>
+              <DialogTitle>{product.name} Gallery</DialogTitle>
+              <DialogDescription>View the full set of product images in a larger viewer.</DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border bg-muted">
+                <Image src={activeImage || product.image} alt={product.name} fill className="object-contain" />
+                <button
+                  type="button"
+                  title="Previous image"
+                  aria-label="Previous image"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-black/55 p-2 text-white hover:bg-black/70"
+                  onClick={() => {
+                    const current = Math.max(0, galleryImages.findIndex((item) => item === (activeImage || galleryImages[0])));
+                    const next = (current - 1 + galleryImages.length) % galleryImages.length;
+                    setSelectedGalleryImage(galleryImages[next]);
+                  }}
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+                <button
+                  type="button"
+                  title="Next image"
+                  aria-label="Next image"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-black/55 p-2 text-white hover:bg-black/70"
+                  onClick={() => {
+                    const current = Math.max(0, galleryImages.findIndex((item) => item === (activeImage || galleryImages[0])));
+                    const next = (current + 1) % galleryImages.length;
+                    setSelectedGalleryImage(galleryImages[next]);
+                  }}
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-5 gap-2">
+                {galleryImages.map((img, idx) => (
+                  <button
+                    key={`${img}-${idx}`}
+                    type="button"
+                    title={`Gallery thumbnail ${idx + 1}`}
+                    aria-label={`Gallery thumbnail ${idx + 1}`}
+                    onClick={() => setSelectedGalleryImage(img)}
+                    className={`relative aspect-square overflow-hidden rounded-lg border-2 ${activeImage === img ? "border-primary" : "border-transparent"}`}
+                  >
+                    <Image src={img} alt={`${product.name} ${idx + 1}`} fill className="object-cover" />
+                  </button>
+                ))}
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
       </main>

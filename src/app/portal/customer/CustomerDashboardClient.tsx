@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MOCK_PRODUCTS } from "@/app/lib/mock-data";
 import { getMyOrdersFromBackend } from "@/lib/api/orders";
+import { getWishlistFromBackend, WishlistItem } from "@/lib/api/wishlist";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5001/api";
 
@@ -17,6 +18,7 @@ export default function CustomerDashboardClient({ recommendations }: any) {
   const router = useRouter();
   const [user, setUser] = useState<any>({ name: "Customer", email: "", role: "customer" });
   const [orders, setOrders] = useState<any[]>([]);
+  const [wishlist, setWishlist] = useState<WishlistItem[]>([]);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -47,6 +49,12 @@ export default function CustomerDashboardClient({ recommendations }: any) {
             localStorage.setItem("google_auth_user", JSON.stringify(data.user));
             const backendOrders = await getMyOrdersFromBackend(token);
             setOrders(backendOrders);
+            try {
+              const wishlistItems = await getWishlistFromBackend(token);
+              setWishlist(wishlistItems);
+            } catch (wishlistError) {
+              console.error("Failed to load wishlist", wishlistError);
+            }
             return;
           }
 
@@ -314,6 +322,45 @@ export default function CustomerDashboardClient({ recommendations }: any) {
             })}
           </div>
         </section>
+
+            <section className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+                  <Heart className="h-5 w-5 text-rose-600" />
+                  Saved Wishlist
+                </h2>
+                <Badge variant="secondary" className="rounded-full">{wishlist.length} items</Badge>
+              </div>
+
+              {wishlist.length === 0 ? (
+                <Card className="border-dashed border-gray-200 shadow-sm">
+                  <CardContent className="p-6 text-sm text-muted-foreground">
+                    Your wishlist is empty. Tap the heart on any product to save it here.
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {wishlist.map((item) => (
+                    <Card key={item.id} className="overflow-hidden shadow-sm border-gray-100">
+                      <div className="relative aspect-square bg-gray-100">
+                        <Image src={item.product.image} alt={item.product.name} fill className="object-cover" />
+                      </div>
+                      <CardContent className="p-4 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <Badge variant="secondary" className="rounded-full">{item.product.category}</Badge>
+                          <span className="text-xs font-semibold text-muted-foreground">₹{(item.product.price * 80).toLocaleString()}</span>
+                        </div>
+                        <h3 className="font-semibold text-lg line-clamp-1">{item.product.name}</h3>
+                        <p className="text-sm text-muted-foreground line-clamp-2">{item.product.description}</p>
+                        <Button asChild size="sm" className="rounded-full w-full">
+                          <Link href={`/product/${item.product.id}`}>View Product</Link>
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </section>
 
       </main>
     </div>

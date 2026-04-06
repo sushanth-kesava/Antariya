@@ -4,13 +4,15 @@ import { useState } from "react";
 import { useGoogleLogin } from "@react-oauth/google";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Sparkles, ArrowRight, Loader2, Store, User } from "lucide-react";
+import { Sparkles, ArrowRight, Loader2, User, Shield, BadgeCheck } from "lucide-react";
 import Link from "next/link";
 import { Navbar } from "@/components/navbar";
 import { loginWithGoogleOnBackend } from "@/lib/api/auth";
+import { useToast } from "@/hooks/use-toast";
 
 export default function SignupPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [role, setRole] = useState<"customer" | "admin">("customer");
 
@@ -26,19 +28,46 @@ export default function SignupPage() {
           expiresIn: tokenResponse.expires_in,
         });
 
+        if (result.pendingApproval) {
+          toast({
+            title: "Admin request submitted",
+            description: result.message || "Your request is waiting for superadmin approval.",
+          });
+          router.push("/admin-login");
+          return;
+        }
+
+        if (!result.token || !result.user) {
+          throw new Error("Signup completed without a usable auth session.");
+        }
+
         localStorage.setItem("app_auth_token", result.token);
         localStorage.setItem("google_auth_user", JSON.stringify(result.user));
         localStorage.setItem("user_role", result.user.role);
 
-        router.push("/");
+        if (result.user.role === "admin") {
+          router.push("/portal/admin");
+        } else {
+          router.push("/");
+        }
         
       } catch (error) {
-        console.error("Signup Error:", error);
+        toast({
+          title: "Signup failed",
+          description: error instanceof Error ? error.message : "We could not complete account setup. Please try again.",
+          variant: "destructive",
+        });
       } finally {
         setLoading(false);
       }
     },
-    onError: () => console.error("Signup Failed"),
+    onError: () => {
+      toast({
+        title: "Google sign-in failed",
+        description: "Please try again or choose a different account.",
+        variant: "destructive",
+      });
+    },
   });
 
   return (
@@ -58,25 +87,32 @@ export default function SignupPage() {
             </div>
 
             <div className="space-y-4">
-              <p className="text-sm font-bold text-center text-gray-700">I am joining as a:</p>
-              <div className="grid grid-cols-2 gap-4">
-                <button 
+              <p className="text-sm font-bold text-center text-gray-700">Choose account type</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
                   onClick={() => setRole("customer")}
-                  className={`flex flex-col items-center justify-center p-5 rounded-2xl border-2 transition-all ${role === "customer" ? "border-secondary bg-secondary/5 text-secondary scale-[1.02] shadow-sm" : "border-gray-200 bg-white text-gray-500 hover:border-gray-300"}`}
+                  className={`rounded-2xl border p-5 text-left transition-all ${role === "customer" ? "border-primary bg-primary/5 shadow-sm" : "border-gray-200 bg-gray-50"}`}
                 >
-                  <User className="h-8 w-8 mb-3" />
-                  <span className="font-bold">Customer</span>
-                  <span className="text-[10px] text-muted-foreground mt-1">I want to buy products</span>
+                  <User className="h-8 w-8 text-secondary" />
+                  <p className="mt-3 font-bold">Customer</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed mt-1">Browse, shop, wishlist, and place orders.</p>
                 </button>
-                <button 
+                <button
+                  type="button"
                   onClick={() => setRole("admin")}
-                  className={`flex flex-col items-center justify-center p-5 rounded-2xl border-2 transition-all ${role === "admin" ? "border-secondary bg-secondary/5 text-secondary scale-[1.02] shadow-sm" : "border-gray-200 bg-white text-gray-500 hover:border-gray-300"}`}
+                  className={`rounded-2xl border p-5 text-left transition-all ${role === "admin" ? "border-primary bg-primary/5 shadow-sm" : "border-gray-200 bg-gray-50"}`}
                 >
-                  <Store className="h-8 w-8 mb-3" />
-                  <span className="font-bold">Company / Admin</span>
-                  <span className="text-[10px] text-muted-foreground mt-1">I want to sell items</span>
+                  <Shield className="h-8 w-8 text-primary" />
+                  <p className="mt-3 font-bold">Admin</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed mt-1">Request access to manage products, reviews, and orders.</p>
                 </button>
               </div>
+              {role === "admin" ? (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-800 leading-relaxed">
+                  Admin sign-up submits an approval request. Approved admins can log in from the admin portal after review.
+                </div>
+              ) : null}
             </div>
 
             <Button 
@@ -93,12 +129,20 @@ export default function SignupPage() {
           </div>
           
           <div className="p-6 bg-muted/40 border-t border-border/50 text-center space-y-3">
-             <p className="text-xs text-center text-muted-foreground px-6 font-medium leading-relaxed">
+              <p className="text-xs text-center text-muted-foreground px-6 font-medium leading-relaxed">
               By registering, you agree to our{" "}
               <Link href="/terms" className="underline underline-offset-4 hover:text-primary">Terms of Service</Link>{" "}
               and{" "}
               <Link href="/privacy" className="underline underline-offset-4 hover:text-primary">Privacy Policy</Link>.
             </p>
+            <p className="text-xs text-center text-muted-foreground px-6 leading-relaxed flex items-center justify-center gap-2">
+              <Shield className="h-3.5 w-3.5" /> Admin requests are reviewed by the superadmin before access is granted.
+            </p>
+            {role === "admin" ? (
+              <p className="text-xs text-center text-muted-foreground px-6 leading-relaxed flex items-center justify-center gap-2">
+                <BadgeCheck className="h-3.5 w-3.5" /> Your request will be queued for superadmin approval before access is granted.
+              </p>
+            ) : null}
             <p className="text-sm text-muted-foreground font-medium">
               Already have an account?{" "}
               <Link href="/login" className="text-primary font-bold hover:underline inline-flex items-center">

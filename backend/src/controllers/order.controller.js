@@ -1,5 +1,8 @@
 const Product = require("../models/Product");
 const Order = require("../models/Order");
+const User = require("../models/User");
+const Review = require("../models/Review");
+const WishlistItem = require("../models/WishlistItem");
 
 function normalizeOrder(order) {
   return {
@@ -146,7 +149,7 @@ async function createOrder(req, res, next) {
     const order = await Order.create({
       userId: req.auth.sub,
       userEmail: req.auth.email,
-      userRole: req.auth.role === "admin" ? "admin" : "customer",
+      userRole: req.auth.role === "admin" || req.auth.role === "superadmin" ? "admin" : "customer",
       items: orderItems,
       subtotal,
       shipping,
@@ -178,7 +181,136 @@ async function getMyOrders(req, res, next) {
   }
 }
 
+async function getAdminDashboard(req, res, next) {
+  try {
+    if (req.auth?.role !== "admin" && req.auth?.role !== "superadmin") {
+      return res.status(403).json({
+        success: false,
+        message: "Admin access required",
+      });
+    }
+
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const [
+      totalCustomers,
+      totalOrders,
+      todayOrders,
+      lowStockProducts,
+      pendingReviews,
+      wishlistItems,
+      revenueStats,
+      recentOrders,
+      statusAgg,
+    ] = await Promise.all([
+      User.countDocuments({ role: "customer" }),
+      Order.countDocuments({}),
+      Order.countDocuments({ createdAt: { $gte: todayStart } }),
+      Product.countDocuments({ stock: { $lte: 10 } }),
+      Review.countDocuments({ moderationStatus: "pending" }),
+      WishlistItem.countDocuments({}),
+      Order.aggregate([
+        {
+          $group: {
+            _id: null,
+            totalRevenue: { $sum: "$total" },
+          },
+        },
+      ]),
+      Order.find({}).sort({ createdAt: -1 }).limit(8),
+      Order.aggregate([
+        {
+          $group: {
+            _id: "$status",
+            count: { $sum: 1 },
+          },
+        },
+      ]),
+    ]);
+
+    const totalRevenue = Number(revenueStats?.[0]?.totalRevenue || 0);
+    const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+
+    const statusBreakdown = {
+      Processing: 0,
+      Shipped: 0,
+      Delivered: 0,
+      Cancelled: 0,
+    };
+
+    for (const row of statusAgg) {
+      if (row && typeof row._id === "string" && Object.prototype.hasOwnProperty.call(statusBreakdown, row._id)) {
+        statusBreakdown[row._id] = Number(row.count || 0);
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      summary: {
+        customers: totalCustomers,
+        totalOrders,
+        totalRevenue,
+        averageOrderValue,
+        todayOrders,
+        lowStockProducts,
+        pendingReviews,
+        wishlistItems,
+      },
+      recentOrders: recentOrders.map(normalizeOrder),
+      statusBreakdown,
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function updateAdminOrderStatus(req, res, next) {
+  try {
+    if (req.auth?.role !== "admin" && req.auth?.role !== "superadmin") {
+      return res.status(403).json({
+        success: false,
+        message: "Admin access required",
+      });
+    }
+
+    const { orderId } = req.params;
+    const { status } = req.body;
+    const allowedStatuses = new Set(["Processing", "Shipped", "Delivered", "Cancelled"]);
+
+    if (!allowedStatuses.has(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid order status",
+      });
+    }
+
+    const order = await Order.findByIdAndUpdate(
+      orderId,
+      { status },
+      { new: true }
+    );
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Order status updated",
+      order: normalizeOrder(order),
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
 module.exports = {
   createOrder,
   getMyOrders,
+  getAdminDashboard,
+  updateAdminOrderStatus,
 };

@@ -3,9 +3,24 @@ import type {Metadata} from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+
 export const metadata: Metadata = {
   title: 'Antariya | Premium Embroidery Marketplace',
   description: 'The ultimate marketplace for embroidery designs, threads, fabrics, and machine accessories.',
+  metadataBase: new URL(siteUrl),
+  openGraph: {
+    title: 'Antariya | Premium Embroidery Marketplace',
+    description: 'The ultimate marketplace for embroidery designs, threads, fabrics, and machine accessories.',
+    url: siteUrl,
+    siteName: 'Antariya',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Antariya | Premium Embroidery Marketplace',
+    description: 'The ultimate marketplace for embroidery designs, threads, fabrics, and machine accessories.',
+  },
 };
 
 import { GoogleOAuthProvider } from '@react-oauth/google';

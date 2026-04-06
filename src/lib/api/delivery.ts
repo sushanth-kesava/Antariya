@@ -11,6 +11,9 @@ export type DeliveryAvailability = {
   prepaidSupported?: boolean;
   eta?: string;
   shipping?: string;
+  estimatedDispatchDate?: string;
+  lastMilePartner?: string;
+  returnEligible?: boolean;
 };
 
 export async function checkDeliveryByPincode(pincode: string): Promise<DeliveryAvailability> {

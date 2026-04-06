@@ -15,6 +15,7 @@ export interface Product {
   category: string;
   dealerId: string;
   image: string;
+  galleryImages?: string[];
   stock: number;
   fileDownloadLink?: string;
   rating: number;

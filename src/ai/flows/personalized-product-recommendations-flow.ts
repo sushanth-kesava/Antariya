@@ -52,6 +52,38 @@ export async function personalizedProductRecommendations(
   return personalizedProductRecommendationsFlow(input);
 }
 
+function buildFallbackRecommendations(
+  input: PersonalizedProductRecommendationsInput
+): PersonalizedProductRecommendationsOutput {
+  const history = [...(input.browsingHistory || []), ...(input.pastPurchases || [])].join(' ').toLowerCase();
+  const wantsApparel = /hoodie|blouse|garment|fabric|thread|stitch/.test(history) || /wedding|festive|custom/.test((input.currentQuery || '').toLowerCase());
+
+  return {
+    recommendations: [
+      {
+        productId: 'fallback-design-pack',
+        productName: 'Royal Zardosi Floral Pack',
+        category: 'Embroidery Designs',
+        reason: 'A premium design pack that aligns with traditional embroidery and detailed custom work.',
+      },
+      {
+        productId: 'fallback-thread-set',
+        productName: 'Vibrant Silk Thread Set',
+        category: 'Machine Threads',
+        reason: 'Useful for finishing custom garments and matching ornate embroidery palettes.',
+      },
+      {
+        productId: wantsApparel ? 'fallback-hoodie' : 'fallback-blouse',
+        productName: wantsApparel ? 'Premium Cotton Hoodie - Jet Black' : 'Silk Blend Blouse Piece',
+        category: wantsApparel ? 'Hoodies' : 'Blouses',
+        reason: wantsApparel
+          ? 'A dependable apparel base for personalized embroidery and premium gifting.'
+          : 'A refined base garment that works well for festive customization and elegant embroidery.',
+      },
+    ],
+  };
+}
+
 const recommendationsPrompt = ai.definePrompt({
   name: 'personalizedProductRecommendationsPrompt',
   input: {schema: PersonalizedProductRecommendationsInputSchema},
@@ -86,10 +118,15 @@ const personalizedProductRecommendationsFlow = ai.defineFlow(
     outputSchema: PersonalizedProductRecommendationsOutputSchema,
   },
   async input => {
-    const {output} = await recommendationsPrompt(input);
-    if (!output) {
-      throw new Error('Failed to generate product recommendations.');
+    try {
+      const {output} = await recommendationsPrompt(input);
+      if (!output) {
+        return buildFallbackRecommendations(input);
+      }
+
+      return output;
+    } catch (error) {
+      return buildFallbackRecommendations(input);
     }
-    return output;
   }
 );

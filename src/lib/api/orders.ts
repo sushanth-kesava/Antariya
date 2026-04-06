@@ -28,6 +28,8 @@ export type OrderItem = {
 
 export type Order = {
   id: string;
+  userEmail?: string;
+  userRole?: "customer" | "admin";
   items: OrderItem[];
   subtotal: number;
   shipping: number;
@@ -70,4 +72,71 @@ export async function getMyOrdersFromBackend(token: string): Promise<Order[]> {
   }
 
   return (data.orders || []) as Order[];
+}
+
+export type AdminDashboardSummary = {
+  customers: number;
+  totalOrders: number;
+  totalRevenue: number;
+  averageOrderValue: number;
+  todayOrders: number;
+  lowStockProducts: number;
+  pendingReviews: number;
+  wishlistItems: number;
+};
+
+export type AdminDashboardStatusBreakdown = {
+  Processing: number;
+  Shipped: number;
+  Delivered: number;
+  Cancelled: number;
+};
+
+export type AdminDashboardPayload = {
+  summary: AdminDashboardSummary;
+  recentOrders: Order[];
+  statusBreakdown: AdminDashboardStatusBreakdown;
+};
+
+export async function getAdminDashboardFromBackend(token: string): Promise<AdminDashboardPayload> {
+  const response = await fetch(`${API_BASE_URL}/orders/admin/dashboard`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data?.success) {
+    throw new Error(data?.message || "Failed to load admin dashboard");
+  }
+
+  return {
+    summary: data.summary as AdminDashboardSummary,
+    recentOrders: (data.recentOrders || []) as Order[],
+    statusBreakdown: data.statusBreakdown as AdminDashboardStatusBreakdown,
+  };
+}
+
+export async function updateAdminOrderStatusOnBackend(
+  token: string,
+  orderId: string,
+  status: Order["status"]
+): Promise<Order> {
+  const response = await fetch(`${API_BASE_URL}/orders/admin/${orderId}/status`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ status }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data?.success) {
+    throw new Error(data?.message || "Failed to update order status");
+  }
+
+  return data.order as Order;
 }

@@ -4,12 +4,13 @@ import { useState } from "react";
 import { useGoogleLogin } from "@react-oauth/google";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Loader2, User } from "lucide-react";
+import { Sparkles, ArrowRight, Loader2, Shield } from "lucide-react";
+import Link from "next/link";
 import { Navbar } from "@/components/navbar";
 import { loginWithGoogleOnBackend } from "@/lib/api/auth";
 import { useToast } from "@/hooks/use-toast";
 
-export default function LoginPage() {
+export default function AdminLoginPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -40,11 +41,10 @@ export default function LoginPage() {
         } else {
           router.push("/");
         }
-        
       } catch (error) {
         toast({
-          title: "Login failed",
-          description: error instanceof Error ? error.message : "We could not complete sign in. Please try again.",
+          title: "Admin login failed",
+          description: error instanceof Error ? error.message : "This account is not approved for admin access.",
           variant: "destructive",
         });
       } finally {
@@ -68,34 +68,46 @@ export default function LoginPage() {
           <div className="p-8 space-y-8 bg-card">
             <div className="text-center space-y-4">
               <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto text-primary">
-                <Sparkles className="h-8 w-8" />
+                <Shield className="h-8 w-8" />
               </div>
               <div className="space-y-2">
-                <h1 className="text-3xl font-bold font-headline">Welcome Back</h1>
-                <p className="text-muted-foreground text-sm font-medium">Log in to your Antariya account</p>
+                <h1 className="text-3xl font-bold font-headline">Admin Portal Access</h1>
+                <p className="text-muted-foreground text-sm font-medium">Restricted sign-in for approved administrator accounts.</p>
               </div>
             </div>
 
             <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-center space-y-2">
-              <User className="h-6 w-6 mx-auto text-primary" />
-              <p className="text-sm font-bold text-gray-700">Customer sign-in</p>
-              <p className="text-xs text-muted-foreground leading-relaxed">This page is for customer accounts. Admins should use the dedicated admin login page.</p>
+              <Sparkles className="h-6 w-6 mx-auto text-primary" />
+              <p className="text-sm font-bold text-gray-700">Approval required</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">If your Google account is not provisioned as an admin, access will be denied.</p>
             </div>
 
-            <Button 
-              onClick={() => login()} 
+            <Button
+              onClick={() => login()}
               disabled={loading}
               className="w-full h-14 rounded-full text-lg font-bold shadow-lg shadow-primary/20 hover:scale-105 transition-all text-white"
             >
               {loading ? (
                 <><Loader2 className="mr-3 h-5 w-5 animate-spin" /> Authenticating...</>
               ) : (
-                "Sign in with Google"
+                "Sign in as Admin"
               )}
             </Button>
           </div>
+
           <div className="p-6 bg-muted/40 border-t border-border/50 text-center">
-            <p className="text-sm text-muted-foreground font-medium">Use the same login for customer, admin, and superadmin accounts. Sign-up is where you choose the account type.</p>
+            <p className="text-sm text-muted-foreground font-medium">
+              Looking for customer login?{" "}
+              <Link href="/login" className="text-primary font-bold hover:underline inline-flex items-center">
+                Go to customer login <ArrowRight className="h-4 w-4 ml-1" />
+              </Link>
+            </p>
+            <p className="mt-2 text-xs text-muted-foreground font-medium">
+              Need the highest-level console?{" "}
+              <Link href="/superadmin-login" className="text-primary font-bold hover:underline inline-flex items-center">
+                Go to superadmin login <ArrowRight className="h-4 w-4 ml-1" />
+              </Link>
+            </p>
           </div>
         </div>
       </div>

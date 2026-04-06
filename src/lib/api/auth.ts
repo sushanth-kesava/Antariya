@@ -1,8 +1,8 @@
-export type AppRole = "customer" | "admin";
+export type AppRole = "customer" | "admin" | "superadmin";
 
 type GoogleAuthPayload = {
   googleAccessToken: string;
-  role: AppRole;
+  role?: AppRole;
   tokenType?: string;
   scope?: string;
   expiresIn?: number;
@@ -11,9 +11,14 @@ type GoogleAuthPayload = {
 type AuthResponse = {
   success: boolean;
   message: string;
-  token: string;
-  user: {
+  token?: string;
+  pendingApproval?: boolean;
+  request?: {
     id: string;
+    status: string;
+  };
+  user?: {
+    id: string | null;
     email: string;
     displayName: string;
     photoURL: string | null;

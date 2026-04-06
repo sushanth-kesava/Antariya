@@ -1,6 +1,7 @@
 import { Product } from "@/app/lib/mock-data";
 
 const CART_STORAGE_KEY = "stitchmart_cart";
+export const CART_UPDATED_EVENT = "antariya-cart-updated";
 
 export type ProductCustomization = {
   symbol: string;
@@ -66,6 +67,11 @@ export function setCartItems(items: CartItem[]) {
   }
 
   localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+  window.dispatchEvent(new Event(CART_UPDATED_EVENT));
+}
+
+export function getCartItemCount(): number {
+  return getCartItems().reduce((sum, item) => sum + item.quantity, 0);
 }
 
 export function addProductToCart(product: Product, quantity = 1, customization?: ProductCustomization) {
@@ -102,4 +108,5 @@ export function clearCart() {
   }
 
   localStorage.removeItem(CART_STORAGE_KEY);
+  window.dispatchEvent(new Event(CART_UPDATED_EVENT));
 }
