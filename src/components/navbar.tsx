@@ -30,6 +30,18 @@ export function Navbar() {
   const [loading, setLoading] = useState(true);
   const [cartCount, setCartCount] = useState(0);
 
+  const portalHref = user?.role === "superadmin"
+    ? "/portal/superadmin"
+    : user?.role === "admin"
+      ? "/portal/admin"
+      : "/portal/customer";
+
+  const logoHref = user?.role === "superadmin"
+    ? "/portal/superadmin"
+    : user?.role === "admin"
+      ? "/portal/admin"
+      : "/";
+
   // Validate session against backend on mount.
   useEffect(() => {
     const loadUser = async () => {
@@ -96,7 +108,7 @@ export function Navbar() {
     <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto px-4 h-20 flex items-center justify-between gap-4">
         <div className="flex items-center gap-8">
-          <Link href="/" className="flex items-center gap-2 group">
+          <Link href={logoHref} className="flex items-center gap-2 group">
             <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-white font-bold text-2xl group-hover:rotate-12 transition-all shadow-lg shadow-primary/20">
               S
             </div>
@@ -168,7 +180,7 @@ export function Navbar() {
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                   <DropdownMenuItem asChild className="rounded-xl p-3 cursor-pointer">
-                    <Link href={user.role === "admin" ? "/portal/admin" : "/portal/customer"}>My Portal</Link>
+                    <Link href={portalHref}>My Portal</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild className="rounded-xl p-3 cursor-pointer">
                   <Link href="/customize" className="text-primary font-bold">Build From Scratch</Link>
