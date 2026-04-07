@@ -9,29 +9,13 @@ import { ArrowRight, Loader2, ShieldCheck, Sparkles } from "lucide-react";
 import { BRAND_LOGO_URL, Navbar } from "@/components/navbar";
 import { loginWithGoogleOnBackend } from "@/lib/api/auth";
 import { useToast } from "@/hooks/use-toast";
+import { getPortalPathForRole, persistAuthSession } from "@/lib/auth-session";
 
 export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-
-  const persistSessionAndRoute = (token: string, user: { role: string }) => {
-    localStorage.setItem("app_auth_token", token);
-    localStorage.setItem("google_auth_user", JSON.stringify(user));
-    localStorage.setItem("user_role", user.role);
-
-    if (user.role === "superadmin") {
-      router.replace("/portal/superadmin");
-      return;
-    }
-
-    if (user.role === "admin") {
-      router.replace("/portal/admin");
-      return;
-    }
-
-    router.replace("/");
-  };
+  const [selectedRole, setSelectedRole] = useState<"customer" | "admin">("customer");
 
   const handleAuthFailure = (error: unknown) => {
     const description = error instanceof Error ? error.message : "We could not complete sign in. Please try again.";
@@ -57,6 +41,7 @@ export default function LoginPage() {
         setLoading(true);
         const result = await loginWithGoogleOnBackend({
           googleAccessToken: tokenResponse.access_token,
+          role: selectedRole,
           tokenType: tokenResponse.token_type,
           scope: tokenResponse.scope,
           expiresIn: tokenResponse.expires_in,
@@ -66,8 +51,8 @@ export default function LoginPage() {
           throw new Error("Authentication response was incomplete.");
         }
 
-        persistSessionAndRoute(result.token, result.user);
-        
+        persistAuthSession(result.token, result.user);
+        router.replace(getPortalPathForRole(result.user.role));
       } catch (error) {
         handleAuthFailure(error);
       } finally {
@@ -96,8 +81,30 @@ export default function LoginPage() {
               <div className="space-y-3">
                 <h1 className="text-3xl md:text-4xl font-bold font-headline tracking-tight">Welcome Back</h1>
                 <p className="text-muted-foreground text-sm md:text-base max-w-md mx-auto leading-relaxed">
-                  Continue with Google to access your Antariya India account. We automatically detect your role and route you to the right dashboard.
+                  Continue with Google to access your Antariya India account. Choose customer or admin and we route you to the right portal.
                 </p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-xs font-bold tracking-wide text-gray-600 text-center">Select login type</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => setSelectedRole("customer")}
+                  className={`rounded-xl border px-4 py-3 text-sm font-semibold transition-colors ${selectedRole === "customer" ? "border-primary bg-primary/10 text-primary" : "border-gray-200 bg-gray-50 text-gray-700"}`}
+                >
+                  Customer
+                </button>
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => setSelectedRole("admin")}
+                  className={`rounded-xl border px-4 py-3 text-sm font-semibold transition-colors ${selectedRole === "admin" ? "border-primary bg-primary/10 text-primary" : "border-gray-200 bg-gray-50 text-gray-700"}`}
+                >
+                  Admin
+                </button>
               </div>
             </div>
 
@@ -124,19 +131,13 @@ export default function LoginPage() {
               {loading ? (
                 <><Loader2 className="mr-3 h-5 w-5 animate-spin" /> Authenticating...</>
               ) : (
-                "Continue with Google"
+                `Continue with Google (${selectedRole})`
               )}
             </Button>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-center">
+            <div className="grid grid-cols-1 gap-2 text-xs text-center">
               <Link href="/signup" className="rounded-xl border border-gray-200 bg-gray-50 py-2.5 font-semibold text-gray-700 hover:bg-gray-100 transition-colors">
                 Create account
-              </Link>
-              <Link href="/admin-login" className="rounded-xl border border-gray-200 bg-gray-50 py-2.5 font-semibold text-gray-700 hover:bg-gray-100 transition-colors">
-                Admin login
-              </Link>
-              <Link href="/superadmin-login" className="rounded-xl border border-gray-200 bg-gray-50 py-2.5 font-semibold text-gray-700 hover:bg-gray-100 transition-colors">
-                Superadmin login
               </Link>
             </div>
           </div>

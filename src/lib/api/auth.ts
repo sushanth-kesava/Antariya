@@ -1,4 +1,4 @@
-export type AppRole = "customer" | "admin" | "superadmin";
+import type { AppRole } from "@/lib/auth-session";
 
 type GoogleAuthPayload = {
   googleAccessToken: string;

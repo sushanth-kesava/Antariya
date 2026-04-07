@@ -10,6 +10,7 @@ import { Navbar } from "@/components/navbar";
 import { loginWithGoogleOnBackend } from "@/lib/api/auth";
 import { useToast } from "@/hooks/use-toast";
 import { BRAND_ASSET_URL } from "@/lib/brand";
+import { getPortalPathForRole, persistAuthSession } from "@/lib/auth-session";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -34,7 +35,7 @@ export default function SignupPage() {
             title: "Admin request submitted",
             description: result.message || "Your request is waiting for superadmin approval.",
           });
-          router.push("/admin-login");
+          router.push("/login");
           return;
         }
 
@@ -42,15 +43,8 @@ export default function SignupPage() {
           throw new Error("Signup completed without a usable auth session.");
         }
 
-        localStorage.setItem("app_auth_token", result.token);
-        localStorage.setItem("google_auth_user", JSON.stringify(result.user));
-        localStorage.setItem("user_role", result.user.role);
-
-        if (result.user.role === "admin") {
-          router.push("/portal/admin");
-        } else {
-          router.push("/");
-        }
+        persistAuthSession(result.token, result.user);
+        router.replace(getPortalPathForRole(result.user.role));
         
       } catch (error) {
         toast({
@@ -111,7 +105,7 @@ export default function SignupPage() {
               </div>
               {role === "admin" ? (
                 <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-800 leading-relaxed">
-                  Admin sign-up submits an approval request. Approved admins can log in from the admin portal after review.
+                  Admin sign-up submits an approval request. Approved admins can log in from the main login page after review.
                 </div>
               ) : null}
             </div>

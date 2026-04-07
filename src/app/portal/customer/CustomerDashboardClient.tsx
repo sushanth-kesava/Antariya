@@ -13,6 +13,7 @@ import { getMyOrdersFromBackend } from "@/lib/api/orders";
 import { getWishlistFromBackend, WishlistItem } from "@/lib/api/wishlist";
 import { BRAND_ASSET_URL } from "@/lib/brand";
 import { formatINR, formatIndianDate, normalizeCatalogPriceToINR } from "@/lib/india";
+import { clearAuthSession, getPortalPathForRole } from "@/lib/auth-session";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5001/api";
 
@@ -40,6 +41,11 @@ export default function CustomerDashboardClient({ recommendations }: any) {
           const data = await response.json();
 
           if (response.ok && data?.success && data?.user) {
+            if (data.user.role && data.user.role !== "customer") {
+              router.replace(getPortalPathForRole(data.user.role));
+              return;
+            }
+
             const mappedUser = {
               id: data.user.id,
               name: data.user.displayName || "Customer",
@@ -60,15 +66,11 @@ export default function CustomerDashboardClient({ recommendations }: any) {
             return;
           }
 
-          localStorage.removeItem("app_auth_token");
-          localStorage.removeItem("google_auth_user");
-          localStorage.removeItem("user_role");
+          clearAuthSession();
           router.replace("/login");
           return;
         } catch (error) {
-          localStorage.removeItem("app_auth_token");
-          localStorage.removeItem("google_auth_user");
-          localStorage.removeItem("user_role");
+          clearAuthSession();
           router.replace("/login");
           return;
         }

@@ -142,7 +142,7 @@ async function createAccessRequest(req, res, next) {
     }
 
     const { requestType, title, message, targetEmail, targetName, requestedScopes = [] } = req.body;
-    const validTypes = new Set(["admin_approval", "superadmin_access", "feature_request"]);
+    const validTypes = new Set(["admin_approval", "feature_request"]);
 
     if (!validTypes.has(requestType)) {
       return res.status(400).json({
@@ -158,7 +158,7 @@ async function createAccessRequest(req, res, next) {
       });
     }
 
-    if ((requestType === "admin_approval" || requestType === "superadmin_access") && !targetEmail) {
+    if (requestType === "admin_approval" && !targetEmail) {
       return res.status(400).json({
         success: false,
         message: "Target email is required for approval requests",
@@ -240,6 +240,27 @@ async function reviewAccessRequest(req, res, next) {
     }
 
     if (status === "approved") {
+      if (request.requestType === "superadmin_access") {
+        return res.status(400).json({
+          success: false,
+          message: "Creating new superadmin accounts is disabled",
+        });
+      }
+
+      if (request.requestType === "feature_request") {
+        request.status = status;
+        request.reviewedBy = req.auth.sub;
+        request.reviewedAt = new Date();
+        request.reviewNote = reviewNote ? String(reviewNote).trim() : null;
+        await request.save();
+
+        return res.status(200).json({
+          success: true,
+          message: `Access request ${status}`,
+          request: normalizeAccessRequest(request),
+        });
+      }
+
       const targetEmail = String(request.targetEmail || request.requestedByEmail || "").trim().toLowerCase();
 
       if (!targetEmail) {
@@ -249,14 +270,13 @@ async function reviewAccessRequest(req, res, next) {
         });
       }
 
-      const nextRole = request.requestType === "superadmin_access" ? "superadmin" : "admin";
       const existingProfile = await AdminProfile.findOne({ email: targetEmail });
 
       const profile = existingProfile || new AdminProfile({ email: targetEmail, displayName: request.targetName || targetEmail.split("@")[0] });
       profile.displayName = request.targetName || profile.displayName || targetEmail.split("@")[0];
       profile.photoURL = profile.photoURL || null;
       profile.provider = profile.provider || "google";
-      profile.role = nextRole === "superadmin" ? "superadmin" : profile.role || "admin";
+      profile.role = profile.role === "superadmin" ? "superadmin" : "admin";
       profile.active = true;
       await profile.save();
     }
@@ -286,7 +306,7 @@ async function updateUserRole(req, res, next) {
     const { email, role } = req.body;
     const normalizedEmail = String(email || "").trim().toLowerCase();
     const nextRole = String(role || "").trim().toLowerCase();
-    const validRoles = new Set(["customer", "admin", "superadmin"]);
+    const validRoles = new Set(["customer", "admin"]);
 
     if (!normalizedEmail) {
       return res.status(400).json({
@@ -298,7 +318,7 @@ async function updateUserRole(req, res, next) {
     if (!validRoles.has(nextRole)) {
       return res.status(400).json({
         success: false,
-        message: "Role must be customer, admin, or superadmin",
+        message: "Role must be customer or admin",
       });
     }
 
@@ -351,7 +371,7 @@ async function updateUserRole(req, res, next) {
     adminDocument.displayName = adminDocument.displayName || existingUser?.displayName || normalizedEmail.split("@")[0];
     adminDocument.photoURL = adminDocument.photoURL || existingUser?.photoURL || null;
     adminDocument.provider = adminDocument.provider || "google";
-    adminDocument.role = nextRole === "superadmin" ? "superadmin" : "admin";
+    adminDocument.role = existingAdmin?.role === "superadmin" ? "superadmin" : "admin";
     adminDocument.active = true;
     await adminDocument.save();
 

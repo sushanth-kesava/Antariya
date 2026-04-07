@@ -1,6 +1,6 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5001/api";
 
-export type SuperadminRequestType = "admin_approval" | "superadmin_access" | "feature_request";
+export type SuperadminRequestType = "admin_approval" | "feature_request" | "superadmin_access";
 export type SuperadminRequestStatus = "pending" | "approved" | "rejected";
 
 export type SuperAdminDashboardSummary = {
@@ -63,7 +63,7 @@ export type SuperAdminDashboardPayload = {
   accessRequests: SuperAdminAccessRequest[];
 };
 
-export type ManagedRole = "customer" | "admin" | "superadmin";
+export type ManagedRole = "customer" | "admin";
 
 export type SuperAdminManagedAccount = {
   email: string;

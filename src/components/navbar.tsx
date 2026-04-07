@@ -16,32 +16,18 @@ import { Badge } from "@/components/ui/badge";
 import { useState, useEffect } from "react";
 import { googleLogout } from '@react-oauth/google';
 import { CART_UPDATED_EVENT, getCartItemCount } from "@/lib/cart";
+import { clearAuthSession, getPortalPathForRole } from "@/lib/auth-session";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5001/api";
 export const BRAND_LOGO_URL = "https://res.cloudinary.com/doefhzx01/image/upload/v1775491592/Antariya-icon_1_mzdn29.png";
-
-function clearLocalSession() {
-  localStorage.removeItem('app_auth_token');
-  localStorage.removeItem('google_auth_user');
-  localStorage.removeItem('user_role');
-}
 
 export function Navbar() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [cartCount, setCartCount] = useState(0);
 
-  const portalHref = user?.role === "superadmin"
-    ? "/portal/superadmin"
-    : user?.role === "admin"
-      ? "/portal/admin"
-      : "/portal/customer";
-
-  const logoHref = user?.role === "superadmin"
-    ? "/portal/superadmin"
-    : user?.role === "admin"
-      ? "/portal/admin"
-      : "/";
+  const portalHref = user?.role ? getPortalPathForRole(user.role) : "/portal/customer";
+  const logoHref = user?.role ? getPortalPathForRole(user.role) : "/";
 
   // Validate session against backend on mount.
   useEffect(() => {
@@ -49,7 +35,7 @@ export function Navbar() {
       const token = localStorage.getItem('app_auth_token');
 
       if (!token) {
-        clearLocalSession();
+        clearAuthSession();
         setUser(null);
         setLoading(false);
         return;
@@ -65,7 +51,7 @@ export function Navbar() {
         const data = await response.json();
 
         if (!response.ok || !data?.success || !data?.user) {
-          clearLocalSession();
+          clearAuthSession();
           setUser(null);
           setLoading(false);
           return;
@@ -74,7 +60,7 @@ export function Navbar() {
         setUser(data.user);
         localStorage.setItem('google_auth_user', JSON.stringify(data.user));
       } catch (error) {
-        clearLocalSession();
+        clearAuthSession();
         setUser(null);
       } finally {
         setLoading(false);
@@ -102,7 +88,7 @@ export function Navbar() {
   const handleLogout = () => {
     googleLogout();
     setUser(null);
-    clearLocalSession();
+    clearAuthSession();
   };
 
   return (

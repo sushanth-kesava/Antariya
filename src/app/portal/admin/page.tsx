@@ -43,6 +43,7 @@ import {
 import { createAccessRequestOnBackend, SuperadminRequestType } from "@/lib/api/superadmin";
 import { BRAND_ASSET_URL } from "@/lib/brand";
 import { formatINR, formatIndianDate, formatIndianDateTime, normalizeCatalogPriceToINR } from "@/lib/india";
+import { clearAuthSession, getPortalPathForRole } from "@/lib/auth-session";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5001/api";
 
@@ -96,8 +97,7 @@ export default function AdminPortal() {
       const token = localStorage.getItem("app_auth_token");
 
       if (!token) {
-        localStorage.removeItem("google_auth_user");
-        localStorage.removeItem("user_role");
+        clearAuthSession();
         setLoadingCatalog(false);
         router.replace("/login");
         return;
@@ -113,9 +113,7 @@ export default function AdminPortal() {
         const data = await response.json();
 
         if (!response.ok || !data?.success || !data?.user) {
-          localStorage.removeItem("app_auth_token");
-          localStorage.removeItem("google_auth_user");
-          localStorage.removeItem("user_role");
+          clearAuthSession();
           setLoadingCatalog(false);
           router.replace("/login");
           return;
@@ -123,7 +121,7 @@ export default function AdminPortal() {
 
         if (data.user.role !== "admin" && data.user.role !== "superadmin") {
           setLoadingCatalog(false);
-          router.replace("/");
+          router.replace(getPortalPathForRole(data.user.role));
           return;
         }
 
@@ -160,9 +158,7 @@ export default function AdminPortal() {
         setLoadingCatalog(false);
         setAuthChecked(true);
       } catch (err) {
-        localStorage.removeItem("app_auth_token");
-        localStorage.removeItem("google_auth_user");
-        localStorage.removeItem("user_role");
+        clearAuthSession();
         setLoadingCatalog(false);
         router.replace("/login");
       }
@@ -452,7 +448,7 @@ export default function AdminPortal() {
                   <ShieldCheck className="h-5 w-5 text-primary" /> Request Approval
                 </CardTitle>
                 <CardDescription>
-                  Submit admin account approvals, superadmin access requests, or feature requests for review.
+                  Submit admin account approvals or feature requests for review.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -475,7 +471,6 @@ export default function AdminPortal() {
                       >
                         <option value="feature_request">Feature request</option>
                         <option value="admin_approval">Admin account approval</option>
-                        <option value="superadmin_access">Superadmin access request</option>
                       </select>
                     </div>
                     <div>

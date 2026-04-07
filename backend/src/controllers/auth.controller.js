@@ -14,10 +14,60 @@ function calculateExpiryDate(expiresInSeconds) {
   return new Date(now + Number(expiresInSeconds) * 1000);
 }
 
+async function resolveCurrentAccount(userId, email, role) {
+  const normalizedEmail = email ? String(email).trim().toLowerCase() : null;
+
+  if (normalizedEmail) {
+    const activeAdmin = await AdminProfile.findOne({ email: normalizedEmail, active: true });
+
+    if (activeAdmin) {
+      return {
+        account: activeAdmin,
+        role: activeAdmin.role || "admin",
+      };
+    }
+
+    const userAccount = await User.findOne({ email: normalizedEmail });
+
+    if (userAccount) {
+      return {
+        account: userAccount,
+        role: userAccount.role || "customer",
+      };
+    }
+  }
+
+  if (userId) {
+    const adminById = await AdminProfile.findById(userId);
+
+    if (adminById && adminById.active) {
+      return {
+        account: adminById,
+        role: adminById.role || "admin",
+      };
+    }
+
+    const userById = await User.findById(userId);
+
+    if (userById) {
+      return {
+        account: userById,
+        role: userById.role || "customer",
+      };
+    }
+  }
+
+  return {
+    account: null,
+    role: role === "admin" || role === "superadmin" ? role : "customer",
+  };
+}
+
 async function loginWithGoogle(req, res, next) {
   try {
     const { googleAccessToken, role = null, tokenType = "Bearer", scope = null, expiresIn = null } = req.body;
     const normalizedRole = role === null || typeof role === "undefined" ? null : String(role).toLowerCase();
+    const selectedRole = normalizedRole === "admin" || normalizedRole === "customer" ? normalizedRole : null;
 
     if (!googleAccessToken) {
       return res.status(400).json({
@@ -44,20 +94,15 @@ async function loginWithGoogle(req, res, next) {
     const existingAdmin = await AdminProfile.findOne({ email: normalizedEmail, active: true });
     const existingUser = await User.findOne({ email: normalizedEmail });
     const emailAllowedAsAdmin = env.adminAllowedEmails.includes(normalizedEmail);
-    const emailAllowedAsSuperAdmin = env.superAdminAllowedEmails.includes(normalizedEmail);
     const inferredRole = existingAdmin
-      ? emailAllowedAsSuperAdmin
-        ? "superadmin"
-        : existingAdmin.role || "admin"
-      : emailAllowedAsSuperAdmin
-        ? "superadmin"
+      ? existingAdmin.role || "admin"
+      : selectedRole === "admin" && emailAllowedAsAdmin
+        ? "admin"
         : existingUser
           ? existingUser.role || "customer"
-          : emailAllowedAsAdmin
-            ? "admin"
-            : "customer";
+          : "customer";
 
-    const requestedPrivilegedRole = normalizedRole === "superadmin" || normalizedRole === "admin" ? normalizedRole : null;
+    const requestedPrivilegedRole = selectedRole === "admin" ? "admin" : null;
 
     const userPayload = {
       googleId: googleProfile.sub,
@@ -79,31 +124,26 @@ async function loginWithGoogle(req, res, next) {
 
     let authDocument;
 
-    if (requestedPrivilegedRole === "admin" || requestedPrivilegedRole === "superadmin") {
-      const shouldBeSuperAdmin = requestedPrivilegedRole === "superadmin" || emailAllowedAsSuperAdmin;
-      const isAllowedPrivilegedEmail = shouldBeSuperAdmin ? emailAllowedAsSuperAdmin : emailAllowedAsAdmin;
+    if (requestedPrivilegedRole === "admin") {
+      const isAllowedPrivilegedEmail = emailAllowedAsAdmin || Boolean(existingAdmin);
 
       if (!isAllowedPrivilegedEmail) {
         const request = await AccessRequest.create({
-          requestType: shouldBeSuperAdmin ? "superadmin_access" : "admin_approval",
+          requestType: "admin_approval",
           requestedById: googleProfile.sub,
           requestedByEmail: normalizedEmail,
           requestedByRole: "admin",
           targetEmail: normalizedEmail,
           targetName: googleProfile.name || googleProfile.email.split("@")[0],
-          title: shouldBeSuperAdmin ? "Superadmin access request" : "Admin access request",
-          message: shouldBeSuperAdmin
-            ? "A superadmin login request was submitted from the sign-up flow."
-            : "An admin access request was submitted from the sign-up flow.",
-          requestedScopes: shouldBeSuperAdmin ? ["portal:superadmin", "portal:admin", "portal:customer"] : ["portal:admin", "portal:customer"],
+          title: "Admin access request",
+          message: "An admin access request was submitted from login/sign-up.",
+          requestedScopes: ["portal:admin", "portal:customer"],
         });
 
         return res.status(202).json({
           success: true,
           pendingApproval: true,
-          message: shouldBeSuperAdmin
-            ? "This account is not approved for superadmin access."
-            : "Your admin request has been submitted and is pending approval.",
+          message: "Your admin request has been submitted and is pending approval.",
           request: {
             id: request._id,
             status: request.status,
@@ -113,7 +153,7 @@ async function loginWithGoogle(req, res, next) {
             email: normalizedEmail,
             displayName: googleProfile.name || googleProfile.email.split("@")[0],
             photoURL: googleProfile.picture || null,
-            role: shouldBeSuperAdmin ? "superadmin" : "admin",
+            role: "admin",
           },
         });
       }
@@ -125,7 +165,7 @@ async function loginWithGoogle(req, res, next) {
       adminDocument.displayName = userPayload.displayName;
       adminDocument.photoURL = userPayload.photoURL;
       adminDocument.provider = "google";
-      adminDocument.role = shouldBeSuperAdmin ? "superadmin" : adminDocument.role || "admin";
+      adminDocument.role = existingAdmin?.role === "superadmin" ? "superadmin" : adminDocument.role || "admin";
       adminDocument.active = true;
       adminDocument.lastAdminLoginAt = new Date();
       adminDocument.loginCount = Number(adminDocument.loginCount || 0) + 1;
@@ -137,7 +177,7 @@ async function loginWithGoogle(req, res, next) {
         adminDocument.displayName = userPayload.displayName;
         adminDocument.photoURL = userPayload.photoURL;
         adminDocument.provider = "google";
-        adminDocument.role = emailAllowedAsSuperAdmin ? "superadmin" : existingAdmin?.role || inferredRole;
+        adminDocument.role = existingAdmin?.role || (inferredRole === "superadmin" ? "superadmin" : "admin");
         adminDocument.active = true;
         adminDocument.lastAdminLoginAt = new Date();
         adminDocument.loginCount = Number(adminDocument.loginCount || 0) + 1;
@@ -202,6 +242,7 @@ async function getCurrentUser(req, res, next) {
   try {
     const userId = req.auth?.sub;
     const role = req.auth?.role;
+    const email = req.auth?.email;
 
     if (!userId) {
       return res.status(401).json({
@@ -210,7 +251,7 @@ async function getCurrentUser(req, res, next) {
       });
     }
 
-    const user = role === "admin" || role === "superadmin" ? await AdminProfile.findById(userId) : await User.findById(userId);
+    const { account: user, role: currentRole } = await resolveCurrentAccount(userId, email, role);
 
     if (!user) {
       return res.status(404).json({
@@ -226,7 +267,7 @@ async function getCurrentUser(req, res, next) {
         email: user.email,
         displayName: user.displayName,
         photoURL: user.photoURL,
-        role: role === "admin" || role === "superadmin" ? (user.role || "admin") : (user.role || "customer"),
+        role: currentRole,
       },
     });
   } catch (error) {

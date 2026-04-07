@@ -35,6 +35,7 @@ import {
   updateUserRoleOnBackend,
 } from "@/lib/api/superadmin";
 import { formatINR } from "@/lib/india";
+import { clearAuthSession, getPortalPathForRole } from "@/lib/auth-session";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5001/api";
 
@@ -60,7 +61,7 @@ export default function SuperAdminPortalPage() {
       const token = localStorage.getItem("app_auth_token");
 
       if (!token) {
-        router.replace("/superadmin-login");
+        router.replace("/login");
         return;
       }
 
@@ -73,10 +74,12 @@ export default function SuperAdminPortalPage() {
         const data = await response.json();
 
         if (!response.ok || !data?.success || !data?.user || data.user.role !== "superadmin") {
-          localStorage.removeItem("app_auth_token");
-          localStorage.removeItem("google_auth_user");
-          localStorage.removeItem("user_role");
-          router.replace("/superadmin-login");
+          if (data?.user?.role) {
+            router.replace(getPortalPathForRole(data.user.role));
+          } else {
+            router.replace("/login");
+          }
+
           return;
         }
 
@@ -85,11 +88,9 @@ export default function SuperAdminPortalPage() {
         const payload = await getSuperAdminDashboardFromBackend(token);
         setDashboard(payload);
       } catch (sessionError) {
-        localStorage.removeItem("app_auth_token");
-        localStorage.removeItem("google_auth_user");
-        localStorage.removeItem("user_role");
+        clearAuthSession();
         setError(sessionError instanceof Error ? sessionError.message : "Failed to load superadmin session.");
-        router.replace("/superadmin-login");
+        router.replace("/login");
       } finally {
         setLoading(false);
       }
@@ -423,7 +424,6 @@ export default function SuperAdminPortalPage() {
                       >
                         <option value="customer">customer</option>
                         <option value="admin">admin</option>
-                        <option value="superadmin">superadmin</option>
                       </select>
                       <Button
                         type="button"
