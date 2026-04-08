@@ -18,9 +18,9 @@ import { useRouter } from "next/navigation";
 import { googleLogout } from '@react-oauth/google';
 import { CART_UPDATED_EVENT, getCartItemCount } from "@/lib/cart";
 import { clearAuthSession, getPortalPathForRole } from "@/lib/auth-session";
+import { BRAND_LOGO_URL } from "@/lib/brand";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5001/api";
-export const BRAND_LOGO_URL = "https://res.cloudinary.com/doefhzx01/image/upload/v1775491592/Antariya-icon_1_mzdn29.png";
 
 export function Navbar() {
   const router = useRouter();
@@ -102,7 +102,7 @@ export function Navbar() {
             <img
               src={BRAND_LOGO_URL}
               alt="Antariya logo"
-              className="h-16 w-auto max-w-[260px] rounded-1xl object-cover group-hover:scale-[1.02] transition-transform"
+              className="h-16 w-auto max-w-[260px] rounded-2xl object-cover group-hover:scale-[1.02] transition-transform"
             />
           </Link>
           

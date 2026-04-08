@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { ArrowRight, Loader2, ShieldCheck, Sparkles } from "lucide-react";
-import { BRAND_LOGO_URL, Navbar } from "@/components/navbar";
+import { Navbar } from "@/components/navbar";
+import { Footer } from "@/components/footer";
 import { loginWithGoogleOnBackend } from "@/lib/api/auth";
 import { useToast } from "@/hooks/use-toast";
 import { isAuthenticated, persistAuthSession } from "@/lib/auth-session";
@@ -81,9 +82,6 @@ export default function LoginPage() {
         <div className="w-full max-w-xl bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-100">
           <div className="p-8 md:p-10 space-y-8 bg-card">
             <div className="text-center space-y-5">
-              <div className="w-20 h-20 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto text-primary">
-                <img src={BRAND_LOGO_URL} alt="Antariya icon" className="h-14 w-14 rounded-xl object-cover" />
-              </div>
               <div className="space-y-3">
                 <h1 className="text-3xl md:text-4xl font-bold font-headline tracking-tight">Welcome Back</h1>
                 <p className="text-muted-foreground text-sm md:text-base max-w-md mx-auto leading-relaxed">
@@ -157,6 +155,7 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
+      <Footer />
     </div>
   );
 }

@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { MOCK_PRODUCTS } from "@/app/lib/mock-data";
 import { getMyOrdersFromBackend } from "@/lib/api/orders";
 import { getWishlistFromBackend, WishlistItem } from "@/lib/api/wishlist";
-import { BRAND_ASSET_URL } from "@/lib/brand";
+import { Footer } from "@/components/footer";
 import { formatINR, formatIndianDate, normalizeCatalogPriceToINR } from "@/lib/india";
 import { clearAuthSession, getPortalPathForRole } from "@/lib/auth-session";
 
@@ -87,14 +87,12 @@ export default function CustomerDashboardClient({ recommendations }: any) {
   const isNewCustomer = orders.length === 0;
 
   return (
-    <div className="flex-1 flex flex-col lg:flex-row w-full max-w-[1760px] mx-auto px-3 sm:px-4 lg:px-6 py-8 gap-8">
+    <div className="flex-1 flex flex-col w-full">
+    <div className="flex flex-col lg:flex-row w-full max-w-[1760px] mx-auto px-3 sm:px-4 lg:px-6 py-8 gap-8">
       {/* Sidebar - responsive: hidden on small screens */}
       <aside className="w-full lg:w-64 space-y-4">
         <div className="bg-card border shadow-sm rounded-2xl p-6 space-y-6">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden">
-              <img src={BRAND_ASSET_URL} alt="Antariya logo" className="h-12 w-12 rounded-full object-cover" />
-            </div>
             <div>
               <p className="font-bold text-lg leading-tight">{user.name}</p>
               <p className="text-sm text-muted-foreground mt-1">

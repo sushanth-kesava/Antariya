@@ -2,7 +2,7 @@
 import type {Metadata} from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
-import { BRAND_ASSET_URL, BRAND_ICON_URL } from '@/lib/brand';
+import { BRAND_ICON_URL, BRAND_LOGO_URL } from '@/lib/brand';
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
 
@@ -21,13 +21,13 @@ export const metadata: Metadata = {
     url: siteUrl,
     siteName: 'Antariya',
     type: 'website',
-    images: [{ url: BRAND_ASSET_URL }],
+    images: [{ url: BRAND_LOGO_URL }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Antariya | Premium Embroidery Marketplace',
     description: 'The ultimate marketplace for embroidery designs, threads, fabrics, and machine accessories.',
-    images: [BRAND_ASSET_URL],
+    images: [BRAND_LOGO_URL],
   },
 };
 

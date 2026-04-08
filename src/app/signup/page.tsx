@@ -7,9 +7,9 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, Loader2, User, Shield, BadgeCheck } from "lucide-react";
 import Link from "next/link";
 import { Navbar } from "@/components/navbar";
+import { Footer } from "@/components/footer";
 import { loginWithGoogleOnBackend } from "@/lib/api/auth";
 import { useToast } from "@/hooks/use-toast";
-import { BRAND_ASSET_URL } from "@/lib/brand";
 import { isAuthenticated, persistAuthSession } from "@/lib/auth-session";
 
 export default function SignupPage() {
@@ -78,9 +78,6 @@ export default function SignupPage() {
         <div className="w-full max-w-lg bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-100">
           <div className="p-8 space-y-8 bg-card">
             <div className="text-center w-full space-y-4">
-              <div className="w-16 h-16 bg-secondary/10 rounded-2xl flex items-center justify-center mx-auto text-secondary">
-                <img src={BRAND_ASSET_URL} alt="Antariya icon" className="h-10 w-10 rounded-xl object-cover" />
-              </div>
               <div className="space-y-2">
                 <h1 className="text-3xl font-bold font-headline">Create your Account</h1>
                 <p className="text-muted-foreground text-sm font-medium">Join India&apos;s embroidery-first marketplace</p>
