@@ -24,6 +24,8 @@ import {
 import {
   getSuperAdminDashboardFromBackend,
   ManagedRole,
+  reviewAccessRequestOnBackend,
+  SuperAdminAccessRequest,
   SuperAdminCustomerProfile,
   SuperAdminDashboardPayload,
   SuperAdminProfile,
@@ -46,6 +48,7 @@ export default function SuperAdminPortalPage() {
   const [roleTarget, setRoleTarget] = useState<ManagedRole>("admin");
   const [updatingRole, setUpdatingRole] = useState(false);
   const [roleSuccess, setRoleSuccess] = useState<string | null>(null);
+  const [reviewingRequestId, setReviewingRequestId] = useState<string | null>(null);
 
   useEffect(() => {
     const loadSession = async () => {
@@ -165,8 +168,93 @@ export default function SuperAdminPortalPage() {
     }
   };
 
+  const handleReviewAccessRequest = async (requestId: string, status: "approved" | "rejected") => {
+    if (!authToken || reviewingRequestId) {
+      return;
+    }
+
+    try {
+      setReviewingRequestId(requestId);
+      setError(null);
+
+      const reviewedRequest = await reviewAccessRequestOnBackend(authToken, requestId, status);
+
+      setDashboard((current) => {
+        if (!current) {
+          return current;
+        }
+
+        const previousRequest = current.accessRequests.find((request) => request.id === requestId);
+        const nextAccessRequests = current.accessRequests.map((request) =>
+          request.id === requestId ? reviewedRequest : request
+        );
+
+        let nextAdminProfiles = current.adminProfiles;
+        if (status === "approved" && reviewedRequest.requestType === "admin_approval") {
+          const approvedEmail = String(reviewedRequest.targetEmail || reviewedRequest.requestedByEmail || "")
+            .trim()
+            .toLowerCase();
+
+          if (approvedEmail) {
+            const existingProfile = current.adminProfiles.find(
+              (profile) => profile.email.toLowerCase() === approvedEmail
+            );
+
+            const approvedProfile: SuperAdminProfile = {
+              id: existingProfile?.id || `approved-${approvedEmail}`,
+              email: approvedEmail,
+              displayName:
+                reviewedRequest.targetName ||
+                existingProfile?.displayName ||
+                approvedEmail.split("@")[0],
+              photoURL: existingProfile?.photoURL || null,
+              role: existingProfile?.role === "superadmin" ? "superadmin" : "admin",
+              active: true,
+              loginCount: existingProfile?.loginCount || 0,
+              lastAdminLoginAt: existingProfile?.lastAdminLoginAt || null,
+              createdAt: existingProfile?.createdAt || new Date().toISOString(),
+            };
+
+            nextAdminProfiles = [
+              approvedProfile,
+              ...current.adminProfiles.filter((profile) => profile.email.toLowerCase() !== approvedEmail),
+            ];
+          }
+        }
+
+        const wasPending = previousRequest?.status === "pending";
+        const nextPendingRequests = wasPending
+          ? Math.max(0, Number(current.summary.pendingRequests || 0) - 1)
+          : Number(current.summary.pendingRequests || 0);
+
+        return {
+          ...current,
+          summary: {
+            ...current.summary,
+            pendingRequests: nextPendingRequests,
+          },
+          accessRequests: nextAccessRequests,
+          adminProfiles: nextAdminProfiles,
+        };
+      });
+
+      setRoleSuccess(`Request ${status}.`);
+    } catch (reviewError) {
+      setError(reviewError instanceof Error ? reviewError.message : "Failed to review access request.");
+    } finally {
+      setReviewingRequestId(null);
+    }
+  };
+
   const adminProfiles = dashboard?.adminProfiles || [];
   const customerProfiles = dashboard?.customerProfiles || [];
+  const pendingAccessRequests = useMemo(
+    () =>
+      (dashboard?.accessRequests || []).filter(
+        (request) => request.status === "pending" && request.requestType === "admin_approval"
+      ),
+    [dashboard?.accessRequests]
+  );
 
   if (!mounted || loading) {
     return (
@@ -342,6 +430,65 @@ export default function SuperAdminPortalPage() {
                       ))}
                     </div>
                   </div>
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-[28px] border-gray-100 shadow-sm bg-white">
+                <CardHeader>
+                  <CardTitle className="text-xl flex items-center gap-2"><Shield className="h-5 w-5 text-slate-700" /> Access Requests</CardTitle>
+                  <CardDescription>Approve or reject pending admin access requests.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {pendingAccessRequests.length === 0 ? (
+                    <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-5 text-sm text-gray-600">
+                      No pending admin access requests.
+                    </div>
+                  ) : (
+                    <div className="space-y-3 max-h-[540px] overflow-auto pr-1">
+                      {pendingAccessRequests.map((request: SuperAdminAccessRequest) => {
+                        const targetEmail = request.targetEmail || request.requestedByEmail;
+                        return (
+                          <div key={request.id} className="rounded-2xl border border-gray-200 bg-gray-50 p-4 space-y-3">
+                            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                              <div>
+                                <p className="text-sm font-semibold text-gray-900">{request.targetName || targetEmail}</p>
+                                <p className="text-xs text-gray-500">{targetEmail}</p>
+                                <p className="mt-2 text-xs text-gray-600">Requested by: {request.requestedByEmail}</p>
+                              </div>
+                              <Badge className="w-fit rounded-full bg-amber-100 text-amber-800 hover:bg-amber-100">pending</Badge>
+                            </div>
+
+                            <div className="space-y-1">
+                              <p className="text-sm font-semibold text-gray-800">{request.title}</p>
+                              <p className="text-sm text-gray-600 leading-relaxed">{request.message}</p>
+                            </div>
+
+                            <div className="flex flex-wrap gap-2 pt-1">
+                              <Button
+                                type="button"
+                                className="rounded-xl"
+                                disabled={reviewingRequestId === request.id}
+                                onClick={() => handleReviewAccessRequest(request.id, "approved")}
+                              >
+                                {reviewingRequestId === request.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                Approve
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                className="rounded-xl"
+                                disabled={reviewingRequestId === request.id}
+                                onClick={() => handleReviewAccessRequest(request.id, "rejected")}
+                              >
+                                {reviewingRequestId === request.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                Reject
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>

@@ -7,6 +7,8 @@ const productSchema = new mongoose.Schema(
     price: { type: Number, required: true, min: 0 },
     category: { type: String, required: true, trim: true },
     dealerId: { type: String, required: true, index: true },
+    dealerName: { type: String, required: true, trim: true },
+    dealerEmail: { type: String, required: true, trim: true, lowercase: true, index: true },
     image: { type: String, required: true, trim: true },
     images: { type: [String], default: [] },
     galleryImages: { type: [String], default: [] },
@@ -19,5 +21,7 @@ const productSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+productSchema.index({ dealerId: 1, createdAt: -1 });
 
 module.exports = mongoose.models.Product || mongoose.model("Product", productSchema);

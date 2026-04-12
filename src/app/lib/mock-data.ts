@@ -14,6 +14,8 @@ export interface Product {
   price: number;
   category: string;
   dealerId: string;
+  dealerName?: string;
+  dealerEmail?: string | null;
   image: string;
   images?: string[];
   galleryImages?: string[];

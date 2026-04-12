@@ -12,6 +12,8 @@ const seedProductsData = [
     price: 49.99,
     category: "Embroidery Designs",
     dealerId: "seed-admin",
+    dealerName: "Seed Admin",
+    dealerEmail: "seed-admin@stitchmart.local",
     image: "https://picsum.photos/seed/design1/600/600",
     galleryImages: [
       "https://images.unsplash.com/photo-1595341595379-cf0f0f94f9d1?auto=format&fit=crop&q=80&w=1200",
@@ -29,6 +31,8 @@ const seedProductsData = [
     price: 35,
     category: "Machine Threads",
     dealerId: "seed-admin",
+    dealerName: "Seed Admin",
+    dealerEmail: "seed-admin@stitchmart.local",
     image: "https://picsum.photos/seed/thread1/400/400",
     galleryImages: [
       "https://images.unsplash.com/photo-1584208124888-3f7a7f9699d0?auto=format&fit=crop&q=80&w=1200",
@@ -45,6 +49,8 @@ const seedProductsData = [
     price: 25,
     category: "Hoodies",
     dealerId: "seed-admin",
+    dealerName: "Seed Admin",
+    dealerEmail: "seed-admin@stitchmart.local",
     image: "https://picsum.photos/seed/hoodie1/600/600",
     galleryImages: [
       "https://images.unsplash.com/photo-1618354691261-e2a0a4f6f07b?auto=format&fit=crop&q=80&w=1200",
@@ -61,6 +67,8 @@ const seedProductsData = [
     price: 18.5,
     category: "Blouses",
     dealerId: "seed-admin",
+    dealerName: "Seed Admin",
+    dealerEmail: "seed-admin@stitchmart.local",
     image: "https://picsum.photos/seed/blouse1/600/600",
     galleryImages: [
       "https://images.unsplash.com/photo-1583391733981-5871f92f9f2f?auto=format&fit=crop&q=80&w=1200",
@@ -148,6 +156,8 @@ function normalizeProduct(doc) {
     price: doc.price,
     category: doc.category,
     dealerId: doc.dealerId,
+    dealerName: doc.dealerName || "Unknown Admin",
+    dealerEmail: doc.dealerEmail || null,
     image: doc.image,
     images: galleryImages,
     galleryImages,
@@ -241,6 +251,15 @@ async function getDisplayNameForUser(userId, role) {
 
   const user = await User.findById(userId).select("displayName");
   return user?.displayName || "Customer";
+}
+
+async function getScopedProductIdsForModerator(auth) {
+  if (auth?.role === "superadmin") {
+    return null;
+  }
+
+  const ownedProducts = await Product.find({ dealerId: auth.sub }).select("_id");
+  return ownedProducts.map((product) => product._id);
 }
 
 async function syncProductRating(productId) {
@@ -392,6 +411,18 @@ async function createProduct(req, res, next) {
       });
     }
 
+    const creatorProfile = await AdminProfile.findById(req.auth.sub).select("displayName email");
+    const fallbackName = String(req.auth.email || "admin").split("@")[0];
+    const dealerName = creatorProfile?.displayName || fallbackName;
+    const dealerEmail = String(creatorProfile?.email || req.auth.email || "").trim().toLowerCase();
+
+    if (!dealerEmail) {
+      return res.status(400).json({
+        success: false,
+        message: "Admin email is required to create products",
+      });
+    }
+
     const primaryImage = normalizedGallery[0];
 
     const product = await Product.create({
@@ -399,6 +430,8 @@ async function createProduct(req, res, next) {
       description,
       price: Number(price),
       category,
+      dealerName,
+      dealerEmail,
       image: primaryImage,
       images: normalizedGallery,
       galleryImages: normalizedGallery,
@@ -595,6 +628,18 @@ async function getReviewModerationQueue(req, res, next) {
 
     const { status, search } = req.query;
     const filter = {};
+    const scopedProductIds = await getScopedProductIdsForModerator(req.auth);
+
+    if (Array.isArray(scopedProductIds)) {
+      if (scopedProductIds.length === 0) {
+        return res.status(200).json({
+          success: true,
+          reviews: [],
+        });
+      }
+
+      filter.productId = { $in: scopedProductIds };
+    }
 
     if (status && ["approved", "hidden", "flagged", "pending"].includes(String(status))) {
       filter.moderationStatus = String(status);
@@ -647,6 +692,17 @@ async function updateReviewModeration(req, res, next) {
       });
     }
 
+    if (req.auth?.role !== "superadmin") {
+      const product = await Product.findById(review.productId).select("dealerId");
+
+      if (!product || product.dealerId !== req.auth.sub) {
+        return res.status(403).json({
+          success: false,
+          message: "You can only moderate reviews for your own products",
+        });
+      }
+    }
+
     review.moderationStatus = String(moderationStatus);
     review.moderationNote = typeof moderationNote === "string" ? moderationNote.trim().slice(0, 300) : null;
     review.moderatedBy = req.auth.sub;
@@ -678,8 +734,21 @@ async function getReviewModerationActivity(req, res, next) {
 
     const limitValue = Number.parseInt(String(req.query.limit || "50"), 10);
     const safeLimit = Number.isFinite(limitValue) ? Math.min(Math.max(limitValue, 1), 200) : 50;
+    const scopedProductIds = await getScopedProductIdsForModerator(req.auth);
+    const activityFilter = { moderatedAt: { $ne: null } };
 
-    const reviews = await Review.find({ moderatedAt: { $ne: null } })
+    if (Array.isArray(scopedProductIds)) {
+      if (scopedProductIds.length === 0) {
+        return res.status(200).json({
+          success: true,
+          activity: [],
+        });
+      }
+
+      activityFilter.productId = { $in: scopedProductIds };
+    }
+
+    const reviews = await Review.find(activityFilter)
       .populate("productId", "name category")
       .sort({ moderatedAt: -1 })
       .limit(safeLimit);

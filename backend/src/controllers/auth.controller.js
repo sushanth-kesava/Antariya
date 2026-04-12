@@ -164,17 +164,44 @@ async function loginWithGoogle(req, res, next) {
       const isAllowedPrivilegedEmail = emailAllowedAsAdmin || Boolean(existingAdmin);
 
       if (!isAllowedPrivilegedEmail) {
-        const request = await AccessRequest.create({
-          requestType: "admin_approval",
-          requestedById: googleProfile.sub,
-          requestedByEmail: normalizedEmail,
-          requestedByRole: "admin",
-          targetEmail: normalizedEmail,
-          targetName: googleProfile.name || googleProfile.email.split("@")[0],
-          title: "Admin access request",
-          message: "An admin access request was submitted from login/sign-up.",
-          requestedScopes: ["portal:admin", "portal:customer"],
-        });
+        let request;
+
+        try {
+          request = await AccessRequest.findOneAndUpdate(
+            {
+              requestType: "admin_approval",
+              targetEmail: normalizedEmail,
+              status: "pending",
+            },
+            {
+              $setOnInsert: {
+                requestType: "admin_approval",
+                requestedById: googleProfile.sub,
+                requestedByEmail: normalizedEmail,
+                requestedByRole: "admin",
+                targetEmail: normalizedEmail,
+                targetName: googleProfile.name || googleProfile.email.split("@")[0],
+                title: "Admin access request",
+                message: "An admin access request was submitted from login/sign-up.",
+                requestedScopes: ["portal:admin", "portal:customer"],
+              },
+            },
+            {
+              new: true,
+              upsert: true,
+            }
+          );
+        } catch (requestError) {
+          if (requestError?.code === 11000) {
+            request = await AccessRequest.findOne({
+              requestType: "admin_approval",
+              targetEmail: normalizedEmail,
+              status: "pending",
+            }).sort({ createdAt: -1 });
+          } else {
+            throw requestError;
+          }
+        }
 
         return res.status(202).json({
           success: true,

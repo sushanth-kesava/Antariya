@@ -3,6 +3,9 @@ const mongoose = require("mongoose");
 const orderItemSchema = new mongoose.Schema(
   {
     productId: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true },
+    dealerId: { type: String, required: true, index: true },
+    dealerName: { type: String, required: true, trim: true },
+    dealerEmail: { type: String, required: true, trim: true, lowercase: true },
     name: { type: String, required: true },
     image: { type: String, required: true },
     price: { type: Number, required: true, min: 0 },

@@ -165,19 +165,64 @@ async function createAccessRequest(req, res, next) {
       });
     }
 
-    const request = await AccessRequest.create({
-      requestType,
-      requestedById: req.auth.sub,
-      requestedByEmail: req.auth.email,
-      requestedByRole: req.auth.role,
-      targetEmail: targetEmail ? String(targetEmail).trim().toLowerCase() : null,
-      targetName: targetName ? String(targetName).trim() : null,
-      title: String(title).trim(),
-      message: String(message).trim(),
-      requestedScopes: Array.isArray(requestedScopes)
-        ? requestedScopes.map((value) => String(value).trim()).filter(Boolean)
-        : [],
-    });
+    const normalizedTargetEmail = targetEmail ? String(targetEmail).trim().toLowerCase() : null;
+    const normalizedTitle = String(title).trim();
+    const normalizedMessage = String(message).trim();
+    const normalizedScopes = Array.isArray(requestedScopes)
+      ? requestedScopes.map((value) => String(value).trim()).filter(Boolean)
+      : [];
+
+    let request;
+    if (requestType === "admin_approval" && normalizedTargetEmail) {
+      try {
+        request = await AccessRequest.findOneAndUpdate(
+          {
+            requestType: "admin_approval",
+            targetEmail: normalizedTargetEmail,
+            status: "pending",
+          },
+          {
+            $setOnInsert: {
+              requestType,
+              requestedById: req.auth.sub,
+              requestedByEmail: req.auth.email,
+              requestedByRole: req.auth.role,
+              targetEmail: normalizedTargetEmail,
+              targetName: targetName ? String(targetName).trim() : null,
+              title: normalizedTitle,
+              message: normalizedMessage,
+              requestedScopes: normalizedScopes,
+            },
+          },
+          {
+            new: true,
+            upsert: true,
+          }
+        );
+      } catch (requestError) {
+        if (requestError?.code === 11000) {
+          request = await AccessRequest.findOne({
+            requestType: "admin_approval",
+            targetEmail: normalizedTargetEmail,
+            status: "pending",
+          }).sort({ createdAt: -1 });
+        } else {
+          throw requestError;
+        }
+      }
+    } else {
+      request = await AccessRequest.create({
+        requestType,
+        requestedById: req.auth.sub,
+        requestedByEmail: req.auth.email,
+        requestedByRole: req.auth.role,
+        targetEmail: normalizedTargetEmail,
+        targetName: targetName ? String(targetName).trim() : null,
+        title: normalizedTitle,
+        message: normalizedMessage,
+        requestedScopes: normalizedScopes,
+      });
+    }
 
     return res.status(201).json({
       success: true,

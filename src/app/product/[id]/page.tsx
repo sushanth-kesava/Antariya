@@ -285,6 +285,8 @@ export default function ProductDetails({ params }: { params: Promise<{ id: strin
           : undefined,
       }
     : null;
+  const sellerName = product?.dealerName || "Admin";
+  const sellerEmail = product?.dealerEmail || "Not provided";
 
   useEffect(() => {
     if (galleryImages.length > 0) {
@@ -811,6 +813,12 @@ export default function ProductDetails({ params }: { params: Promise<{ id: strin
               </div>
               
               <p className="text-xl text-muted-foreground leading-relaxed">{product.description}</p>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <p className="text-xs uppercase tracking-wide text-slate-600 font-semibold">Seller</p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">{sellerName}</p>
+                <p className="text-xs text-slate-600">Dealer contact: {sellerEmail}</p>
+              </div>
             </div>
 
             <div className="p-8 rounded-[32px] bg-card border border-border/50 shadow-sm space-y-8">

@@ -33,5 +33,16 @@ const accessRequestSchema = new mongoose.Schema(
 );
 
 accessRequestSchema.index({ status: 1, createdAt: -1 });
+accessRequestSchema.index(
+  { requestType: 1, targetEmail: 1, status: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      requestType: "admin_approval",
+      status: "pending",
+      targetEmail: { $type: "string" },
+    },
+  }
+);
 
 module.exports = mongoose.models.AccessRequest || mongoose.model("AccessRequest", accessRequestSchema);

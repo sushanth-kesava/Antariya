@@ -19,6 +19,9 @@ export type OrderItemInput = {
 
 export type OrderItem = {
   productId: string;
+  dealerId?: string;
+  dealerName?: string;
+  dealerEmail?: string;
   name: string;
   image: string;
   price: number;
