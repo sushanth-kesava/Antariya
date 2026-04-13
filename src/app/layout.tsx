@@ -1,10 +1,21 @@
 
 import type {Metadata} from 'next';
+import { Inter, Literata } from 'next/font/google';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { BRAND_ICON_URL, BRAND_LOGO_URL } from '@/lib/brand';
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+});
+
+const literata = Literata({
+  subsets: ['latin'],
+  variable: '--font-literata',
+});
 
 export const metadata: Metadata = {
   title: 'Antariya | Premium Embroidery Marketplace',
@@ -44,11 +55,8 @@ export default function RootLayout({
         <link rel="icon" href={BRAND_ICON_URL} />
         <link rel="shortcut icon" href={BRAND_ICON_URL} />
         <link rel="apple-touch-icon" href={BRAND_ICON_URL} />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Literata:opsz,wght@7..72,400;7..72,600;7..72,700&display=swap" rel="stylesheet" />
       </head>
-      <body className="font-body antialiased selection:bg-primary selection:text-white">
+      <body className={`${inter.variable} ${literata.variable} font-body antialiased selection:bg-primary selection:text-white`}>
         <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "YOUR_GOOGLE_CLIENT_ID"}>
           {children}
           <Toaster />

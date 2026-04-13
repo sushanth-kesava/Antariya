@@ -7,7 +7,7 @@ import { CATEGORIES, Product } from "@/app/lib/mock-data";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Filter, Search, ChevronDown, RefreshCw, Sparkles, Palette, ShoppingBag, ArrowRight } from "lucide-react";
+import { Filter, Search, ChevronDown, RefreshCw, Sparkles, Palette, ShoppingBag } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { getProductsFromBackend } from "@/lib/api/products";

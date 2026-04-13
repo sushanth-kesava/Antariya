@@ -10,7 +10,6 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { 
   ShoppingCart, 
   Heart, 
-  Download, 
   Star, 
   ShieldCheck, 
   Truck, 
@@ -56,6 +55,32 @@ const LAST_SUCCESSFUL_PINCODE_KEY = "antariya_last_successful_pincode";
 const APPAREL_CATEGORIES = new Set(["Hoodies", "Blouses"]);
 
 type ReviewTag = "All" | "Quality" | "Fit" | "Delivery" | "Customization";
+
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  if (typeof error === "object" && error !== null && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim().length > 0) {
+      return message;
+    }
+  }
+
+  return fallback;
+}
+
+function getErrorCode(error: unknown) {
+  if (typeof error === "object" && error !== null && "code" in error) {
+    const code = (error as { code?: unknown }).code;
+    if (typeof code === "number") {
+      return code;
+    }
+  }
+
+  return undefined;
+}
 
 function getSizeChart(category: string) {
   if (category === "Hoodies") {
@@ -174,8 +199,8 @@ export default function ProductDetails({ params }: { params: Promise<{ id: strin
       try {
         const data = await getProductByIdFromBackend(id);
         setProduct(data);
-      } catch (err: any) {
-        setError(err?.message || "Failed to load product");
+      } catch (err) {
+        setError(getErrorMessage(err, "Failed to load product"));
       } finally {
         setLoading(false);
       }
@@ -447,10 +472,10 @@ export default function ProductDetails({ params }: { params: Promise<{ id: strin
         title: result.saved ? "Saved to wishlist" : "Removed from wishlist",
         description: result.saved ? `${product.name} has been added to your wishlist.` : `${product.name} has been removed from your wishlist.`,
       });
-    } catch (wishlistError: any) {
+    } catch (wishlistError) {
       toast({
         title: "Wishlist update failed",
-        description: wishlistError?.message || "Please try again.",
+        description: getErrorMessage(wishlistError, "Please try again."),
       });
     } finally {
       setWishlistLoading(false);
@@ -521,10 +546,10 @@ export default function ProductDetails({ params }: { params: Promise<{ id: strin
         title: "Review submitted",
         description: "Thanks for your feedback.",
       });
-    } catch (submitError: any) {
+    } catch (submitError) {
       toast({
         title: "Review submission failed",
-        description: submitError?.message || "Please try again.",
+        description: getErrorMessage(submitError, "Please try again."),
       });
     } finally {
       setSubmittingReview(false);
@@ -568,10 +593,10 @@ export default function ProductDetails({ params }: { params: Promise<{ id: strin
         returnEligible: Boolean(result.returnEligible),
       });
       persistSuccessfulPincode(normalized);
-    } catch (checkError: any) {
+    } catch (checkError) {
       setDeliveryResult({
         status: "unavailable",
-        message: checkError?.message || "Unable to verify delivery right now. Please try again.",
+        message: getErrorMessage(checkError, "Unable to verify delivery right now. Please try again."),
       });
     }
   };
@@ -641,11 +666,12 @@ export default function ProductDetails({ params }: { params: Promise<{ id: strin
         returnEligible: Boolean(result.returnEligible),
       });
       persistSuccessfulPincode(detectedPincode);
-    } catch (locationError: any) {
+    } catch (locationError) {
+      const errorCode = getErrorCode(locationError);
       const fallbackMessage =
-        locationError?.code === 1
+        errorCode === 1
           ? "Location permission denied. Please allow location access or enter pincode manually."
-          : locationError?.message || "Unable to fetch pincode from your location right now.";
+          : getErrorMessage(locationError, "Unable to fetch pincode from your location right now.");
 
       setDeliveryResult({
         status: "unavailable",
@@ -699,7 +725,7 @@ export default function ProductDetails({ params }: { params: Promise<{ id: strin
           <div className="space-y-2">
             <h2 className="text-3xl font-bold font-headline">Product Not Found</h2>
             <p className="text-muted-foreground max-w-md mx-auto">
-              We couldn't find the product you're looking for. It might have been removed or the ID is incorrect.
+              We couldn&apos;t find the product you&apos;re looking for. It might have been removed or the ID is incorrect.
             </p>
           </div>
           <Button asChild className="rounded-full px-8 h-12">
@@ -799,7 +825,7 @@ export default function ProductDetails({ params }: { params: Promise<{ id: strin
               
               <div className="flex items-center gap-6">
                 <span className="text-4xl font-bold text-primary">{formatINR(normalizeCatalogPriceToINR(Number(product.price || 0)))}</span>
-                <Badge className="bg-green-500/10 text-green-600 border-none px-4 py-1 text-sm font-bold">In Stock: {product.stock}</Badge>
+                <Badge className="bg-green-500/10 text-green-600 border-none px-4 py-1 text-sm font-bold">{stockBadgeLabel}</Badge>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 {product.stock === 0 ? (
@@ -1087,7 +1113,7 @@ export default function ProductDetails({ params }: { params: Promise<{ id: strin
                     <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground">Product Story</p>
                     <h3 className="text-2xl font-bold">Why this product stands out</h3>
                     <p className="text-muted-foreground leading-relaxed">
-                      Crafted with precision and inspired by India's rich textile heritage, this product is designed for customers who want a dependable base with a premium finish. It balances comfort, durability, and embroidery readiness so your final piece looks intentional from day one.
+                      Crafted with precision and inspired by India&apos;s rich textile heritage, this product is designed for customers who want a dependable base with a premium finish. It balances comfort, durability, and embroidery readiness so your final piece looks intentional from day one.
                     </p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
                       {getProductHighlights(product.category).map((item) => (
