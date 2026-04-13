@@ -15,10 +15,24 @@ const { notFound, errorHandler } = require("./middleware/error.middleware");
 
 const app = express();
 
+const allowedOrigins = Array.isArray(env.frontendUrls)
+  ? env.frontendUrls
+  : [env.frontendUrl].filter(Boolean);
+
 app.use(helmet());
 app.use(
   cors({
-    origin: env.frontendUrl,
+    origin(origin, callback) {
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Not allowed by CORS"));
+    },
     credentials: true,
   })
 );
