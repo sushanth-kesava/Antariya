@@ -16,7 +16,7 @@ function normalizeDisplayName(email, displayName) {
   return String(email || "user").split("@")[0];
 }
 
-function issueAuthResponse(authDocument, inferredRole) {
+function issueJwtToken(authDocument, inferredRole) {
   const jwtPayload = {
     sub: authDocument._id.toString(),
     email: authDocument.email,
@@ -24,7 +24,11 @@ function issueAuthResponse(authDocument, inferredRole) {
   };
 
   const jwtOptions = env.jwtExpiresIn ? { expiresIn: env.jwtExpiresIn } : undefined;
-  const appToken = jwt.sign(jwtPayload, env.jwtSecret, jwtOptions);
+  return jwt.sign(jwtPayload, env.jwtSecret, jwtOptions);
+}
+
+function issueAuthResponse(authDocument, inferredRole) {
+  const appToken = issueJwtToken(authDocument, inferredRole);
 
   return {
     success: true,
@@ -130,15 +134,10 @@ async function loginWithGoogle(req, res, next) {
     const existingUser = await User.findOne({ email: normalizedEmail });
 
     const requestedRole = selectedRole || "customer";
-    const emailAllowedAsSuperAdmin = env.superAdminAllowedEmails.includes(normalizedEmail);
-    const emailAllowedAsAdmin = env.adminAllowedEmails.includes(normalizedEmail);
     const existingAdminRole = existingAdmin?.role === "superadmin" ? "superadmin" : existingAdmin ? "admin" : "customer";
-
-    const inferredRole = emailAllowedAsSuperAdmin || existingAdminRole === "superadmin"
-      ? "superadmin"
-      : emailAllowedAsAdmin || existingAdminRole === "admin"
-        ? "admin"
-        : "customer";
+    const inferredRole = existingAdminRole;
+    const isEligibleForAdminRequest =
+      env.adminAllowedEmails.length === 0 || env.adminAllowedEmails.includes(normalizedEmail);
 
     if (requestedRole === "customer" && inferredRole !== "customer") {
       return res.status(409).json({
@@ -199,90 +198,72 @@ async function loginWithGoogle(req, res, next) {
       authDocument = await adminDocument.save();
       shouldSendWelcomeEmail = isNewSuperAdmin;
     } else if (requestedRole === "admin" && inferredRole === "customer") {
-      const isEligibleForAdminRequest =
-        env.adminAllowedEmails.length === 0 || env.adminAllowedEmails.includes(normalizedEmail);
-
-      if (!existingAdmin) {
-        if (!isEligibleForAdminRequest) {
-          return res.status(403).json({
-            success: false,
-            message: "This email is not eligible for admin access request.",
-          });
-        }
-
-        let request;
-
-        try {
-          request = await AccessRequest.findOneAndUpdate(
-            {
-              requestType: "admin_approval",
-              targetEmail: normalizedEmail,
-              status: "pending",
-            },
-            {
-              $setOnInsert: {
-                requestType: "admin_approval",
-                requestedById: googleProfile.sub,
-                requestedByEmail: normalizedEmail,
-                requestedByRole: "admin",
-                targetEmail: normalizedEmail,
-                targetName: googleProfile.name || googleProfile.email.split("@")[0],
-                title: "Admin access request",
-                message: "An admin access request was submitted from login/sign-up.",
-                requestedScopes: ["portal:admin", "portal:customer"],
-              },
-            },
-            {
-              new: true,
-              upsert: true,
-            }
-          );
-        } catch (requestError) {
-          if (requestError?.code === 11000) {
-            request = await AccessRequest.findOne({
-              requestType: "admin_approval",
-              targetEmail: normalizedEmail,
-              status: "pending",
-            }).sort({ createdAt: -1 });
-          } else {
-            throw requestError;
-          }
-        }
-
-        return res.status(202).json({
-          success: true,
-          pendingApproval: true,
-          message: "Your admin request has been submitted and is pending approval.",
-          request: {
-            id: request._id,
-            status: request.status,
-          },
-          user: {
-            id: null,
-            email: normalizedEmail,
-            displayName: googleProfile.name || googleProfile.email.split("@")[0],
-            photoURL: googleProfile.picture || null,
-            role: "admin",
-          },
+      if (!isEligibleForAdminRequest) {
+        return res.status(403).json({
+          success: false,
+          message: "This email is not eligible for admin access request.",
         });
       }
 
-      await User.deleteOne({ email: userPayload.email });
+      let request;
 
-      const isNewAdmin = !existingAdmin;
-      const adminDocument = existingAdmin || new AdminProfile({ email: userPayload.email });
-      adminDocument.googleId = userPayload.googleId;
-      adminDocument.displayName = userPayload.displayName;
-      adminDocument.photoURL = userPayload.photoURL;
-      adminDocument.provider = "google";
-      adminDocument.role = existingAdmin?.role === "superadmin" ? "superadmin" : adminDocument.role || "admin";
-      adminDocument.active = true;
-      adminDocument.lastAdminLoginAt = new Date();
-      adminDocument.loginCount = Number(adminDocument.loginCount || 0) + 1;
-      authDocument = await adminDocument.save();
-      shouldSendWelcomeEmail = isNewAdmin;
+      try {
+        request = await AccessRequest.findOneAndUpdate(
+          {
+            requestType: "admin_approval",
+            targetEmail: normalizedEmail,
+            status: "pending",
+          },
+          {
+            $setOnInsert: {
+              requestType: "admin_approval",
+              requestedById: googleProfile.sub,
+              requestedByEmail: normalizedEmail,
+              requestedByRole: "admin",
+              targetEmail: normalizedEmail,
+              targetName: googleProfile.name || googleProfile.email.split("@")[0],
+              title: "Admin access request",
+              message: "An admin access request was submitted from login/sign-up.",
+              requestedScopes: ["portal:admin", "portal:customer"],
+            },
+          },
+          {
+            new: true,
+            upsert: true,
+          }
+        );
+      } catch (requestError) {
+        if (requestError?.code === 11000) {
+          request = await AccessRequest.findOne({
+            requestType: "admin_approval",
+            targetEmail: normalizedEmail,
+            status: "pending",
+          }).sort({ createdAt: -1 });
+        } else {
+          throw requestError;
+        }
+      }
+
+      return res.status(202).json({
+        success: true,
+        pendingApproval: true,
+        message: "Your admin request has been submitted and is pending approval.",
+        request: {
+          id: request._id,
+          status: request.status,
+        },
+        user: {
+          id: null,
+          email: normalizedEmail,
+          displayName: googleProfile.name || googleProfile.email.split("@")[0],
+          photoURL: googleProfile.picture || null,
+          role: "admin",
+        },
+      });
     } else {
       if (inferredRole === "admin") {
+        await User.deleteOne({ email: userPayload.email });
+
         const isNewAdmin = !existingAdmin;
         const adminDocument = existingAdmin || new AdminProfile({ email: userPayload.email });
         adminDocument.googleId = userPayload.googleId;
@@ -531,8 +512,11 @@ async function getCurrentUser(req, res, next) {
       });
     }
 
+    const refreshedToken = issueJwtToken(user, currentRole);
+
     return res.status(200).json({
       success: true,
+      token: refreshedToken,
       user: {
         id: user._id,
         email: user.email,

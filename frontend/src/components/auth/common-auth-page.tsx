@@ -125,7 +125,10 @@ export default function CommonAuthPage({ mode }: { mode: AuthMode }) {
           role: normalizeAppRole(data.user.role),
         } as AuthSessionUser;
 
-        persistAuthSession(token, normalizedUser);
+        const refreshedToken =
+          typeof data.token === "string" && data.token.trim().length > 0 ? data.token : token;
+
+        persistAuthSession(refreshedToken, normalizedUser);
         router.replace(nextPath || getPortalPathForRole(normalizedUser.role));
       } catch {
         clearAuthSession();

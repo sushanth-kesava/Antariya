@@ -17,7 +17,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { googleLogout } from '@react-oauth/google';
 import { CART_UPDATED_EVENT, getCartItemCount } from "@/lib/cart";
-import { clearAuthSession, getPortalPathForRole } from "@/lib/auth-session";
+import { clearAuthSession, getPortalPathForRole, normalizeAppRole, persistAuthSession } from "@/lib/auth-session";
 
 type AuthUser = {
   role?: string;
@@ -65,8 +65,19 @@ export function Navbar() {
           return;
         }
 
-        setUser(data.user);
-        localStorage.setItem('google_auth_user', JSON.stringify(data.user));
+        const normalizedUser = {
+          id: data.user.id,
+          email: data.user.email,
+          displayName: data.user.displayName,
+          photoURL: data.user.photoURL || null,
+          role: normalizeAppRole(data.user.role),
+        };
+
+        const sessionToken =
+          typeof data.token === 'string' && data.token.trim().length > 0 ? data.token : token;
+
+        persistAuthSession(sessionToken, normalizedUser);
+        setUser(normalizedUser);
       } catch {
         clearAuthSession();
         setUser(null);

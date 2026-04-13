@@ -13,7 +13,7 @@ import { getMyOrdersFromBackend } from "@/lib/api/orders";
 import { getWishlistFromBackend, WishlistItem } from "@/lib/api/wishlist";
 import { Footer } from "@/components/footer";
 import { formatINR, formatIndianDate, normalizeCatalogPriceToINR } from "@/lib/india";
-import { clearAuthSession, getPortalPathForRole } from "@/lib/auth-session";
+import { clearAuthSession, getPortalPathForRole, normalizeAppRole, persistAuthSession } from "@/lib/auth-session";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5001/api";
 
@@ -41,24 +41,36 @@ export default function CustomerDashboardClient({ recommendations }: any) {
           const data = await response.json();
 
           if (response.ok && data?.success && data?.user) {
-            if (data.user.role && data.user.role !== "customer") {
-              router.replace(getPortalPathForRole(data.user.role));
+            const normalizedUser = {
+              id: data.user.id,
+              email: data.user.email,
+              displayName: data.user.displayName,
+              photoURL: data.user.photoURL || null,
+              role: normalizeAppRole(data.user.role),
+            };
+
+            const sessionToken =
+              typeof data.token === "string" && data.token.trim().length > 0 ? data.token : token;
+
+            persistAuthSession(sessionToken, normalizedUser);
+
+            if (normalizedUser.role !== "customer") {
+              router.replace(getPortalPathForRole(normalizedUser.role));
               return;
             }
 
             const mappedUser = {
-              id: data.user.id,
-              name: data.user.displayName || "Customer",
-              email: data.user.email || "",
-              role: data.user.role || "customer",
+              id: normalizedUser.id,
+              name: normalizedUser.displayName || "Customer",
+              email: normalizedUser.email || "",
+              role: normalizedUser.role,
             };
 
             setUser(mappedUser);
-            localStorage.setItem("google_auth_user", JSON.stringify(data.user));
-            const backendOrders = await getMyOrdersFromBackend(token);
+            const backendOrders = await getMyOrdersFromBackend(sessionToken);
             setOrders(backendOrders);
             try {
-              const wishlistItems = await getWishlistFromBackend(token);
+              const wishlistItems = await getWishlistFromBackend(sessionToken);
               setWishlist(wishlistItems);
             } catch (wishlistError) {
               console.error("Failed to load wishlist", wishlistError);

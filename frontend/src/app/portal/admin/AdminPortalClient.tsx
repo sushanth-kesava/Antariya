@@ -45,9 +45,9 @@ import {
   updateAdminOrderStatusOnBackend,
 } from "@/lib/api/orders";
 import { formatINR, formatIndianDate, formatIndianDateTime, normalizeCatalogPriceToINR } from "@/lib/india";
-import { clearAuthSession, getPortalPathForRole } from "@/lib/auth-session";
+import { clearAuthSession, getPortalPathForRole, normalizeAppRole, persistAuthSession } from "@/lib/auth-session";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://api.antariyaofficial.com/";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://api.antariyaofficial.com/api";
 
 type AdminView =
   | "operations-overview"
@@ -134,23 +134,36 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
           return;
         }
 
-        if (data.user.role !== "admin") {
+        const normalizedUser = {
+          id: data.user.id,
+          email: data.user.email,
+          displayName: data.user.displayName,
+          photoURL: data.user.photoURL || null,
+          role: normalizeAppRole(data.user.role),
+        };
+
+        const sessionToken =
+          typeof data.token === "string" && data.token.trim().length > 0 ? data.token : token;
+
+        persistAuthSession(sessionToken, normalizedUser);
+
+        if (normalizedUser.role !== "admin") {
           setLoadingCatalog(false);
-          router.replace(getPortalPathForRole(data.user.role));
+          router.replace(getPortalPathForRole(normalizedUser.role));
           return;
         }
 
-        setAuthToken(token);
-        setAdminUser(data.user);
+        setAuthToken(sessionToken);
+        setAdminUser(normalizedUser);
         const [products, adminDashboard] = await Promise.all([
-          getProductsFromBackend({ dealerId: data.user.id }),
-          getAdminDashboardFromBackend(token),
+          getProductsFromBackend({ dealerId: normalizedUser.id }),
+          getAdminDashboardFromBackend(sessionToken),
         ]);
         setCatalog(products);
         setDashboardData(adminDashboard);
         try {
           setLoadingModeration(true);
-          const reviews = await getReviewModerationQueueFromBackend(token, { status: "pending" });
+          const reviews = await getReviewModerationQueueFromBackend(sessionToken, { status: "pending" });
           setModerationQueue(reviews);
         } catch (moderationLoadError) {
           console.error("Failed to preload moderation queue", moderationLoadError);
@@ -161,7 +174,7 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
 
         try {
           setLoadingModerationActivity(true);
-          const activity = await getReviewModerationActivityFromBackend(token, 20);
+          const activity = await getReviewModerationActivityFromBackend(sessionToken, 20);
           setModerationActivity(activity);
         } catch (activityLoadError) {
           console.error("Failed to preload moderation activity", activityLoadError);
@@ -172,7 +185,7 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
 
         setLoadingCatalog(false);
         setAuthChecked(true);
-      } catch (err) {
+      } catch {
         clearAuthSession();
         setLoadingCatalog(false);
         router.replace("/login");

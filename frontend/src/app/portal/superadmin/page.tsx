@@ -32,7 +32,7 @@ import {
   updateUserRoleOnBackend,
 } from "@/lib/api/superadmin";
 import { formatINR } from "@/lib/india";
-import { clearAuthSession, getPortalPathForRole } from "@/lib/auth-session";
+import { clearAuthSession, getPortalPathForRole, normalizeAppRole, persistAuthSession } from "@/lib/auth-session";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5001/api";
 
@@ -68,9 +68,27 @@ export default function SuperAdminPortalPage() {
         });
         const data = await response.json();
 
-        if (!response.ok || !data?.success || !data?.user || data.user.role !== "superadmin") {
-          if (data?.user?.role) {
-            router.replace(getPortalPathForRole(data.user.role));
+        if (!response.ok || !data?.success || !data?.user) {
+          router.replace("/login");
+          return;
+        }
+
+        const normalizedUser = {
+          id: data.user.id,
+          email: data.user.email,
+          displayName: data.user.displayName,
+          photoURL: data.user.photoURL || null,
+          role: normalizeAppRole(data.user.role),
+        };
+
+        const sessionToken =
+          typeof data.token === "string" && data.token.trim().length > 0 ? data.token : token;
+
+        persistAuthSession(sessionToken, normalizedUser);
+
+        if (normalizedUser.role !== "superadmin") {
+          if (normalizedUser.role) {
+            router.replace(getPortalPathForRole(normalizedUser.role));
           } else {
             router.replace("/login");
           }
@@ -78,9 +96,9 @@ export default function SuperAdminPortalPage() {
           return;
         }
 
-        setAuthToken(token);
-        setUser(data.user);
-        const payload = await getSuperAdminDashboardFromBackend(token);
+        setAuthToken(sessionToken);
+        setUser(normalizedUser);
+        const payload = await getSuperAdminDashboardFromBackend(sessionToken);
         setDashboard(payload);
       } catch (sessionError) {
         clearAuthSession();

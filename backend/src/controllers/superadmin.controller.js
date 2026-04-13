@@ -324,6 +324,8 @@ async function reviewAccessRequest(req, res, next) {
       profile.role = profile.role === "superadmin" ? "superadmin" : "admin";
       profile.active = true;
       await profile.save();
+
+      await User.deleteOne({ email: targetEmail });
     }
 
     request.status = status;
@@ -420,9 +422,8 @@ async function updateUserRole(req, res, next) {
     adminDocument.active = true;
     await adminDocument.save();
 
-    if (existingUser && existingUser.role !== "customer") {
-      existingUser.role = "customer";
-      await existingUser.save();
+    if (existingUser) {
+      await User.deleteOne({ email: normalizedEmail });
     }
 
     return res.status(200).json({
