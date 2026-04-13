@@ -3,13 +3,36 @@ const dotenv = require("dotenv");
 
 dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 
+function normalizeOrigin(value) {
+  const candidate = String(value || "").trim().replace(/\/+$/, "");
+
+  if (!candidate) {
+    return "";
+  }
+
+  try {
+    const parsed = new URL(candidate);
+    return `${parsed.protocol}//${parsed.host}`;
+  } catch {
+    return candidate;
+  }
+}
+
+const configuredFrontendUrls = String(process.env.FRONTEND_URLS || process.env.FRONTEND_URL || "http://localhost:9002")
+  .split(",")
+  .map((value) => normalizeOrigin(value))
+  .filter(Boolean);
+
+const frontendUrls = Array.from(new Set(configuredFrontendUrls));
+
 const env = {
   port: process.env.PORT || 5000,
   nodeEnv: process.env.NODE_ENV || "development",
   mongoUri: process.env.MONGODB_URI,
   jwtSecret: process.env.JWT_SECRET,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN,
-  frontendUrl: process.env.FRONTEND_URL || "https://antariyaofficial.com/",
+  frontendUrl: frontendUrls[0] || "http://localhost:9002",
+  frontendUrls,
   appName: process.env.APP_NAME || "StitchMart",
   adminAllowedEmails: String(process.env.ADMIN_ALLOWED_EMAILS || "")
     .split(",")

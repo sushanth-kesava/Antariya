@@ -14,11 +14,19 @@ const wishlistRoutes = require("./routes/wishlist.routes");
 const { notFound, errorHandler } = require("./middleware/error.middleware");
 
 const app = express();
+const allowedOrigins = new Set(env.frontendUrls || [env.frontendUrl].filter(Boolean));
 
 app.use(helmet());
 app.use(
   cors({
-    origin: env.frontendUrl, // Now set to https://antariyaofficial.com via .env
+    origin(origin, callback) {
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      const normalizedOrigin = String(origin).trim().replace(/\/+$/, "");
+      return callback(null, allowedOrigins.has(normalizedOrigin));
+    },
     credentials: true,
   })
 );

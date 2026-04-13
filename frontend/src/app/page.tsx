@@ -10,13 +10,28 @@ import { ChevronRight, Zap, ShieldCheck, Truck, RefreshCcw, Database } from "luc
 import Link from "next/link";
 import { BRAND_LOGO_URL } from "@/lib/brand";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { getProductsFromBackend, seedProductsOnBackend } from "@/lib/api/products";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Home() {
+  const router = useRouter();
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const hostname = window.location.hostname.toLowerCase();
+    const pathname = window.location.pathname;
+
+    if (hostname === "admin.antariyaofficial.com" && (pathname === "/" || pathname === "")) {
+      router.replace("/admin-login");
+    }
+  }, [router]);
 
   useEffect(() => {
     async function fetchData() {
