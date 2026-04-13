@@ -102,7 +102,7 @@ async function loginWithGoogle(req, res, next) {
   try {
     const { googleAccessToken, role = null, tokenType = "Bearer", scope = null, expiresIn = null } = req.body;
     const normalizedRole = role === null || typeof role === "undefined" ? null : String(role).toLowerCase();
-    const selectedRole = normalizedRole === "admin" || normalizedRole === "customer" ? normalizedRole : null;
+    const selectedRole = normalizedRole === "admin" || normalizedRole === "superadmin" || normalizedRole === "customer" ? normalizedRole : null;
 
     if (!googleAccessToken) {
       return res.status(400).json({
@@ -129,15 +129,19 @@ async function loginWithGoogle(req, res, next) {
     const existingAdmin = await AdminProfile.findOne({ email: normalizedEmail, active: true });
     const existingUser = await User.findOne({ email: normalizedEmail });
     const emailAllowedAsAdmin = env.adminAllowedEmails.includes(normalizedEmail);
+    const emailAllowedAsSuperAdmin = env.superAdminAllowedEmails.includes(normalizedEmail);
     const inferredRole = existingAdmin
       ? existingAdmin.role || "admin"
-      : selectedRole === "admin" && emailAllowedAsAdmin
+      : selectedRole === "superadmin" && emailAllowedAsSuperAdmin
+        ? "superadmin"
+        : selectedRole === "admin" && (emailAllowedAsAdmin || emailAllowedAsSuperAdmin)
         ? "admin"
         : existingUser
           ? existingUser.role || "customer"
           : "customer";
 
-    const requestedPrivilegedRole = selectedRole === "admin" ? "admin" : null;
+    const requestedPrivilegedRole =
+      selectedRole === "superadmin" ? "superadmin" : selectedRole === "admin" ? "admin" : null;
 
     const userPayload = {
       googleId: googleProfile.sub,
@@ -160,8 +164,32 @@ async function loginWithGoogle(req, res, next) {
     let authDocument;
     let shouldSendWelcomeEmail = false;
 
-    if (requestedPrivilegedRole === "admin") {
-      const isAllowedPrivilegedEmail = emailAllowedAsAdmin || Boolean(existingAdmin);
+    if (requestedPrivilegedRole === "superadmin") {
+      const isAllowedSuperAdminEmail = emailAllowedAsSuperAdmin || (existingAdmin && existingAdmin.role === "superadmin");
+
+      if (!isAllowedSuperAdminEmail) {
+        return res.status(403).json({
+          success: false,
+          message: "This email is not allowed for superadmin access.",
+        });
+      }
+
+      await User.deleteOne({ email: userPayload.email });
+
+      const isNewSuperAdmin = !existingAdmin;
+      const adminDocument = existingAdmin || new AdminProfile({ email: userPayload.email });
+      adminDocument.googleId = userPayload.googleId;
+      adminDocument.displayName = userPayload.displayName;
+      adminDocument.photoURL = userPayload.photoURL;
+      adminDocument.provider = "google";
+      adminDocument.role = "superadmin";
+      adminDocument.active = true;
+      adminDocument.lastAdminLoginAt = new Date();
+      adminDocument.loginCount = Number(adminDocument.loginCount || 0) + 1;
+      authDocument = await adminDocument.save();
+      shouldSendWelcomeEmail = isNewSuperAdmin;
+    } else if (requestedPrivilegedRole === "admin") {
+      const isAllowedPrivilegedEmail = emailAllowedAsAdmin || emailAllowedAsSuperAdmin || Boolean(existingAdmin);
 
       if (!isAllowedPrivilegedEmail) {
         let request;

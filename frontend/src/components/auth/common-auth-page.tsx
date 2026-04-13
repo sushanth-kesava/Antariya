@@ -69,7 +69,7 @@ export default function CommonAuthPage({ mode }: { mode: AuthMode }) {
   const roleFromQuery = searchParams.get("role");
   const nextPath = useMemo(() => sanitizeNextPath(searchParams.get("next")), [searchParams]);
   const selectedRole = useMemo(() => normalizeRole(roleFromQuery), [roleFromQuery]);
-  const selectedRoleForGoogle = selectedRole === "superadmin" ? undefined : selectedRole;
+  const selectedRoleForGoogle = selectedRole;
   const isSignup = mode === "signup";
   const blockedSuperadminSignup = isSignup && selectedRole === "superadmin";
   const isSuperadminCredentialsFlow = !isSignup && selectedRole === "superadmin";
