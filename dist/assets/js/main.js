@@ -224,7 +224,8 @@
 
           if (success) {
             success.hidden = false;
-            success.textContent = payload?.message || "You are on the waitlist. We will notify you before launch.";
+            const confirmationPrefix = payload?.message || "You are on the waitlist. We will notify you before launch.";
+            success.textContent = `${confirmationPrefix} VIP members get a 20% launch coupon and 48-hour early access.`;
             success.classList.remove("waitlist-error");
           }
 
