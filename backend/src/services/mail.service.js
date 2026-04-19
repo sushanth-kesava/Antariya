@@ -159,7 +159,75 @@ async function sendWelcomeEmail({ to, displayName }) {
   return sendMail({ to, ...message });
 }
 
+function buildWaitlistConfirmationMessage({ displayName }) {
+  const appName = env.appName || "StitchMart";
+  const safeName = escapeHtml(displayName || "there");
+  const safeAppName = escapeHtml(appName);
+  const websiteUrl = env.frontendUrl || "https://antariyaofficial.com";
+  const safeWebsiteUrl = escapeHtml(websiteUrl);
+
+  return {
+    subject: `You are on the ${appName} VIP waitlist`,
+    text:
+      `Hi ${displayName || "there"},\n\n` +
+      `Thanks for joining the ${appName} VIP waitlist. You are now in line for early access and launch updates.\n\n` +
+      `We will email you when invites open.\n\n` +
+      `Website: ${websiteUrl}\n\n` +
+      `Regards,\n${appName} Team`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="UTF-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+          <title>${safeAppName} VIP Waitlist</title>
+        </head>
+        <body style="margin:0;padding:0;background:#f5f5f4;font-family:Arial,Helvetica,sans-serif;color:#1c1917;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f4;padding:24px 0;">
+            <tr>
+              <td align="center">
+                <table role="presentation" width="640" cellpadding="0" cellspacing="0" style="width:640px;max-width:94%;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e7e5e4;">
+                  <tr>
+                    <td style="background:#111827;padding:28px;">
+                      <p style="margin:0;font-size:12px;letter-spacing:0.09em;text-transform:uppercase;color:#fbbf24;font-weight:700;">VIP Waitlist</p>
+                      <h1 style="margin:10px 0 0;font-size:30px;line-height:1.2;color:#ffffff;">${safeAppName}</h1>
+                      <p style="margin:10px 0 0;font-size:15px;line-height:1.6;color:#e5e7eb;">You are confirmed for priority launch updates and early access drops.</p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding:30px 28px 12px;">
+                      <p style="margin:0;font-size:17px;line-height:1.6;color:#111827;">Hi <strong>${safeName}</strong>,</p>
+                      <p style="margin:12px 0 0;font-size:15px;line-height:1.7;color:#374151;">Thanks for joining our VIP waitlist. We have secured your spot and will email you first when launch access opens.</p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td align="center" style="padding:16px 28px 8px;">
+                      <a href="${safeWebsiteUrl}" style="display:inline-block;background:#111827;color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;padding:13px 30px;border-radius:10px;">Visit ${safeAppName}</a>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding:18px 28px 28px;">
+                      <p style="margin:0;font-size:13px;line-height:1.6;color:#57534e;">This email confirms your VIP waitlist registration.</p>
+                      <p style="margin:12px 0 0;font-size:12px;line-height:1.6;color:#a8a29e;">${safeAppName} Team</p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+      </html>
+    `,
+  };
+}
+
+async function sendWaitlistConfirmationEmail({ to, displayName }) {
+  const message = buildWaitlistConfirmationMessage({ displayName });
+  return sendMail({ to, ...message });
+}
+
 module.exports = {
   sendWelcomeEmail,
+  sendWaitlistConfirmationEmail,
   hasMailConfig,
 };

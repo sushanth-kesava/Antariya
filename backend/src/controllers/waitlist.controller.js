@@ -1,4 +1,8 @@
 const WaitlistSubscriber = require("../models/WaitlistSubscriber");
+const {
+  sendWaitlistConfirmationEmail,
+  hasMailConfig,
+} = require("../services/mail.service");
 
 function normalizeInput(value) {
   return String(value || "").trim();
@@ -32,6 +36,15 @@ async function subscribeToWaitlist(req, res, next) {
         setDefaultsOnInsert: true,
       }
     );
+
+    if (hasMailConfig()) {
+      sendWaitlistConfirmationEmail({
+        to: subscriber.email,
+        displayName: subscriber.name,
+      }).catch((mailError) => {
+        console.error("Waitlist confirmation email failed:", mailError.message);
+      });
+    }
 
     return res.status(200).json({
       success: true,
