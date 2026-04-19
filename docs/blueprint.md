@@ -1,4 +1,4 @@
-# **App Name**: StitchMart
+# **App Name**: 
 
 ## Core Features:
 

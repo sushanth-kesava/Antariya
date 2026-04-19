@@ -11,6 +11,7 @@ const orderRoutes = require("./routes/order.routes");
 const superAdminRoutes = require("./routes/superadmin.routes");
 const deliveryRoutes = require("./routes/delivery.routes");
 const wishlistRoutes = require("./routes/wishlist.routes");
+const waitlistRoutes = require("./routes/waitlist.routes");
 const { notFound, errorHandler } = require("./middleware/error.middleware");
 
 const app = express();
@@ -64,6 +65,7 @@ app.use("/api/orders", orderRoutes);
 app.use("/api/superadmin", superAdminRoutes);
 app.use("/api/delivery", deliveryRoutes);
 app.use("/api/wishlist", wishlistRoutes);
+app.use("/api/waitlist", waitlistRoutes);
 app.use(notFound);
 app.use(errorHandler);
 
