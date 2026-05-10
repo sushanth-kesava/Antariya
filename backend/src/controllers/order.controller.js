@@ -175,7 +175,7 @@ async function createOrder(req, res, next) {
         productId: product._id,
         dealerId: product.dealerId,
         dealerName: product.dealerName || "Unknown Admin",
-        dealerEmail: product.dealerEmail || "unknown@stitchmart.local",
+        dealerEmail: product.dealerEmail || "unknown@antariya.local",
         name: product.name,
         image: product.image,
         price: unitPriceINR,

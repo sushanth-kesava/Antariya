@@ -5,82 +5,6 @@ const AdminProfile = require("../models/AdminProfile");
 const multer = require("multer");
 const { uploadProductImageBuffer } = require("../services/cloudinary.service");
 
-const seedProductsData = [
-  {
-    name: "Royal Zardosi Floral Pack",
-    description: "A collection of 5 traditional Indian floral designs optimized for high-speed machines.",
-    price: 49.99,
-    category: "Embroidery Designs",
-    dealerId: "seed-admin",
-    dealerName: "Seed Admin",
-    dealerEmail: "seed-admin@stitchmart.local",
-    image: "https://picsum.photos/seed/design1/600/600",
-    galleryImages: [
-      "https://images.unsplash.com/photo-1595341595379-cf0f0f94f9d1?auto=format&fit=crop&q=80&w=1200",
-      "https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?auto=format&fit=crop&q=80&w=1200",
-      "https://images.unsplash.com/photo-1576566588028-4147f3842f27?auto=format&fit=crop&q=80&w=1200",
-    ],
-    stock: 999,
-    fileDownloadLink: "/designs/royal-zardosi.zip",
-    rating: 4.8,
-    customizable: false,
-  },
-  {
-    name: "Vibrant Silk Thread Set",
-    description: "Set of 24 colors, 1000m each. High sheen and break resistance.",
-    price: 35,
-    category: "Machine Threads",
-    dealerId: "seed-admin",
-    dealerName: "Seed Admin",
-    dealerEmail: "seed-admin@stitchmart.local",
-    image: "https://picsum.photos/seed/thread1/400/400",
-    galleryImages: [
-      "https://images.unsplash.com/photo-1584208124888-3f7a7f9699d0?auto=format&fit=crop&q=80&w=1200",
-      "https://images.unsplash.com/photo-1613626630502-182579c04343?auto=format&fit=crop&q=80&w=1200",
-      "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?auto=format&fit=crop&q=80&w=1200",
-    ],
-    stock: 50,
-    rating: 4.5,
-    customizable: false,
-  },
-  {
-    name: "Premium Cotton Hoodie - Jet Black",
-    description: "Heavyweight 400GSM cotton hoodie, perfect for intricate embroidery work.",
-    price: 25,
-    category: "Hoodies",
-    dealerId: "seed-admin",
-    dealerName: "Seed Admin",
-    dealerEmail: "seed-admin@stitchmart.local",
-    image: "https://picsum.photos/seed/hoodie1/600/600",
-    galleryImages: [
-      "https://images.unsplash.com/photo-1618354691261-e2a0a4f6f07b?auto=format&fit=crop&q=80&w=1200",
-      "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&q=80&w=1200",
-      "https://images.unsplash.com/photo-1571945153237-4929e783af4a?auto=format&fit=crop&q=80&w=1200",
-    ],
-    stock: 100,
-    rating: 4.7,
-    customizable: true,
-  },
-  {
-    name: "Silk Blend Blouse Piece",
-    description: "Unstitched blouse piece in rich silk, ready for custom zardosi embroidery.",
-    price: 18.5,
-    category: "Blouses",
-    dealerId: "seed-admin",
-    dealerName: "Seed Admin",
-    dealerEmail: "seed-admin@stitchmart.local",
-    image: "https://picsum.photos/seed/blouse1/600/600",
-    galleryImages: [
-      "https://images.unsplash.com/photo-1583391733981-5871f92f9f2f?auto=format&fit=crop&q=80&w=1200",
-      "https://images.unsplash.com/photo-1622662021019-ffddc9e60f65?auto=format&fit=crop&q=80&w=1200",
-      "https://images.unsplash.com/photo-1614676471928-2ed0ad1061a4?auto=format&fit=crop&q=80&w=1200",
-    ],
-    stock: 150,
-    rating: 4.6,
-    customizable: true,
-  },
-];
-
 const MAX_PRODUCT_IMAGES = 6;
 const MAX_PRODUCT_IMAGE_SIZE_BYTES = 8 * 1024 * 1024;
 
@@ -374,7 +298,7 @@ async function uploadProductImages(req, res, next) {
     const uploaded = await Promise.all(
       files.map((file) =>
         uploadProductImageBuffer(file.buffer, {
-          folder: `stitchmart/products/${req.auth.sub}`,
+          folder: `antariya/products/${req.auth.sub}`,
         })
       )
     );
@@ -495,29 +419,6 @@ async function deleteProduct(req, res, next) {
     return res.status(200).json({
       success: true,
       message: "Product deleted",
-    });
-  } catch (error) {
-    return next(error);
-  }
-}
-
-async function seedProducts(req, res, next) {
-  try {
-    const existingCount = await Product.countDocuments();
-
-    if (existingCount > 0) {
-      return res.status(200).json({
-        success: false,
-        message: "Database already has data.",
-      });
-    }
-
-    const inserted = await Product.insertMany(seedProductsData);
-
-    return res.status(201).json({
-      success: true,
-      message: "Database seeded successfully!",
-      count: inserted.length,
     });
   } catch (error) {
     return next(error);
@@ -789,7 +690,6 @@ module.exports = {
   productImageUploadMiddleware,
   createProduct,
   deleteProduct,
-  seedProducts,
   getProductReviews,
   createProductReview,
   getReviewModerationQueue,

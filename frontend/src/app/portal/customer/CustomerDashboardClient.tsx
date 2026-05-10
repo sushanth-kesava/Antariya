@@ -8,20 +8,88 @@ import { Package, Heart, Download, Settings, Star, LayoutDashboard, Sparkles, Sh
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MOCK_PRODUCTS } from "@/app/lib/mock-data";
+import { type Product } from "@/app/lib/mock-data";
 import { getMyOrdersFromBackend } from "@/lib/api/orders";
 import { getWishlistFromBackend, WishlistItem } from "@/lib/api/wishlist";
+import { getProductsFromBackend } from "@/lib/api/products";
 import { Footer } from "@/components/footer";
 import { formatINR, formatIndianDate, normalizeCatalogPriceToINR } from "@/lib/india";
 import { clearAuthSession, getPortalPathForRole, normalizeAppRole, persistAuthSession } from "@/lib/auth-session";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5001/api";
 
-export default function CustomerDashboardClient({ recommendations }: any) {
+type RecommendationCard = {
+  product: Product;
+  reason: string;
+};
+
+function buildRecommendations(products: Product[], orders: any[], wishlist: WishlistItem[]): RecommendationCard[] {
+  const productById = new Map(products.map((product) => [product.id, product]));
+  const categoryScores = new Map<string, number>();
+  const productIdsFromWishlist = new Set<string>();
+  const productIdsFromOrders = new Set<string>();
+
+  const addScore = (category: string | undefined, weight: number) => {
+    if (!category) {
+      return;
+    }
+
+    categoryScores.set(category, (categoryScores.get(category) || 0) + weight);
+  };
+
+  wishlist.forEach((item) => {
+    productIdsFromWishlist.add(item.product.id);
+    addScore(item.product.category, 3);
+  });
+
+  orders.forEach((order) => {
+    order.items.forEach((orderItem: { productId?: string }) => {
+      if (!orderItem.productId) {
+        return;
+      }
+
+      productIdsFromOrders.add(orderItem.productId);
+      const product = productById.get(orderItem.productId);
+      addScore(product?.category, 2);
+    });
+  });
+
+  const rankedProducts = [...products].sort((left, right) => {
+    const leftScore = categoryScores.get(left.category) || 0;
+    const rightScore = categoryScores.get(right.category) || 0;
+
+    if (leftScore !== rightScore) {
+      return rightScore - leftScore;
+    }
+
+    if (right.rating !== left.rating) {
+      return right.rating - left.rating;
+    }
+
+    return right.stock - left.stock;
+  });
+
+  return rankedProducts.slice(0, 3).map((product) => {
+    let reason = `Trending now in ${product.category}.`;
+
+    if (productIdsFromWishlist.has(product.id)) {
+      reason = "You already saved this item, so it is a strong match for your wishlist.";
+    } else if (productIdsFromOrders.has(product.id)) {
+      reason = "Built around a product you already ordered, with a similar style and fit.";
+    } else if ((categoryScores.get(product.category) || 0) > 0) {
+      reason = `Matches your interest in ${product.category}.`;
+    }
+
+    return { product, reason };
+  });
+}
+
+export default function CustomerDashboardClient() {
   const router = useRouter();
   const [user, setUser] = useState<any>({ name: "Customer", email: "", role: "customer" });
   const [orders, setOrders] = useState<any[]>([]);
   const [wishlist, setWishlist] = useState<WishlistItem[]>([]);
+  const [recommendations, setRecommendations] = useState<RecommendationCard[]>([]);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -72,8 +140,22 @@ export default function CustomerDashboardClient({ recommendations }: any) {
             try {
               const wishlistItems = await getWishlistFromBackend(sessionToken);
               setWishlist(wishlistItems);
+              try {
+                const catalog = await getProductsFromBackend({ limit: 24 });
+                setRecommendations(buildRecommendations(catalog.products, backendOrders, wishlistItems));
+              } catch (catalogError) {
+                console.error("Failed to load recommendation catalog", catalogError);
+                setRecommendations([]);
+              }
             } catch (wishlistError) {
               console.error("Failed to load wishlist", wishlistError);
+              try {
+                const catalog = await getProductsFromBackend({ limit: 24 });
+                setRecommendations(buildRecommendations(catalog.products, backendOrders, []));
+              } catch (catalogError) {
+                console.error("Failed to load recommendation catalog", catalogError);
+                setRecommendations([]);
+              }
             }
             return;
           }
@@ -97,6 +179,7 @@ export default function CustomerDashboardClient({ recommendations }: any) {
   if (!mounted) return null; // Avoid hydration mismatch
 
   const isNewCustomer = orders.length === 0;
+  const purchasedItemsCount = orders.reduce((sum, order) => sum + (order.items?.length || 0), 0);
 
   return (
     <div className="flex-1 flex flex-col w-full">
@@ -124,7 +207,7 @@ export default function CustomerDashboardClient({ recommendations }: any) {
             </Button>
             <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground">
               <Download className="h-4 w-4" />
-              Downloads {orders.length > 0 && <Badge className="ml-auto rounded-full bg-primary/20 text-primary border-none">12</Badge>}
+              Purchases {purchasedItemsCount > 0 && <Badge className="ml-auto rounded-full bg-primary/20 text-primary border-none">{purchasedItemsCount}</Badge>}
             </Button>
             <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground">
               <Heart className="h-4 w-4" />
@@ -139,7 +222,7 @@ export default function CustomerDashboardClient({ recommendations }: any) {
         
         <div className="bg-primary p-6 rounded-2xl text-primary-foreground space-y-4 hidden lg:block shadow-lg shadow-primary/20">
           <p className="text-lg font-bold">Need Help?</p>
-          <p className="text-sm text-primary-foreground/90 leading-relaxed">Our support team is available 24/7 for all your embroidery machine technical issues.</p>
+          <p className="text-sm text-primary-foreground/90 leading-relaxed">Our support team is available for embroidery orders, customization, and product help.</p>
           <Button size="sm" variant="secondary" className="w-full mt-2 rounded-full font-bold">
             Contact Support
           </Button>
@@ -153,12 +236,12 @@ export default function CustomerDashboardClient({ recommendations }: any) {
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border border-primary/20 rounded-3xl p-8 sm:p-12 text-center md:text-left flex flex-col md:flex-row items-center gap-8 shadow-sm">
               <div className="flex-1 space-y-4">
-                <Badge variant="outline" className="border-primary text-primary font-bold tracking-widest px-3 py-1 bg-white">WELCOME TO STITCHMART</Badge>
+                <Badge variant="outline" className="border-primary text-primary font-bold tracking-widest px-3 py-1 bg-white">WELCOME TO ANTARIYA</Badge>
                 <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-gray-900 leading-tight">
                   Your Creative <br className="hidden md:block"/> Journey Begins Here.
                 </h1>
                 <p className="text-lg text-muted-foreground max-w-xl">
-                  Explore our premium, industry-certified embroidery designs, robust machines, and exquisite base garments. As a new member, enjoy an exclusive <span className="text-primary font-bold">15% off</span> your first order!
+                  Explore our premium, industry-certified embroidery designs, robust machines, and exquisite base garments. As a new member, ask support about the latest welcome offers available on live orders.
                 </p>
                 <div className="pt-4 flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
                   <Button asChild size="lg" className="rounded-full h-12 px-8 shadow-lg shadow-primary/30">
@@ -173,8 +256,12 @@ export default function CustomerDashboardClient({ recommendations }: any) {
                   </Button>
                 </div>
               </div>
-              <div className="hidden lg:block w-64 h-64 relative rounded-full overflow-hidden border-8 border-white shadow-xl bg-gray-100 flex-shrink-0">
-                <Image src="https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?auto=format&fit=crop&q=80&w=800" alt="Embroidery Splash" fill className="object-cover" />
+              <div className="hidden lg:flex w-64 h-64 relative rounded-full overflow-hidden border-8 border-white shadow-xl bg-gradient-to-br from-primary via-primary/70 to-accent flex-shrink-0 items-center justify-center text-center px-6">
+                <div className="space-y-2 text-white">
+                  <Sparkles className="h-10 w-10 mx-auto" />
+                  <p className="text-lg font-bold">Live Studio</p>
+                  <p className="text-sm text-white/80">Orders, designs, and support update from your account</p>
+                </div>
               </div>
             </div>
 
@@ -185,7 +272,7 @@ export default function CustomerDashboardClient({ recommendations }: any) {
                   <CardTitle>Shop Designs</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-muted-foreground mb-4">Discover 10,000+ premium digital embroidery designs instantly downloadable.</p>
+                  <p className="text-muted-foreground mb-4">Browse live embroidery designs, garments, and supplies from the current catalog.</p>
                   <Button variant="link" asChild className="p-0 text-blue-600"><Link href="/shop">Explore Library &rarr;</Link></Button>
                 </CardContent>
               </Card>
@@ -205,7 +292,7 @@ export default function CustomerDashboardClient({ recommendations }: any) {
                   <CardTitle>Member Perks</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-muted-foreground mb-4">Complete your profile to earn 500 Loyalty points instantly!</p>
+                  <p className="text-muted-foreground mb-4">Complete your profile to unlock loyalty rewards tied to your live orders.</p>
                   <Button variant="outline" size="sm" className="rounded-full w-full">Complete Profile</Button>
                 </CardContent>
               </Card>
@@ -228,17 +315,17 @@ export default function CustomerDashboardClient({ recommendations }: any) {
               </Card>
               <Card className="shadow-sm">
                 <CardHeader className="pb-2">
-                  <CardDescription>Available Downloads</CardDescription>
-                  <CardTitle className="text-4xl lg:text-5xl">12</CardTitle>
+                  <CardDescription>Purchased Items</CardDescription>
+                  <CardTitle className="text-4xl lg:text-5xl">{purchasedItemsCount}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-muted-foreground">Designs ready to use</p>
+                  <p className="text-sm text-muted-foreground">Items across all completed and active orders</p>
                 </CardContent>
               </Card>
               <Card className="shadow-sm">
                 <CardHeader className="pb-2">
-                  <CardDescription>Loyalty Points</CardDescription>
-                  <CardTitle className="text-4xl lg:text-5xl text-accent">1,250</CardTitle>
+                  <CardDescription>Rewards Status</CardDescription>
+                  <CardTitle className="text-2xl font-semibold text-accent">Live</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground">Redeemable for discounts</p>
@@ -299,42 +386,49 @@ export default function CustomerDashboardClient({ recommendations }: any) {
             <Badge variant="secondary" className="bg-primary/5 text-primary border-primary/20">{isNewCustomer ? "Welcome Picks" : "Personalized"}</Badge>
           </div>
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {recommendations?.recommendations?.map((rec: any, idx: number) => {
-              const mockMatch = MOCK_PRODUCTS.find(p => p.name.includes(rec.productName.split(' ')[0]));
-              const product = mockMatch || MOCK_PRODUCTS[idx % MOCK_PRODUCTS.length];
-              
-              return (
-                <Card key={idx} className="flex flex-col hover:shadow-lg transition-all duration-300 group overflow-hidden border-gray-100 shadow-sm cursor-pointer">
-                  <div className="relative aspect-square sm:aspect-video w-full overflow-hidden bg-gray-100">
-                    <Image 
-                      src={product.image} 
-                      alt={rec.productName} 
-                      fill 
-                      className="object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                    <div className="absolute top-3 left-3">
-                      <Badge className="bg-white/90 text-gray-900 backdrop-blur-sm border-none shadow-sm font-bold">
-                        {rec.category}
-                      </Badge>
+          {recommendations.length === 0 ? (
+            <Card className="border-dashed border-gray-200 shadow-sm">
+              <CardContent className="p-6 text-sm text-muted-foreground">
+                Recommendations will appear once live products and customer activity are available.
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {recommendations.map((rec) => {
+                const product = rec.product;
+
+                return (
+                  <Card key={product.id} className="flex flex-col hover:shadow-lg transition-all duration-300 group overflow-hidden border-gray-100 shadow-sm cursor-pointer">
+                    <div className="relative aspect-square sm:aspect-video w-full overflow-hidden bg-gray-100">
+                      <Image
+                        src={product.image}
+                        alt={product.name}
+                        fill
+                        className="object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                      <div className="absolute top-3 left-3">
+                        <Badge className="bg-white/90 text-gray-900 backdrop-blur-sm border-none shadow-sm font-bold">
+                          {product.category}
+                        </Badge>
+                      </div>
                     </div>
-                  </div>
-                  <CardHeader className="p-5 pb-2">
-                    <CardTitle className="text-lg leading-tight group-hover:text-primary transition-colors">{rec.productName}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-5 pt-0 flex-1 space-y-4">
-                    <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2">{rec.reason}</p>
-                  </CardContent>
-                  <div className="p-5 pt-0 mt-auto flex items-center justify-between">
-                    <span className="font-bold text-lg">{formatINR(normalizeCatalogPriceToINR(Number(product.price || 0)))}</span>
-                    <Button size="sm" className="rounded-full opacity-0 group-hover:opacity-100 transition-opacity translate-y-2 group-hover:translate-y-0 shadow-md">
-                      View Item <ArrowRight className="ml-1 h-3 w-3" />
-                    </Button>
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
+                    <CardHeader className="p-5 pb-2">
+                      <CardTitle className="text-lg leading-tight group-hover:text-primary transition-colors">{product.name}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-5 pt-0 flex-1 space-y-4">
+                      <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2">{rec.reason}</p>
+                    </CardContent>
+                    <div className="p-5 pt-0 mt-auto flex items-center justify-between">
+                      <span className="font-bold text-lg">{formatINR(normalizeCatalogPriceToINR(Number(product.price || 0)))}</span>
+                      <Button size="sm" className="rounded-full opacity-0 group-hover:opacity-100 transition-opacity translate-y-2 group-hover:translate-y-0 shadow-md">
+                        View Item <ArrowRight className="ml-1 h-3 w-3" />
+                      </Button>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
         </section>
 
             <section className="space-y-4">

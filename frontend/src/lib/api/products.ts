@@ -273,15 +273,3 @@ export async function deleteProductOnBackend(token: string, productId: string): 
   }
 }
 
-export async function seedProductsOnBackend(): Promise<{ success: boolean; message: string }> {
-  const response = await fetch(`${API_BASE_URL}/products/seed`, {
-    method: "POST",
-  });
-
-  const data = await response.json();
-
-  return {
-    success: Boolean(data?.success),
-    message: data?.message || "Unknown response",
-  };
-}

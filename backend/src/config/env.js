@@ -14,7 +14,12 @@ const frontendOrigins = String(process.env.FRONTEND_URL || "")
   .map((value) => normalizeOrigin(value))
   .filter(Boolean);
 
-const defaultFrontendOrigins = ["https://antariyaofficial.com", "https://antariya.onrender.com"];
+const defaultFrontendOrigins = [
+  "https://antariyaofficial.com",
+  "https://antariya.onrender.com",
+  "http://localhost:9002",
+  "http://127.0.0.1:9002",
+];
 
 const resolvedFrontendOrigins = frontendOrigins.length > 0 ? frontendOrigins : defaultFrontendOrigins;
 

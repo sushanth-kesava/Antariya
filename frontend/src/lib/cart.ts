@@ -1,6 +1,6 @@
 import { Product } from "@/app/lib/mock-data";
 
-const CART_STORAGE_KEY = "stitchmart_cart";
+const CART_STORAGE_KEY = "antariya_cart";
 export const CART_UPDATED_EVENT = "antariya-cart-updated";
 
 export type ProductCustomization = {

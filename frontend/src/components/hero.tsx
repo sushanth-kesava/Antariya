@@ -2,8 +2,31 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, Sparkles } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import type { Product } from "@/app/lib/mock-data";
 
-export function Hero() {
+type HeroMetrics = {
+  products: number;
+  dealers: number;
+  categories: number;
+  orders: number;
+};
+
+type HeroProps = {
+  metrics: HeroMetrics;
+  featuredProduct: Product | null;
+};
+
+function formatMetric(value: number) {
+  return new Intl.NumberFormat("en-IN").format(value);
+}
+
+export function Hero({ metrics, featuredProduct }: HeroProps) {
+  const heroImage = featuredProduct?.image;
+  const heroTitle = featuredProduct?.name || "Live catalog highlight";
+  const heroDescription = featuredProduct
+    ? `${featuredProduct.category} · ${featuredProduct.dealerName || "Verified dealer"}`
+    : "Live catalog content will appear here once products load.";
+
   return (
     <div id="hero" className="relative overflow-hidden bg-background pt-16 pb-24 lg:pt-32 lg:pb-40">
       <div className="absolute inset-0 z-0 indian-motif-bg opacity-10" />
@@ -37,38 +60,47 @@ export function Hero() {
 
             <div className="flex items-center gap-8 pt-8">
               <div className="space-y-1">
-                <p className="text-2xl font-bold">10k+</p>
-                <p className="text-sm text-muted-foreground">Designs</p>
+                <p className="text-2xl font-bold">{formatMetric(metrics.products)}</p>
+                <p className="text-sm text-muted-foreground">Products</p>
               </div>
               <div className="w-px h-8 bg-border" />
               <div className="space-y-1">
-                <p className="text-2xl font-bold">500+</p>
+                <p className="text-2xl font-bold">{formatMetric(metrics.dealers)}</p>
                 <p className="text-sm text-muted-foreground">Dealers</p>
               </div>
               <div className="w-px h-8 bg-border" />
               <div className="space-y-1">
-                <p className="text-2xl font-bold">50k+</p>
+                <p className="text-2xl font-bold">{formatMetric(metrics.orders)}</p>
                 <p className="text-sm text-muted-foreground">Orders</p>
+              </div>
+              <div className="w-px h-8 bg-border" />
+              <div className="space-y-1">
+                <p className="text-2xl font-bold">{formatMetric(metrics.categories)}</p>
+                <p className="text-sm text-muted-foreground">Categories</p>
               </div>
             </div>
           </div>
           
           <div className="flex-1 relative w-full aspect-[4/3] rounded-2xl overflow-hidden shadow-2xl animate-fade-in [animation-delay:200ms]">
-            <Image 
-              src="https://picsum.photos/seed/stitch-hero/1200/800" 
-              alt="Embroidery craftsmanship" 
-              fill
-              className="object-cover"
-              data-ai-hint="embroidery threads"
-            />
+            {heroImage ? (
+              <Image
+                src={heroImage}
+                alt={heroTitle}
+                fill
+                className="object-cover"
+                priority
+              />
+            ) : (
+              <div className="h-full w-full bg-gradient-to-br from-muted via-background to-muted" />
+            )}
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end p-8">
               <div className="bg-white/90 backdrop-blur-sm p-4 rounded-xl flex items-center gap-4 max-w-xs">
                 <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center text-primary">
                   <Sparkles className="h-6 w-6" />
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-black">New Arrival</p>
-                  <p className="text-xs text-muted-foreground">Vintage Varanasi Silk Collection now available for download.</p>
+                  <p className="text-sm font-bold text-black">{heroTitle}</p>
+                  <p className="text-xs text-muted-foreground">{heroDescription}</p>
                 </div>
               </div>
             </div>

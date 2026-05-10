@@ -753,6 +753,7 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
       <Navbar />
       
       <main className="w-full max-w-[1760px] mx-auto px-3 sm:px-4 lg:px-6 py-12">
+          <div className="origin-top scale-[0.8] w-[125%] -translate-x-[10%]">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
           {/* Image Display */}
           <div className="relative mx-auto w-full max-w-[720px] space-y-6 lg:mx-3">
@@ -1013,7 +1014,6 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
                   <CardContent className="p-5 space-y-4">
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground">Cart Confidence</p>
                         <h3 className="text-xl font-bold">Selected options and delivery summary</h3>
                       </div>
                       <Button variant="outline" size="sm" className="rounded-full" onClick={() => setOpenCustomizer(true)}>
@@ -1031,14 +1031,20 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
                           <Badge variant="secondary" className="rounded-full">{customization.size}</Badge>
                           <Badge variant="secondary" className="rounded-full">{customization.placement}</Badge>
                         </div>
-                        {customization.notes ? <p className="text-muted-foreground">Notes: {customization.notes}</p> : <p className="text-muted-foreground">No special notes added.</p>}
+                        {customization.notes ? (
+                          <p className="text-muted-foreground">Notes: {customization.notes}</p>
+                        ) : (
+                          <p className="text-muted-foreground">No special notes added.</p>
+                        )}
                       </div>
 
                       <div className="rounded-2xl bg-muted/30 p-4 space-y-2">
                         <p className="font-semibold text-foreground">Delivery confidence</p>
                         <p className="text-muted-foreground">Expected range: {expectedDeliveryRange}</p>
                         {deliveryResult.status === "available" ? (
-                          <p className="text-muted-foreground">Dispatch: {new Date(deliveryResult.estimatedDispatchDate).toLocaleDateString()} via {deliveryResult.lastMilePartner}</p>
+                          <p className="text-muted-foreground">
+                            Dispatch: {new Date(deliveryResult.estimatedDispatchDate).toLocaleDateString()} via {deliveryResult.lastMilePartner}
+                          </p>
                         ) : (
                           <p className="text-muted-foreground">Check your pincode above for a live delivery estimate.</p>
                         )}
@@ -1633,6 +1639,7 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
             </div>
           </DialogContent>
         </Dialog>
+      </div>
       </main>
     </div>
   );

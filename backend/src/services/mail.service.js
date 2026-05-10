@@ -72,7 +72,7 @@ function escapeHtml(value) {
 }
 
 function buildWelcomeMessage(displayName) {
-  const appName = env.appName || "StitchMart";
+  const appName = env.appName || "Antariya";
   const safeName = escapeHtml(displayName || "there");
   const safeAppName = escapeHtml(appName);
   const websiteUrl = env.frontendUrl || "http://localhost:9002";
@@ -160,7 +160,7 @@ async function sendWelcomeEmail({ to, displayName }) {
 }
 
 function buildWaitlistConfirmationMessage({ displayName }) {
-  const appName = env.appName || "StitchMart";
+  const appName = env.appName || "Antariya";
   const safeName = escapeHtml(displayName || "there");
   const safeAppName = escapeHtml(appName);
   const websiteUrl = env.frontendUrl || "https://antariyaofficial.com";

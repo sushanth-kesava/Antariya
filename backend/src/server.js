@@ -12,6 +12,7 @@ const superAdminRoutes = require("./routes/superadmin.routes");
 const deliveryRoutes = require("./routes/delivery.routes");
 const wishlistRoutes = require("./routes/wishlist.routes");
 const waitlistRoutes = require("./routes/waitlist.routes");
+const statsRoutes = require("./routes/stats.routes");
 const { notFound, errorHandler } = require("./middleware/error.middleware");
 
 const app = express();
@@ -43,7 +44,7 @@ app.use(morgan("tiny"));
 app.get("/", (req, res) => {
   res.status(200).json({
     success: true,
-    message: "StitchMart backend is running",
+    message: "Antariya backend is running",
     docs: {
       health: "/api/health",
       authGoogle: "/api/auth/google",
@@ -66,6 +67,7 @@ app.use("/api/superadmin", superAdminRoutes);
 app.use("/api/delivery", deliveryRoutes);
 app.use("/api/wishlist", wishlistRoutes);
 app.use("/api/waitlist", waitlistRoutes);
+app.use("/api/stats", statsRoutes);
 app.use(notFound);
 app.use(errorHandler);
 

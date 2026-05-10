@@ -1,4 +1,3 @@
-import { MOCK_PRODUCTS } from "@/app/lib/mock-data";
 import ProductDetailsClient from "./ProductDetailsClient";
 
 type ProductsApiResponse = {
@@ -10,7 +9,7 @@ export async function generateStaticParams() {
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
 
   if (!apiBaseUrl) {
-    return MOCK_PRODUCTS.map((product) => ({ id: product.id }));
+    return [];
   }
 
   try {
@@ -32,18 +31,20 @@ export async function generateStaticParams() {
       return backendIds.map((id) => ({ id }));
     }
   } catch {
-    // Fallback keeps build stable when API is temporarily unavailable.
+    return [];
   }
 
-  return MOCK_PRODUCTS.map((product) => ({ id: product.id }));
+  return [];
 }
 
 type ProductPageProps = {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 };
 
-export default function ProductPage({ params }: ProductPageProps) {
-  return <ProductDetailsClient id={params.id} />;
+export default async function ProductPage({ params }: ProductPageProps) {
+  const { id } = await params;
+
+  return <ProductDetailsClient id={id} />;
 }

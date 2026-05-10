@@ -6,7 +6,6 @@ const {
   productImageUploadMiddleware,
   createProduct,
   deleteProduct,
-  seedProducts,
   getProductReviews,
   createProductReview,
   getReviewModerationQueue,
@@ -27,6 +26,5 @@ router.post("/:id/reviews", requireAuth, createProductReview);
 router.get("/:id", getProductById);
 router.post("/", requireAuth, requireRole("admin", "superadmin"), createProduct);
 router.delete("/:id", requireAuth, requireRole("admin", "superadmin"), deleteProduct);
-router.post("/seed", seedProducts);
 
 module.exports = router;
