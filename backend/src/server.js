@@ -13,6 +13,7 @@ const deliveryRoutes = require("./routes/delivery.routes");
 const wishlistRoutes = require("./routes/wishlist.routes");
 const waitlistRoutes = require("./routes/waitlist.routes");
 const statsRoutes = require("./routes/stats.routes");
+const { seedSampleProductsIfEmpty } = require("./seed/sample-products");
 const { notFound, errorHandler } = require("./middleware/error.middleware");
 
 const app = express();
@@ -74,6 +75,16 @@ app.use(errorHandler);
 async function startServer() {
   try {
     await connectDb(env.mongoUri);
+
+    try {
+      const seedResult = await seedSampleProductsIfEmpty();
+      if (seedResult.seeded) {
+        console.log(`Seeded ${seedResult.count} sample products for the marketplace`);
+      }
+    } catch (seedError) {
+      console.warn("Sample product seed skipped:", seedError.message);
+    }
+
     app.listen(env.port, () => {
       console.log(`Server Started on port ${env.port}`);
     });
