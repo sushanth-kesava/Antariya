@@ -1,4 +1,5 @@
 import ProductDetailsClient from "./ProductDetailsClient";
+import { getApiBaseUrl } from "@/lib/api/base-url";
 
 type ProductsApiResponse = {
   success?: boolean;
@@ -6,13 +7,9 @@ type ProductsApiResponse = {
 };
 
 export async function generateStaticParams() {
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+  const apiBaseUrl = getApiBaseUrl();
 
   try {
-    if (!apiBaseUrl) {
-      throw new Error("API base URL not configured");
-    }
-
     const response = await fetch(`${apiBaseUrl}/products`, {
       method: "GET",
       cache: "no-store",

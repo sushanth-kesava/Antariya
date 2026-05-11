@@ -25,6 +25,7 @@ import {
   loginWithGoogleOnBackend,
   signupWithCredentialsOnBackend,
 } from "@/lib/api/auth";
+import { getApiBaseUrl } from "@/lib/api/base-url";
 
 type AuthMode = "login" | "signup";
 
@@ -62,6 +63,7 @@ export default function CommonAuthPage({ mode }: { mode: AuthMode }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
+  const API_BASE_URL = getApiBaseUrl();
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
