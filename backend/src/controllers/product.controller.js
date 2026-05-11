@@ -3,7 +3,7 @@ const Review = require("../models/Review");
 const User = require("../models/User");
 const AdminProfile = require("../models/AdminProfile");
 const multer = require("multer");
-const { uploadProductImageBuffer } = require("../services/cloudinary.service");
+const { hasCloudinaryCredentials, uploadProductImageBuffer } = require("../services/cloudinary.service");
 
 const MAX_PRODUCT_IMAGES = 6;
 const MAX_PRODUCT_IMAGE_SIZE_BYTES = 8 * 1024 * 1024;
@@ -136,6 +136,12 @@ function normalizeModerationReview(doc) {
     moderatedAt: doc.moderatedAt || null,
     createdAt: doc.createdAt,
   };
+}
+
+function bufferToDataUrl(file) {
+  const mimeType = typeof file?.mimetype === "string" && file.mimetype.trim().length > 0 ? file.mimetype.trim() : "image/jpeg";
+  const base64 = Buffer.from(file.buffer).toString("base64");
+  return `data:${mimeType};base64,${base64}`;
 }
 
 function groupProductsByDealerAndCategory(products) {
@@ -370,28 +376,39 @@ async function uploadProductImages(req, res, next) {
       });
     }
 
-    const uploaded = await Promise.all(
-      files.map((file) =>
-        uploadProductImageBuffer(file.buffer, {
-          folder: `antariya/products/${req.auth.sub}`,
-        })
-      )
-    );
+    let imageUrls = [];
 
-    const imageUrls = uploaded
-      .map((item) => item?.secure_url)
-      .filter((value) => typeof value === "string" && value.trim().length > 0);
+    if (hasCloudinaryCredentials) {
+      try {
+        const uploaded = await Promise.all(
+          files.map((file) =>
+            uploadProductImageBuffer(file.buffer, {
+              folder: `antariya/products/${req.auth.sub}`,
+            })
+          )
+        );
+
+        imageUrls = uploaded
+          .map((item) => item?.secure_url)
+          .filter((value) => typeof value === "string" && value.trim().length > 0);
+      } catch (uploadError) {
+        console.warn("Cloudinary upload failed, falling back to inline image data:", uploadError.message);
+        imageUrls = files.map(bufferToDataUrl);
+      }
+    } else {
+      imageUrls = files.map(bufferToDataUrl);
+    }
 
     if (imageUrls.length === 0) {
       return res.status(500).json({
         success: false,
-        message: "No images were uploaded to Cloudinary",
+        message: "No images were uploaded",
       });
     }
 
     return res.status(201).json({
       success: true,
-      message: "Images uploaded",
+      message: hasCloudinaryCredentials ? "Images uploaded" : "Images stored locally for this request",
       images: imageUrls,
     });
   } catch (error) {
