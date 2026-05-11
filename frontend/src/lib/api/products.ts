@@ -16,6 +16,32 @@ export type ProductInput = {
   fileDownloadLink?: string | null;
 };
 
+export type MarketplaceRole = "customer" | "admin" | "superadmin";
+
+export type MarketplaceDealerCategory = {
+  name: string;
+  count: number;
+  products: Product[];
+};
+
+export type MarketplaceDealerSection = {
+  dealerId: string;
+  dealerName: string;
+  categories: MarketplaceDealerCategory[];
+};
+
+export type MarketplaceLayoutResponse =
+  | {
+      success: true;
+      role: "customer" | "admin";
+      categories: string[];
+    }
+  | {
+      success: true;
+      role: "superadmin";
+      dealerSections: MarketplaceDealerSection[];
+    };
+
 export type ProductReviewTag = "Quality" | "Fit" | "Delivery" | "Customization";
 
 export type ProductReview = {
@@ -97,6 +123,17 @@ export async function getProductsFromBackend(filters?: {
     products: data.products as Product[],
     pagination: data.pagination || { page: 1, limit: 20, total: 0, pages: 0 },
   };
+}
+
+export async function getMarketplaceLayoutFromBackend(role: MarketplaceRole): Promise<MarketplaceLayoutResponse> {
+  const response = await fetch(`${API_BASE_URL}/products/marketplace?role=${encodeURIComponent(role)}`);
+  const data = await response.json();
+
+  if (!response.ok || !data?.success) {
+    throw new Error(data?.message || "Failed to fetch marketplace layout");
+  }
+
+  return data as MarketplaceLayoutResponse;
 }
 
 export async function getProductByIdFromBackend(id: string): Promise<Product | null> {

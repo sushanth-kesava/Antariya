@@ -3,12 +3,12 @@
 
 import { Navbar } from "@/components/navbar";
 import { Hero } from "@/components/hero";
+import { Footer } from "@/components/footer";
 import { ProductCard } from "@/components/product-card";
 import { CATEGORIES, Product } from "@/app/lib/mock-data";
 import { Button } from "@/components/ui/button";
 import { ChevronRight, Zap, ShieldCheck, Truck, RefreshCcw, Loader2, CheckCircle } from "lucide-react";
 import Link from "next/link";
-import { BRAND_LOGO_URL } from "@/lib/brand";
 import { useEffect, useState } from "react";
 import { getProductsFromBackend } from "@/lib/api/products";
 import { useToast } from "@/hooks/use-toast";
@@ -306,62 +306,7 @@ export default function Home() {
         </section>
       </main>
 
-      <footer className="bg-card border-t pt-20 pb-10">
-        <div className="w-full max-w-[1760px] mx-auto px-3 sm:px-4 lg:px-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
-            <div className="space-y-6">
-              <Link href="/" className="flex items-center gap-2">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={BRAND_LOGO_URL} alt="Antariya logo" className="h-32 w-32 rounded-lg object-cover" />
-                <span className="font-theseasons text-6xl font-bold text-black">Antariya</span>
-              </Link>
-              <p className="text-muted-foreground text-sm leading-relaxed">
-                Empowering India&apos;s embroidery industry since 2024. Providing premium digital assets and hardware solutions for small and medium scale embroidery businesses.
-              </p>
-            </div>
-            
-            <div>
-              <h4 className="font-bold mb-6">Marketplace</h4>
-              <ul className="space-y-4 text-sm text-muted-foreground">
-                <li><Link href="#" className="hover:text-primary transition-colors">Embroidery Designs</Link></li>
-                <li><Link href="#" className="hover:text-primary transition-colors">Premium Threads</Link></li>
-                <li><Link href="#" className="hover:text-primary transition-colors">Industrial Fabrics</Link></li>
-                <li><Link href="#" className="hover:text-primary transition-colors">Machine Parts</Link></li>
-              </ul>
-            </div>
-            
-            <div>
-              <h4 className="font-bold mb-6">Company</h4>
-              <ul className="space-y-4 text-sm text-muted-foreground">
-                <li><Link href="#" className="hover:text-primary transition-colors">About Us</Link></li>
-                <li><Link href="#" className="hover:text-primary transition-colors">Dealer Program</Link></li>
-                <li><Link href="#" className="hover:text-primary transition-colors">Careers</Link></li>
-                <li><Link href="#" className="hover:text-primary transition-colors">Contact Support</Link></li>
-              </ul>
-            </div>
-            
-            <div>
-              <h4 className="font-bold mb-6">Support</h4>
-              <ul className="space-y-4 text-sm text-muted-foreground">
-                <li><Link href="#" className="hover:text-primary transition-colors">Tracking Orders</Link></li>
-                <li><Link href="#" className="hover:text-primary transition-colors">Shipping Policy</Link></li>
-                <li><Link href="#" className="hover:text-primary transition-colors">Privacy & Terms</Link></li>
-                <li><Link href="#" className="hover:text-primary transition-colors">Help Center</Link></li>
-              </ul>
-            </div>
-          </div>
-          
-          <div className="border-t pt-10 flex flex-col md:flex-row items-center justify-between gap-6 text-sm text-muted-foreground">
-            <p>© 2026 Antariya India. All rights reserved.</p>
-            <div className="flex items-center gap-8">
-              <Link href="#" className="hover:text-primary">Facebook</Link>
-              <Link href="#" className="hover:text-primary">Instagram</Link>
-              <Link href="#" className="hover:text-primary">LinkedIn</Link>
-              <Link href="#" className="hover:text-primary">Twitter</Link>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

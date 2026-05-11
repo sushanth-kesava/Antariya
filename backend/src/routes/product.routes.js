@@ -1,6 +1,7 @@
 const express = require("express");
 const {
   getProducts,
+  getMarketplaceLayout,
   getProductById,
   uploadProductImages,
   productImageUploadMiddleware,
@@ -17,6 +18,7 @@ const { requireAuth, requireRole } = require("../middleware/auth.middleware");
 const router = express.Router();
 
 router.get("/", getProducts);
+router.get("/marketplace", getMarketplaceLayout);
 router.get("/admin/reviews/activity", requireAuth, requireRole("admin", "superadmin"), getReviewModerationActivity);
 router.get("/admin/reviews", requireAuth, requireRole("admin", "superadmin"), getReviewModerationQueue);
 router.patch("/admin/reviews/:reviewId", requireAuth, requireRole("admin", "superadmin"), updateReviewModeration);

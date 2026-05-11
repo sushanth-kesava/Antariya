@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense } from "react";
-import MarketplaceContent from "./MarketplaceContent";
+import MarketplaceContent from "@/app/marketplace/MarketplaceContent";
 
 function MarketplaceLoading() {
   return (

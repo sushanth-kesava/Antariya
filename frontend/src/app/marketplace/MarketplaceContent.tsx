@@ -2,15 +2,21 @@
 
 import { Navbar } from "@/components/navbar";
 import { ProductCard } from "@/components/product-card";
-import { CATEGORIES, Product } from "@/app/lib/mock-data";
+import { Product } from "@/app/lib/mock-data";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Filter, Search, ChevronDown, RefreshCw, Sparkles, Palette, ShoppingBag, X } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
-import { getProductsFromBackend } from "@/lib/api/products";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import {
+  MarketplaceDealerSection,
+  MarketplaceLayoutResponse,
+  MarketplaceRole,
+  getMarketplaceLayoutFromBackend,
+  getProductsFromBackend,
+} from "@/lib/api/products";
 
 type SortOption = "relevance" | "price_asc" | "price_desc" | "rating" | "newest";
 
@@ -20,6 +26,30 @@ const SORT_LABELS: Record<SortOption, string> = {
   price_desc: "Price: High to Low",
   rating: "Highest Rated",
   newest: "Newest First",
+};
+
+const ROLE_TITLES: Record<MarketplaceRole, { eyebrow: string; title: string; description: string; ctaHref: string; ctaLabel: string }> = {
+  customer: {
+    eyebrow: "Customer Catalog",
+    title: "Browse finished apparel and custom-ready styles.",
+    description: "Find fashion articles, dresses, hoodies, and other customer-facing categories curated for shopping.",
+    ctaHref: "/shop",
+    ctaLabel: "Shop Collection",
+  },
+  admin: {
+    eyebrow: "Admin Supply Catalog",
+    title: "Inventory for production and machine operations.",
+    description: "Manage the operational catalog with threads, needles, spare parts, and related workshop stock.",
+    ctaHref: "/portal/admin/my-company-catalog",
+    ctaLabel: "Open Catalog",
+  },
+  superadmin: {
+    eyebrow: "Superadmin Marketplace",
+    title: "All products grouped by dealer and category.",
+    description: "Review the full product database, organized by dealer ownership and product category.",
+    ctaHref: "/portal/superadmin",
+    ctaLabel: "Open Overview",
+  },
 };
 
 function sortProducts(products: Product[], sort: SortOption): Product[] {
@@ -42,6 +72,7 @@ function sortProducts(products: Product[], sort: SortOption): Product[] {
 export default function MarketplaceContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const pathname = usePathname();
 
   const [selectedCategory, setSelectedCategory] = useState<string | null>(searchParams.get("category") || null);
   const [searchQuery, setSearchQuery] = useState(searchParams.get("search") || "");
@@ -57,8 +88,12 @@ export default function MarketplaceContent() {
   const [priceMin, setPriceMin] = useState("");
   const [priceMax, setPriceMax] = useState("");
   const [minRating, setMinRating] = useState<number | null>(null);
+  const [roleResolved, setRoleResolved] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
   const ITEMS_PER_PAGE = 20;
+
+  const [role, setRole] = useState<MarketplaceRole>("customer");
+  const [marketplaceLayout, setMarketplaceLayout] = useState<MarketplaceLayoutResponse | null>(null);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -72,6 +107,64 @@ export default function MarketplaceContent() {
   }, []);
 
   useEffect(() => {
+    try {
+      const pathRole: MarketplaceRole = pathname?.startsWith("/portal/superadmin")
+        ? "superadmin"
+        : pathname?.startsWith("/portal/admin")
+          ? "admin"
+          : "customer";
+
+      const stored = typeof window !== "undefined" ? localStorage.getItem("user_role") : null;
+      const storedRole = stored?.trim().toLowerCase();
+
+      if (pathRole !== "customer") {
+        setRole(pathRole);
+      } else if (storedRole === "admin" || storedRole === "superadmin") {
+        setRole(storedRole);
+      } else {
+        setRole("customer");
+      }
+    } catch {
+      setRole("customer");
+    } finally {
+      setRoleResolved(true);
+    }
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!roleResolved) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function fetchLayout() {
+      try {
+        const data = await getMarketplaceLayoutFromBackend(role);
+        if (!cancelled) {
+          setMarketplaceLayout(data);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Failed to load marketplace layout:", error);
+        }
+      }
+    }
+
+    fetchLayout();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [role, roleResolved]);
+
+  useEffect(() => {
+    if (!roleResolved || role === "superadmin") {
+      return;
+    }
+
+    let cancelled = false;
+
     async function fetchData() {
       setLoading(true);
       try {
@@ -82,18 +175,39 @@ export default function MarketplaceContent() {
           limit: ITEMS_PER_PAGE,
         });
 
+        if (cancelled) return;
+
         setProducts(data);
         setCurrentPage(1);
         setTotalPages(pagination.pages);
       } catch (error) {
-        console.error("Failed to fetch products:", error);
+        if (!cancelled) {
+          console.error("Failed to fetch products:", error);
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     }
 
     fetchData();
-  }, [selectedCategory, activeSearch]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCategory, activeSearch, role, roleResolved]);
+
+  useEffect(() => {
+    if (role === "superadmin") {
+      setSelectedCategory(null);
+      setPriceMin("");
+      setPriceMax("");
+      setMinRating(null);
+    }
+  }, [role]);
+
+  const heroCopy = ROLE_TITLES[role];
 
   const loadMore = async () => {
     if (currentPage >= totalPages || loadingMore) return;
@@ -157,6 +271,16 @@ export default function MarketplaceContent() {
     (priceMax ? 1 : 0) +
     (minRating ? 1 : 0);
 
+  const marketplaceCategories =
+    role !== "superadmin" && marketplaceLayout && marketplaceLayout.success && "categories" in marketplaceLayout
+      ? marketplaceLayout.categories
+      : [];
+  const marketplaceDealerSections =
+    role === "superadmin" && marketplaceLayout && marketplaceLayout.success && "dealerSections" in marketplaceLayout
+      ? marketplaceLayout.dealerSections
+      : [];
+  const quickPickCategories = marketplaceCategories.slice(0, 3);
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -169,24 +293,23 @@ export default function MarketplaceContent() {
             </div>
             <div className="relative z-10 max-w-2xl space-y-6">
               <div className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-sm font-bold tracking-wide">
-                <Sparkles className="h-4 w-4 text-accent" /> Live Product Catalog
+                <Sparkles className="h-4 w-4 text-accent" /> {heroCopy.eyebrow}
               </div>
               <h1 className="text-4xl md:text-6xl font-black font-headline leading-tight tracking-tight">
-                The Digital <br />
-                <span className="text-accent italic font-normal">Embroidery</span> Library.
+                {heroCopy.title}
               </h1>
               <p className="text-lg md:text-xl text-white/80 leading-relaxed font-medium">
-                Browse our world-class marketplace for digital designs, premium threads, and high-speed machine supplies.
+                {heroCopy.description}
               </p>
               <div className="flex flex-wrap items-center gap-4 pt-4">
                 <Button asChild size="lg" className="rounded-full h-14 px-8 bg-accent text-accent-foreground font-bold text-lg hover:scale-105 hover:bg-accent/90 transition-all shadow-xl shadow-accent/20">
-                  <Link href="/customize">
-                    <Palette className="mr-2 h-5 w-5" /> Open Builder
+                  <Link href={heroCopy.ctaHref}>
+                    <Palette className="mr-2 h-5 w-5" /> {heroCopy.ctaLabel}
                   </Link>
                 </Button>
                 <Button asChild variant="outline" size="lg" className="rounded-full h-14 px-8 bg-white/10 border-white/20 text-white font-bold text-lg hover:bg-white/20 transition-all">
-                  <Link href="/shop">
-                    <ShoppingBag className="mr-2 h-5 w-5" /> Shop Base Garments
+                  <Link href={role === "customer" ? "/customize" : role === "admin" ? "/portal/admin" : "/portal/superadmin"}>
+                    <ShoppingBag className="mr-2 h-5 w-5" /> {role === "customer" ? "Open Builder" : role === "admin" ? "Admin Console" : "Full Inventory"}
                   </Link>
                 </Button>
               </div>
@@ -195,9 +318,13 @@ export default function MarketplaceContent() {
 
           <div className="flex flex-col md:flex-row items-center justify-between gap-6 bg-card border border-border/50 p-6 rounded-3xl shadow-sm">
             <div className="space-y-1 shrink-0">
-              <h1 className="text-3xl font-bold font-headline tracking-tight">Catalogue</h1>
+              <h1 className="text-3xl font-bold font-headline tracking-tight">{role === "superadmin" ? "Inventory Overview" : "Catalogue"}</h1>
               <p className="text-muted-foreground text-sm font-medium">
-                {loading ? "Loading..." : `Showing ${displayProducts.length} items`}
+                {loading
+                  ? "Loading..."
+                  : role === "superadmin"
+                    ? `Showing ${marketplaceDealerSections.length} dealers`
+                    : `Showing ${displayProducts.length} items`}
               </p>
             </div>
 
@@ -205,7 +332,7 @@ export default function MarketplaceContent() {
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input
                 className="pl-12 h-14 rounded-2xl bg-muted/50 border-none text-lg focus-visible:ring-primary"
-                placeholder="Search products..."
+                placeholder={role === "superadmin" ? "Search inventory..." : "Search products..."}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -331,63 +458,80 @@ export default function MarketplaceContent() {
                 <div className="space-y-3">
                   <p className="font-semibold text-sm">Quick Picks</p>
                   <div className="flex flex-wrap gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="rounded-full"
-                      onClick={() => {
-                        setSelectedCategory("Embroidery Designs");
-                        setFilterOpen(false);
-                      }}
-                    >
-                      Designs Only
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="rounded-full"
-                      onClick={() => {
-                        setSelectedCategory("Hoodies");
-                        setFilterOpen(false);
-                      }}
-                    >
-                      Hoodies
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="rounded-full"
-                      onClick={() => {
-                        setSelectedCategory("Threads");
-                        setFilterOpen(false);
-                      }}
-                    >
-                      Threads
-                    </Button>
+                    {quickPickCategories.length > 0 ? (
+                      quickPickCategories.map((category) => (
+                        <Button
+                          key={category}
+                          size="sm"
+                          variant="outline"
+                          className="rounded-full"
+                          onClick={() => {
+                            setSelectedCategory(category);
+                            setFilterOpen(false);
+                          }}
+                        >
+                          {category}
+                        </Button>
+                      ))
+                    ) : (
+                      <span className="text-sm text-muted-foreground">Loading categories...</span>
+                    )}
                   </div>
                 </div>
               </div>
             </div>
           )}
 
-          <div className="flex flex-wrap gap-2">
-            <Badge
-              variant={selectedCategory === null ? "default" : "outline"}
-              className="cursor-pointer px-4 py-2 rounded-full border-primary/20"
-              onClick={() => handleCategoryChange(null)}
-            >
-              All Items
-            </Badge>
-            {CATEGORIES.map((cat) => (
-              <Badge
-                key={cat}
-                variant={selectedCategory === cat ? "default" : "outline"}
-                className="cursor-pointer px-4 py-2 rounded-full border-primary/20"
-                onClick={() => handleCategoryChange(cat)}
-              >
-                {cat}
-              </Badge>
-            ))}
+          {/* Role-specific categories */}
+          <div className="flex flex-col gap-4">
+            {role !== "superadmin" ? (
+              <div className="flex flex-wrap gap-2">
+                <Badge
+                  variant={selectedCategory === null ? "default" : "outline"}
+                  className="cursor-pointer px-4 py-2 rounded-full border-primary/20"
+                  onClick={() => handleCategoryChange(null)}
+                >
+                  All Items
+                </Badge>
+                {marketplaceCategories.map((cat: string) => (
+                  <Badge
+                    key={cat}
+                    variant={selectedCategory === cat ? "default" : "outline"}
+                    className="cursor-pointer px-4 py-2 rounded-full border-primary/20"
+                    onClick={() => handleCategoryChange(cat)}
+                  >
+                    {cat}
+                  </Badge>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {marketplaceDealerSections.length === 0 && !loading ? (
+                  <p className="text-sm text-muted-foreground">No dealer data available.</p>
+                ) : (
+                  marketplaceDealerSections.map((dealerSection: MarketplaceDealerSection) => (
+                    <div key={dealerSection.dealerId} className="border border-border/50 rounded-2xl p-4 bg-card">
+                      <h3 className="font-semibold">{dealerSection.dealerName}</h3>
+                      <div className="mt-3 grid grid-cols-1 gap-4">
+                        {dealerSection.categories.map((category) => (
+                          <div key={category.name} className="p-3 bg-muted/5 rounded-lg">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="font-medium">{category.name}</span>
+                              <Badge className="text-xs">{category.count}</Badge>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                              {category.products.slice(0, 6).map((product: Product) => (
+                                <ProductCard key={product.id} product={product} />
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </div>
 
           {(activeSearch || activeFilterCount > 0) && (
@@ -450,7 +594,7 @@ export default function MarketplaceContent() {
               <RefreshCw className="h-12 w-12 text-primary animate-spin" />
               <p className="text-muted-foreground font-medium">Loading premium catalogue...</p>
             </div>
-          ) : displayProducts.length > 0 ? (
+          ) : role === "superadmin" ? null : displayProducts.length > 0 ? (
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
                 {displayProducts.map((product) => (

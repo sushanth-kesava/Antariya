@@ -12,7 +12,6 @@ import { type Product } from "@/app/lib/mock-data";
 import { getMyOrdersFromBackend } from "@/lib/api/orders";
 import { getWishlistFromBackend, WishlistItem } from "@/lib/api/wishlist";
 import { getProductsFromBackend } from "@/lib/api/products";
-import { Footer } from "@/components/footer";
 import { formatINR, formatIndianDate, normalizeCatalogPriceToINR } from "@/lib/india";
 import { clearAuthSession, getPortalPathForRole, normalizeAppRole, persistAuthSession } from "@/lib/auth-session";
 
@@ -33,7 +32,6 @@ function buildRecommendations(products: Product[], orders: any[], wishlist: Wish
     if (!category) {
       return;
     }
-
     categoryScores.set(category, (categoryScores.get(category) || 0) + weight);
   };
 

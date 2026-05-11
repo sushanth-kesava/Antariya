@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/navbar";
-import { CATEGORIES, Product } from "@/app/lib/mock-data";
+import { Product } from "@/app/lib/mock-data";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
@@ -33,6 +33,7 @@ import {
   getProductsFromBackend,
   getReviewModerationActivityFromBackend,
   getReviewModerationQueueFromBackend,
+  getMarketplaceLayoutFromBackend,
   ModerationActivityItem,
   ModerationReview,
   ReviewModerationStatus,
@@ -83,12 +84,13 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
   const [error, setError] = useState<string | null>(null);
   const [selectedImageFiles, setSelectedImageFiles] = useState<File[]>([]);
   const [isDragOverImages, setIsDragOverImages] = useState(false);
+  const [marketplaceCategories, setMarketplaceCategories] = useState<string[]>([]);
 
   const [formData, setFormData] = useState({
     name: "",
     description: "",
     price: "",
-    category: CATEGORIES[0],
+    category: "",
     stock: "100",
     customizable: false,
     rating: "0",
@@ -161,6 +163,21 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
         ]);
         setCatalog(productsResponse.products);
         setDashboardData(adminDashboard);
+
+        try {
+          const layout = await getMarketplaceLayoutFromBackend("admin");
+          if (layout.success && "categories" in layout) {
+            setMarketplaceCategories(layout.categories);
+            setFormData((current) => ({
+              ...current,
+              category: current.category || layout.categories[0] || "",
+            }));
+          }
+        } catch (layoutError) {
+          console.error("Failed to load marketplace categories", layoutError);
+          setMarketplaceCategories([]);
+        }
+
         try {
           setLoadingModeration(true);
           const reviews = await getReviewModerationQueueFromBackend(sessionToken, { status: "pending" });
@@ -833,8 +850,11 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
                       className="w-full h-12 rounded-xl border-gray-200 bg-gray-50 focus:bg-white px-4 text-base font-medium outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                       value={formData.category}
                       onChange={e => setFormData({...formData, category: e.target.value})}
+                      disabled={marketplaceCategories.length === 0}
                     >
-                      {CATEGORIES.map(cat => (
+                      {marketplaceCategories.length === 0 ? (
+                        <option value="">Loading categories...</option>
+                      ) : marketplaceCategories.map(cat => (
                         <option key={cat} value={cat}>{cat}</option>
                       ))}
                     </select>

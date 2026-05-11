@@ -7,6 +7,10 @@ const { uploadProductImageBuffer } = require("../services/cloudinary.service");
 
 const MAX_PRODUCT_IMAGES = 6;
 const MAX_PRODUCT_IMAGE_SIZE_BYTES = 8 * 1024 * 1024;
+const MARKETPLACE_ROLE_CATEGORIES = {
+  customer: ["Fashion Articles", "Dresses", "Hoodies", "Blouses", "Accessories"],
+  admin: ["Threads", "Needles", "Spear Parts", "Accessories", "Machine Parts"],
+};
 
 const productImageUpload = multer({
   storage: multer.memoryStorage(),
@@ -134,6 +138,45 @@ function normalizeModerationReview(doc) {
   };
 }
 
+function groupProductsByDealerAndCategory(products) {
+  const dealerMap = new Map();
+
+  for (const product of products) {
+    const dealerId = product.dealerId || "unknown";
+    const dealerName = product.dealerName || product.dealerEmail || product.dealerId || "Unknown Dealer";
+    const categoryName = product.category || "Uncategorized";
+
+    if (!dealerMap.has(dealerId)) {
+      dealerMap.set(dealerId, {
+        dealerId,
+        dealerName,
+        categories: new Map(),
+      });
+    }
+
+    const dealerEntry = dealerMap.get(dealerId);
+    if (!dealerEntry.categories.has(categoryName)) {
+      dealerEntry.categories.set(categoryName, []);
+    }
+
+    dealerEntry.categories.get(categoryName).push(normalizeProduct(product));
+  }
+
+  return Array.from(dealerMap.values())
+    .map((dealerEntry) => ({
+      dealerId: dealerEntry.dealerId,
+      dealerName: dealerEntry.dealerName,
+      categories: Array.from(dealerEntry.categories.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([name, items]) => ({
+          name,
+          count: items.length,
+          products: items,
+        })),
+    }))
+    .sort((a, b) => a.dealerName.localeCompare(b.dealerName));
+}
+
 async function resolveModeratorNames(reviews) {
   const moderatorIds = Array.from(
     new Set(
@@ -251,6 +294,38 @@ async function getProducts(req, res, next) {
         total,
         pages: Math.ceil(total / limitNum),
       },
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function getMarketplaceLayout(req, res, next) {
+  try {
+    const role = String(req.query.role || "customer").trim().toLowerCase();
+
+    if (role === "superadmin") {
+      const products = await Product.find({}).sort({ createdAt: -1 });
+      const dealerSections = groupProductsByDealerAndCategory(products);
+
+      return res.status(200).json({
+        success: true,
+        role: "superadmin",
+        dealerSections,
+      });
+    }
+
+    const availableCategories = (await Product.distinct("category")).filter(
+      (category) => typeof category === "string" && category.trim().length > 0
+    );
+    const availableSet = new Set(availableCategories.map((category) => category.trim()));
+    const preferredCategories = MARKETPLACE_ROLE_CATEGORIES[role] || MARKETPLACE_ROLE_CATEGORIES.customer;
+    const categories = preferredCategories.filter((category) => availableSet.has(category));
+
+    return res.status(200).json({
+      success: true,
+      role: role === "admin" ? "admin" : "customer",
+      categories: categories.length > 0 ? categories : availableCategories.sort((a, b) => a.localeCompare(b)),
     });
   } catch (error) {
     return next(error);
@@ -685,6 +760,7 @@ async function getReviewModerationActivity(req, res, next) {
 
 module.exports = {
   getProducts,
+  getMarketplaceLayout,
   getProductById,
   uploadProductImages,
   productImageUploadMiddleware,
