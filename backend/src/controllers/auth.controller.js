@@ -20,7 +20,7 @@ function issueJwtToken(authDocument, inferredRole) {
   const jwtPayload = {
     sub: authDocument._id.toString(),
     email: authDocument.email,
-    role: authDocument.role || inferredRole,
+    role: inferredRole || authDocument.role,
   };
 
   const jwtOptions = env.jwtExpiresIn ? { expiresIn: env.jwtExpiresIn } : undefined;
@@ -39,7 +39,7 @@ function issueAuthResponse(authDocument, inferredRole) {
       email: authDocument.email,
       displayName: authDocument.displayName,
       photoURL: authDocument.photoURL,
-      role: authDocument.role || inferredRole,
+      role: inferredRole || authDocument.role,
     },
   };
 }
@@ -53,16 +53,47 @@ function calculateExpiryDate(expiresInSeconds) {
   return new Date(now + Number(expiresInSeconds) * 1000);
 }
 
+function normalizeEmail(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function resolvePortalRoleForEmail(email, existingAdminRole = null) {
+  const normalizedEmail = normalizeEmail(email);
+
+  if (!normalizedEmail) {
+    return "customer";
+  }
+
+  if (env.superAdminAllowedEmails.includes(normalizedEmail)) {
+    return "superadmin";
+  }
+
+  if (env.adminAllowedEmails.includes(normalizedEmail)) {
+    return "admin";
+  }
+
+  if (env.adminAllowedEmails.length === 0 && existingAdminRole === "admin") {
+    return "admin";
+  }
+
+  return "customer";
+}
+
+function portalMismatchMessage(email, expectedRole) {
+  return `${normalizeEmail(email)} is assigned to the ${expectedRole} portal. Please use the correct Gmail account.`;
+}
+
 async function resolveCurrentAccount(userId, email, role) {
-  const normalizedEmail = email ? String(email).trim().toLowerCase() : null;
+  const normalizedEmail = email ? normalizeEmail(email) : null;
 
   if (normalizedEmail) {
     const activeAdmin = await AdminProfile.findOne({ email: normalizedEmail, active: true });
+    const resolvedAdminRole = resolvePortalRoleForEmail(normalizedEmail, activeAdmin?.role || null);
 
     if (activeAdmin) {
       return {
         account: activeAdmin,
-        role: activeAdmin.role || "admin",
+        role: resolvedAdminRole,
       };
     }
 
@@ -129,35 +160,43 @@ async function loginWithGoogle(req, res, next) {
       });
     }
 
-    const normalizedEmail = String(googleProfile.email).trim().toLowerCase();
+    const normalizedEmail = normalizeEmail(googleProfile.email);
     const existingAdmin = await AdminProfile.findOne({ email: normalizedEmail, active: true });
     const existingUser = await User.findOne({ email: normalizedEmail });
 
     const requestedRole = selectedRole || "customer";
-    const existingAdminRole = existingAdmin?.role === "superadmin" ? "superadmin" : existingAdmin ? "admin" : "customer";
-    const inferredRole = existingAdminRole;
+    const inferredRole = resolvePortalRoleForEmail(normalizedEmail, existingAdmin?.role || null);
     const isEligibleForAdminRequest =
       env.adminAllowedEmails.length === 0 || env.adminAllowedEmails.includes(normalizedEmail);
 
     if (requestedRole === "customer" && inferredRole !== "customer") {
       return res.status(409).json({
         success: false,
-        message: `This account is registered as ${inferredRole}. Please use the ${inferredRole} login portal.`,
+        message: portalMismatchMessage(normalizedEmail, inferredRole),
       });
     }
 
     if (requestedRole === "superadmin" && inferredRole !== "superadmin") {
       return res.status(403).json({
         success: false,
-        message: "This email is not allowed for superadmin access.",
+        message: portalMismatchMessage(normalizedEmail, "superadmin"),
       });
     }
 
     if (requestedRole === "admin" && inferredRole === "superadmin") {
       return res.status(409).json({
         success: false,
-        message: "This account is registered as superadmin. Please use the superadmin login portal.",
+        message: portalMismatchMessage(normalizedEmail, "superadmin"),
       });
+    }
+
+    if (requestedRole === "admin" && inferredRole !== "admin") {
+      if (env.adminAllowedEmails.length > 0) {
+        return res.status(403).json({
+          success: false,
+          message: portalMismatchMessage(normalizedEmail, "admin"),
+        });
+      }
     }
 
     const userPayload = {
@@ -325,7 +364,7 @@ async function loginWithGoogle(req, res, next) {
 async function signupWithCredentials(req, res, next) {
   try {
     const { email, password, displayName, role = "customer" } = req.body;
-    const normalizedEmail = String(email || "").trim().toLowerCase();
+    const normalizedEmail = normalizeEmail(email);
     const normalizedRole = String(role || "customer").trim().toLowerCase();
     const selectedRole = normalizedRole === "admin" ? "admin" : "customer";
 
@@ -410,7 +449,7 @@ async function signupWithCredentials(req, res, next) {
 async function loginWithCredentials(req, res, next) {
   try {
     const { email, password, role = null } = req.body;
-    const normalizedEmail = String(email || "").trim().toLowerCase();
+    const normalizedEmail = normalizeEmail(email);
     const normalizedRole = role === null || typeof role === "undefined" ? null : String(role).toLowerCase();
     const selectedRole = normalizedRole === "admin" || normalizedRole === "superadmin" || normalizedRole === "customer" ? normalizedRole : null;
 
