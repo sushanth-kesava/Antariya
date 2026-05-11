@@ -431,7 +431,14 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
       setTimeout(() => setSuccess(false), 5000);
     } catch (err: any) {
       console.error("Error adding product:", err);
-      setError(err.message || "Failed to add product.");
+      const message = typeof err?.message === "string" ? err.message : "Failed to add product.";
+
+      if (message.toLowerCase().includes("unknown api key") || message.toLowerCase().includes("cloudinary")) {
+        setError("Image upload service is not configured on the backend yet. The product was not saved. Please try again after the backend is updated.");
+        return;
+      }
+
+      setError(message || "Failed to add product.");
     } finally {
       setLoading(false);
     }
@@ -816,7 +823,7 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
                         </div>
                         <div>
                           <p className="text-sm font-semibold">Drag and drop images here</p>
-                          <p className="text-xs text-muted-foreground">or click to browse. Up to 6 images.</p>
+                          <p className="text-xs text-muted-foreground">or click to browse. Up to 6 images. If cloud upload is unavailable, the backend will handle the images another way.</p>
                         </div>
                       </div>
 
@@ -854,11 +861,16 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
                       disabled={marketplaceCategories.length === 0}
                     >
                       {marketplaceCategories.length === 0 ? (
-                        <option value="">Loading categories...</option>
+                        <option value="">Loading categories from backend...</option>
                       ) : marketplaceCategories.map(cat => (
                         <option key={cat} value={cat}>{cat}</option>
                       ))}
                     </select>
+                    {marketplaceCategories.length === 0 ? (
+                      <p className="mt-2 text-xs text-gray-500">
+                        If this stays empty, the backend catalog has not loaded yet. Refresh after the backend is available.
+                      </p>
+                    ) : null}
                   </div>
                 </div>
 
