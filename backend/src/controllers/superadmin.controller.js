@@ -90,6 +90,50 @@ function buildPortalClassificationAudit(adminProfiles, customerProfiles) {
   };
 }
 
+function buildUniquePortalSummaryCounts(adminProfiles, customerProfiles) {
+  const uniqueAccountsByEmail = new Map();
+
+  adminProfiles.forEach((profile) => {
+    const email = normalizeEmail(profile.email);
+
+    if (!email) {
+      return;
+    }
+
+    uniqueAccountsByEmail.set(email, profile.role === "superadmin" ? "superadmin" : "admin");
+  });
+
+  customerProfiles.forEach((profile) => {
+    const email = normalizeEmail(profile.email);
+
+    if (!email || uniqueAccountsByEmail.has(email)) {
+      return;
+    }
+
+    uniqueAccountsByEmail.set(email, "customer");
+  });
+
+  let totalCustomers = 0;
+  let totalAdmins = 0;
+  let totalSuperAdmins = 0;
+
+  for (const role of uniqueAccountsByEmail.values()) {
+    if (role === "superadmin") {
+      totalSuperAdmins += 1;
+    } else if (role === "admin") {
+      totalAdmins += 1;
+    } else {
+      totalCustomers += 1;
+    }
+  }
+
+  return {
+    totalCustomers,
+    totalAdmins,
+    totalSuperAdmins,
+  };
+}
+
 function ensureSuperAdmin(req, res) {
   if (req.auth?.role !== "superadmin") {
     res.status(403).json({
@@ -165,9 +209,6 @@ async function getSuperAdminDashboard(req, res, next) {
     }
 
     const [
-      totalCustomers,
-      totalAdmins,
-      totalSuperAdmins,
       totalOrders,
       totalRevenueStats,
       pendingRequests,
@@ -178,9 +219,6 @@ async function getSuperAdminDashboard(req, res, next) {
       pendingReviews,
       wishlistItems,
     ] = await Promise.all([
-      User.countDocuments({}),
-      AdminProfile.countDocuments({ role: "admin" }),
-      AdminProfile.countDocuments({ role: "superadmin" }),
       Order.countDocuments({}),
       Order.aggregate([{ $group: { _id: null, totalRevenue: { $sum: "$total" } } }]),
       AccessRequest.countDocuments({ status: "pending" }),
@@ -196,13 +234,14 @@ async function getSuperAdminDashboard(req, res, next) {
     const normalizedAdminProfiles = adminProfiles.map(normalizeAdminProfile);
     const normalizedCustomerProfiles = customerProfiles.map(normalizeCustomerProfile);
     const portalClassificationAudit = buildPortalClassificationAudit(normalizedAdminProfiles, normalizedCustomerProfiles);
+    const portalSummaryCounts = buildUniquePortalSummaryCounts(normalizedAdminProfiles, normalizedCustomerProfiles);
 
     return res.status(200).json({
       success: true,
       summary: {
-        totalCustomers,
-        totalAdmins,
-        totalSuperAdmins,
+        totalCustomers: portalSummaryCounts.totalCustomers,
+        totalAdmins: portalSummaryCounts.totalAdmins,
+        totalSuperAdmins: portalSummaryCounts.totalSuperAdmins,
         totalOrders,
         totalRevenue,
         pendingRequests,
