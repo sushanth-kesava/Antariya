@@ -1,4 +1,17 @@
 {
+  "files.exclude": {
+    "frontend/out": true
+  },
+  "search.exclude": {
+    "frontend/out": true
+  },
+  "files.watcherExclude": {
+    "frontend/out/**": true
+  },
+  "problems.exclude": {
+    "**/frontend/out/**": true
+  }
+}{
   "workbench.startupEditor": "readme",
   "css.lint.unknownAtRules": "ignore"
 }

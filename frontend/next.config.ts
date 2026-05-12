@@ -3,6 +3,9 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   output: "export",
   trailingSlash: true,
+  // Disable SWC minification to produce non-minified output files
+  // This makes generated JS more readable and avoids minifier-induced syntax issues
+  swcMinify: false,
   turbopack: {
     root: __dirname,
   },
