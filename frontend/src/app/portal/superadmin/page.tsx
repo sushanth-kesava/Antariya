@@ -267,6 +267,17 @@ export default function SuperAdminPortalPage() {
 
   const adminProfiles = dashboard?.adminProfiles || [];
   const customerProfiles = dashboard?.customerProfiles || [];
+  const getPortalLabel = (role: "customer" | "admin" | "superadmin") => {
+    if (role === "superadmin") {
+      return "Superadmin Portal";
+    }
+
+    if (role === "admin") {
+      return "Admin Portal";
+    }
+
+    return "Customer Portal";
+  };
   const pendingAccessRequests = useMemo(
     () =>
       (dashboard?.accessRequests || []).filter(
@@ -422,6 +433,7 @@ export default function SuperAdminPortalPage() {
                           <div>
                             <p className="text-sm font-semibold text-gray-900">{profile.displayName}</p>
                             <p className="text-xs text-gray-500">{profile.email} • {profile.role}</p>
+                            <p className="text-xs text-gray-600">Registered portal: {getPortalLabel(profile.role)}</p>
                           </div>
                           <div className="text-right text-xs text-gray-500">
                             <p>{profile.active ? "Active" : "Inactive"}</p>
@@ -443,6 +455,7 @@ export default function SuperAdminPortalPage() {
                           <div>
                             <p className="text-sm font-semibold text-gray-900">{profile.displayName}</p>
                             <p className="text-xs text-gray-500">{profile.email}</p>
+                            <p className="text-xs text-gray-600">Registered portal: {getPortalLabel("customer")}</p>
                           </div>
                           <Badge variant="outline" className="rounded-full">customer</Badge>
                         </div>

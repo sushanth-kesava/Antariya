@@ -68,11 +68,15 @@ function resolvePortalRoleForEmail(email, existingAdminRole = null) {
     return "superadmin";
   }
 
-  if (env.adminAllowedEmails.includes(normalizedEmail)) {
+  if (existingAdminRole === "superadmin") {
+    return "superadmin";
+  }
+
+  if (existingAdminRole === "admin") {
     return "admin";
   }
 
-  if (env.adminAllowedEmails.length === 0 && existingAdminRole === "admin") {
+  if (env.adminAllowedEmails.includes(normalizedEmail)) {
     return "admin";
   }
 
@@ -102,7 +106,7 @@ async function resolveCurrentAccount(userId, email, role) {
     if (userAccount) {
       return {
         account: userAccount,
-        role: userAccount.role || "customer",
+        role: resolvePortalRoleForEmail(normalizedEmail, null),
       };
     }
   }
@@ -113,7 +117,7 @@ async function resolveCurrentAccount(userId, email, role) {
     if (adminById && adminById.active) {
       return {
         account: adminById,
-        role: adminById.role || "admin",
+        role: resolvePortalRoleForEmail(adminById.email, adminById.role || "admin"),
       };
     }
 
@@ -122,7 +126,7 @@ async function resolveCurrentAccount(userId, email, role) {
     if (userById) {
       return {
         account: userById,
-        role: userById.role || "customer",
+        role: resolvePortalRoleForEmail(userById.email, null),
       };
     }
   }
@@ -391,6 +395,14 @@ async function signupWithCredentials(req, res, next) {
 
     const existingAdmin = await AdminProfile.findOne({ email: normalizedEmail, active: true });
     const existingUser = await User.findOne({ email: normalizedEmail });
+    const registeredPortalRole = resolvePortalRoleForEmail(normalizedEmail, existingAdmin?.role || null);
+
+    if (registeredPortalRole !== "customer") {
+      return res.status(403).json({
+        success: false,
+        message: portalMismatchMessage(normalizedEmail, registeredPortalRole),
+      });
+    }
 
     if (existingAdmin || (existingUser && existingUser.authProvider === "google" && !existingUser.passwordHash)) {
       return res.status(409).json({
@@ -468,6 +480,15 @@ async function loginWithCredentials(req, res, next) {
     }
 
     const adminAccount = await AdminProfile.findOne({ email: normalizedEmail, active: true });
+    const registeredPortalRole = resolvePortalRoleForEmail(normalizedEmail, adminAccount?.role || null);
+
+    if (registeredPortalRole !== "customer") {
+      return res.status(403).json({
+        success: false,
+        message: portalMismatchMessage(normalizedEmail, registeredPortalRole),
+      });
+    }
+
     if (adminAccount) {
       return res.status(409).json({
         success: false,
