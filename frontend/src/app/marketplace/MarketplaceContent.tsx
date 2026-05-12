@@ -17,6 +17,8 @@ import {
   getMarketplaceLayoutFromBackend,
   getProductsFromBackend,
 } from "@/lib/api/products";
+import { getApiBaseUrl } from "@/lib/api/base-url";
+import { normalizeAppRole } from "@/lib/auth-session";
 
 type SortOption = "relevance" | "price_asc" | "price_desc" | "rating" | "newest";
 
@@ -27,6 +29,8 @@ const SORT_LABELS: Record<SortOption, string> = {
   rating: "Highest Rated",
   newest: "Newest First",
 };
+
+const API_BASE_URL = getApiBaseUrl();
 
 const ROLE_TITLES: Record<MarketplaceRole, { eyebrow: string; title: string; description: string; ctaHref: string; ctaLabel: string }> = {
   customer: {
@@ -114,19 +118,45 @@ export default function MarketplaceContent() {
           ? "admin"
           : "customer";
 
-      const stored = typeof window !== "undefined" ? localStorage.getItem("user_role") : null;
-      const storedRole = stored?.trim().toLowerCase();
-
       if (pathRole !== "customer") {
         setRole(pathRole);
-      } else if (storedRole === "admin" || storedRole === "superadmin") {
-        setRole(storedRole);
-      } else {
-        setRole("customer");
+        setRoleResolved(true);
+        return;
       }
+
+      const resolveSessionRole = async () => {
+        const token = localStorage.getItem("app_auth_token");
+
+        if (!token) {
+          setRole("customer");
+          setRoleResolved(true);
+          return;
+        }
+
+        try {
+          const response = await fetch(`${API_BASE_URL}/auth/me`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+
+          const data = await response.json();
+
+          if (response.ok && data?.success && data?.user) {
+            setRole(normalizeAppRole(data.user.role));
+          } else {
+            setRole("customer");
+          }
+        } catch {
+          setRole("customer");
+        } finally {
+          setRoleResolved(true);
+        }
+      };
+
+      void resolveSessionRole();
     } catch {
       setRole("customer");
-    } finally {
       setRoleResolved(true);
     }
   }, [pathname]);
