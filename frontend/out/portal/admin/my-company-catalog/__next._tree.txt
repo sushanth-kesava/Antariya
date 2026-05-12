@@ -1,6 +1,6 @@
 :HL["/_next/static/media/bf0b6634f251496a-s.p.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
 :HL["/_next/static/media/e4af272ccee01ff0-s.p.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
 :HL["/_next/static/css/4c848bf6a52d75e5.css","style"]
-:HL["/_next/static/css/b597d891dafefa4f.css","style"]
+:HL["/_next/static/css/995168d173533706.css","style"]
 :HL["https://res.cloudinary.com/doefhzx01/image/upload/v1775491590/Antariya-icon__1_-removebg-preview_z1vqp1.png","image"]
-0:{"tree":{"name":"","param":null,"prefetchHints":16,"slots":{"children":{"name":"portal","param":null,"prefetchHints":0,"slots":{"children":{"name":"admin","param":null,"prefetchHints":0,"slots":{"children":{"name":"my-company-catalog","param":null,"prefetchHints":0,"slots":{"children":{"name":"__PAGE__","param":null,"prefetchHints":0,"slots":null}}}}}}}}},"staleTime":300,"buildId":"utqVMi87snN6-FMcjBiL8"}
+0:{"tree":{"name":"","param":null,"prefetchHints":16,"slots":{"children":{"name":"portal","param":null,"prefetchHints":0,"slots":{"children":{"name":"admin","param":null,"prefetchHints":0,"slots":{"children":{"name":"my-company-catalog","param":null,"prefetchHints":0,"slots":{"children":{"name":"__PAGE__","param":null,"prefetchHints":0,"slots":null}}}}}}}}},"staleTime":300,"buildId":"kzcgnVj7XZLsE7EZ-67Ju"}
