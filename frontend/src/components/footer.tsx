@@ -32,18 +32,17 @@ const PUBLIC_SECTIONS = [
     title: "Support",
     links: [
       { label: "Tracking Orders", href: "/portal/customer" },
-      { label: "Shipping Policy", href: "/#hero" },
-      { label: "Privacy & Terms", href: "/#hero" },
-      { label: "Help Center", href: "/#hero" },
+      { label: "Policies Hub", href: "/legal/policies" },
+      { label: "Contact Support", href: "/#hero" },
     ],
   },
 ];
 
 const SOCIAL_LINKS = [
-  { label: "Facebook", href: "#" },
-  { label: "Instagram", href: "#" },
-  { label: "LinkedIn", href: "#" },
-  { label: "Twitter", href: "#" },
+  { label: "Facebook", href: "https://www.facebook.com/" },
+  { label: "Instagram", href: "https://www.instagram.com/antariya.official/?__pwa=1" },
+  { label: "LinkedIn", href: "https://www.linkedin.com/feed/" },
+  { label: "Twitter", href: "https://x.com/" },
 ];
 
 const FOOTER_COPY: Record<FooterVariant, { title: string; description: string; links: Array<{ label: string; href: string }>; note: string }> = {
@@ -51,8 +50,9 @@ const FOOTER_COPY: Record<FooterVariant, { title: string; description: string; l
     title: "Antariya",
     description: "Empowering India's embroidery industry with premium digital assets, physical supplies, and machine solutions.",
     links: [
-      { label: "Privacy Policy", href: "#" },
-      { label: "Terms of Service", href: "#" },
+      { label: "All Policies", href: "/legal/policies" },
+      { label: "Privacy Policy", href: "/legal/privacy" },
+      { label: "Terms of Service", href: "/legal/terms" },
       { label: "Contact", href: "#" },
     ],
     note: `© ${COPYRIGHT_YEAR} Antariya India. All rights reserved.`,

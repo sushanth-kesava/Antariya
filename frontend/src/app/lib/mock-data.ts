@@ -25,13 +25,3 @@ export interface Product {
   customizable?: boolean;
 }
 
-export const CATEGORIES = [
-  'Embroidery Designs',
-  'Machine Threads',
-  'Fabrics',
-  'Needles',
-  'Accessories',
-  'Hoodies',
-  'Blouses'
-];
-

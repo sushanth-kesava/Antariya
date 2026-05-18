@@ -5,7 +5,7 @@ import { Navbar } from "@/components/navbar";
 import { Hero } from "@/components/hero";
 import { Footer } from "@/components/footer";
 import { ProductCard } from "@/components/product-card";
-import { CATEGORIES, Product } from "@/app/lib/mock-data";
+import { Product } from "@/app/lib/mock-data";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ChevronRight, Zap, ShieldCheck, Truck, RefreshCcw, ArrowRight, FileText } from "lucide-react";
@@ -27,12 +27,13 @@ export default function Home() {
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [heroProduct, setHeroProduct] = useState<Product | null>(null);
   const [heroMetrics, setHeroMetrics] = useState<HeroMetrics>({ products: 0, dealers: 0, categories: 0, orders: 0 });
+  const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchData() {
       try {
-        const [catalogResponse, statsResponse] = await Promise.all([
+        const [catalogResponse, statsResponse, layoutResponse] = await Promise.all([
           getProductsFromBackend({ limit: 500 }),
           fetch(`${API_BASE_URL}/stats/home`).then(async (response) => {
             const data = await response.json();
@@ -43,12 +44,23 @@ export default function Home() {
 
             return data.stats as HeroMetrics;
           }),
+          fetch(`${API_BASE_URL}/products/marketplace?role=customer`).then(async (response) => {
+            const data = await response.json();
+
+            if (!response.ok || !data?.success) {
+              return [];
+            }
+
+            return (data.categories as string[]) || [];
+          }).catch(() => []),
         ]);
 
         const { products, pagination } = catalogResponse;
         const liveProducts = products.length > 0 ? products : [];
+        const fetchedCategories = layoutResponse.length > 0 ? layoutResponse : Array.from(new Set(liveProducts.map((product) => product.category).filter(Boolean)));
 
         setFeaturedProducts(liveProducts.slice(0, 4));
+        setCategories(fetchedCategories);
         setHeroProduct(
           [...liveProducts].sort((left, right) => {
             const ratingDelta = (Number(right.rating || 0) - Number(left.rating || 0));
@@ -63,7 +75,7 @@ export default function Home() {
         setHeroMetrics({
           products: statsResponse.products || pagination.total || liveProducts.length,
           dealers: statsResponse.dealers || new Set(liveProducts.map((product) => product.dealerId).filter(Boolean)).size,
-          categories: statsResponse.categories || new Set(liveProducts.map((product) => product.category).filter(Boolean)).size,
+          categories: statsResponse.categories || fetchedCategories.length,
           orders: statsResponse.orders || 0,
         });
       } catch (error) {
@@ -96,7 +108,7 @@ export default function Home() {
             </div>
             
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
-              {CATEGORIES.map((cat) => (
+              {categories.length > 0 ? categories.map((cat) => (
                 <Link 
                   key={cat} 
                   href={`/marketplace?category=${encodeURIComponent(cat)}`}
@@ -107,7 +119,11 @@ export default function Home() {
                   </div>
                   <span className="text-xs font-bold leading-tight line-clamp-2">{cat}</span>
                 </Link>
-              ))}
+              )) : (
+                <div className="col-span-full py-8 text-center text-muted-foreground">
+                  <p>No categories available. Create your first product from the admin portal.</p>
+                </div>
+              )}
             </div>
           </div>
         </section>
