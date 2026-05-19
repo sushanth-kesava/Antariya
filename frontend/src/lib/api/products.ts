@@ -45,6 +45,13 @@ export type MarketplaceLayoutResponse =
 
 export type ProductReviewTag = "Quality" | "Fit" | "Delivery" | "Customization";
 
+export type ProductReviewSummary = {
+  reviewCount: number;
+  averageRating: number;
+  ratingBreakdown: Record<string, number>;
+  reviewImageCount: number;
+};
+
 export type ProductReview = {
   id: string;
   productId: string;
@@ -53,10 +60,21 @@ export type ProductReview = {
   rating: number;
   title: string;
   comment: string;
+  images: string[];
   verified: boolean;
   tags: ProductReviewTag[];
   moderationStatus?: ReviewModerationStatus;
   createdAt: string;
+};
+
+export type ReviewEligibility = {
+  productId: string;
+  productName: string;
+  canReview: boolean;
+  hasDeliveredOrder: boolean;
+  hasReviewed: boolean;
+  existingReview: ProductReview | null;
+  message: string;
 };
 
 export type ReviewModerationStatus = "approved" | "hidden" | "flagged" | "pending";
@@ -80,6 +98,7 @@ export type ProductReviewInput = {
   title: string;
   comment: string;
   tags?: ProductReviewTag[];
+  images?: string[];
 };
 
 function toQueryString(params: Record<string, string | boolean | undefined>) {
@@ -153,7 +172,10 @@ export async function getProductByIdFromBackend(id: string): Promise<Product | n
   return data.product as Product;
 }
 
-export async function getProductReviewsFromBackend(productId: string): Promise<ProductReview[]> {
+export async function getProductReviewsFromBackend(productId: string): Promise<{
+  reviews: ProductReview[];
+  summary: ProductReviewSummary;
+}> {
   const response = await fetch(`${API_BASE_URL}/products/${productId}/reviews`);
   const data = await response.json();
 
@@ -161,7 +183,31 @@ export async function getProductReviewsFromBackend(productId: string): Promise<P
     throw new Error(data?.message || "Failed to fetch product reviews");
   }
 
-  return (data.reviews || []) as ProductReview[];
+  return {
+    reviews: (data.reviews || []) as ProductReview[],
+    summary: (data.summary || {
+      reviewCount: 0,
+      averageRating: 0,
+      ratingBreakdown: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+      reviewImageCount: 0,
+    }) as ProductReviewSummary,
+  };
+}
+
+export async function getReviewEligibilityFromBackend(token: string, productId: string): Promise<ReviewEligibility> {
+  const response = await fetch(`${API_BASE_URL}/products/${productId}/review-eligibility`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data?.success) {
+    throw new Error(data?.message || "Failed to load review eligibility");
+  }
+
+  return data as ReviewEligibility;
 }
 
 export async function addProductReviewOnBackend(

@@ -1,6 +1,7 @@
 const Product = require("../models/Product");
 const Review = require("../models/Review");
 const User = require("../models/User");
+const Order = require("../models/Order");
 const AdminProfile = require("../models/AdminProfile");
 const multer = require("multer");
 const { hasCloudinaryCredentials, uploadProductImageBuffer } = require("../services/cloudinary.service");
@@ -98,6 +99,134 @@ function normalizeProduct(doc) {
   };
 }
 
+function normalizeReviewImages(images) {
+  if (!Array.isArray(images)) {
+    return [];
+  }
+
+  return images
+    .filter((item) => typeof item === "string")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0)
+    .slice(0, 4);
+}
+
+function buildReviewSummary(reviews) {
+  const summary = {
+    reviewCount: 0,
+    averageRating: 0,
+    ratingBreakdown: {
+      1: 0,
+      2: 0,
+      3: 0,
+      4: 0,
+      5: 0,
+    },
+    reviewImageCount: 0,
+  };
+
+  if (!Array.isArray(reviews) || reviews.length === 0) {
+    return summary;
+  }
+
+  let ratingTotal = 0;
+
+  for (const review of reviews) {
+    const rating = Number(review?.rating || 0);
+
+    if (rating >= 1 && rating <= 5) {
+      summary.ratingBreakdown[rating] += 1;
+      ratingTotal += rating;
+    }
+
+    summary.reviewImageCount += normalizeReviewImages(review?.images).length;
+  }
+
+  summary.reviewCount = reviews.length;
+  summary.averageRating = Math.round((ratingTotal / reviews.length) * 10) / 10;
+
+  return summary;
+}
+
+function createEmptyReviewSummary() {
+  return {
+    reviewCount: 0,
+    averageRating: 0,
+    ratingBreakdown: {
+      1: 0,
+      2: 0,
+      3: 0,
+      4: 0,
+      5: 0,
+    },
+    reviewImageCount: 0,
+  };
+}
+
+function updateReviewSummary(summary, review) {
+  const rating = Number(review?.rating || 0);
+
+  if (rating >= 1 && rating <= 5) {
+    summary.ratingBreakdown[rating] += 1;
+    summary._ratingTotal += rating;
+  }
+
+  summary.reviewCount += 1;
+  summary.reviewImageCount += normalizeReviewImages(review?.images).length;
+}
+
+function finalizeReviewSummary(summary) {
+  summary.averageRating = summary.reviewCount > 0 ? Math.round((summary._ratingTotal / summary.reviewCount) * 10) / 10 : 0;
+  delete summary._ratingTotal;
+  return summary;
+}
+
+function buildReviewSummaryMap(reviews) {
+  const summaryMap = new Map();
+
+  for (const review of Array.isArray(reviews) ? reviews : []) {
+    const productId = review?.productId?.toString?.() || "";
+
+    if (!productId) {
+      continue;
+    }
+
+    if (!summaryMap.has(productId)) {
+      summaryMap.set(productId, { ...createEmptyReviewSummary(), _ratingTotal: 0 });
+    }
+
+    updateReviewSummary(summaryMap.get(productId), review);
+  }
+
+  for (const summary of summaryMap.values()) {
+    finalizeReviewSummary(summary);
+  }
+
+  return summaryMap;
+}
+
+async function getProductReviewSummary(productId) {
+  const summaryMap = await getProductReviewSummariesByProductIds([productId]);
+  return summaryMap.get(productId.toString()) || createEmptyReviewSummary();
+}
+
+async function getProductReviewSummariesByProductIds(productIds) {
+  const normalizedIds = Array.isArray(productIds)
+    ? productIds.map((productId) => productId?.toString?.()).filter((productId) => typeof productId === "string" && productId.length > 0)
+    : [];
+
+  if (normalizedIds.length === 0) {
+    return new Map();
+  }
+
+  const reviews = await Review.find({
+    productId: { $in: normalizedIds },
+    $or: [{ moderationStatus: "approved" }, { moderationStatus: { $exists: false } }],
+  }).select("productId rating images");
+
+  return buildReviewSummaryMap(reviews);
+}
+
 function normalizeReview(doc) {
   return {
     id: doc._id.toString(),
@@ -107,6 +236,7 @@ function normalizeReview(doc) {
     rating: doc.rating,
     title: doc.title,
     comment: doc.comment,
+    images: normalizeReviewImages(doc.images),
     verified: doc.verified,
     tags: doc.tags || [],
     moderationStatus: doc.moderationStatus || "approved",
@@ -128,6 +258,7 @@ function normalizeModerationReview(doc) {
     rating: doc.rating,
     title: doc.title,
     comment: doc.comment,
+    images: normalizeReviewImages(doc.images),
     verified: doc.verified,
     tags: doc.tags || [],
     moderationStatus: doc.moderationStatus || "approved",
@@ -257,6 +388,28 @@ async function syncProductRating(productId) {
   await Product.findByIdAndUpdate(productId, { rating: rounded });
 }
 
+async function getReviewEligibilityState(productId, userId) {
+  const [hasDeliveredOrder, existingReview] = await Promise.all([
+    Order.exists({
+      userId,
+      status: "Delivered",
+      items: {
+        $elemMatch: {
+          productId,
+        },
+      },
+    }),
+    Review.findOne({ productId, userId }).select("_id rating title comment images createdAt"),
+  ]);
+
+  return {
+    canReview: Boolean(hasDeliveredOrder),
+    hasDeliveredOrder: Boolean(hasDeliveredOrder),
+    hasReviewed: Boolean(existingReview),
+    existingReview: existingReview ? normalizeReview(existingReview) : null,
+  };
+}
+
 async function getProducts(req, res, next) {
   try {
     const { category, search, dealerId, customizable, page = "1", limit = "20" } = req.query;
@@ -291,9 +444,21 @@ async function getProducts(req, res, next) {
       Product.countDocuments(filter),
     ]);
 
+    const reviewSummaryMap = await getProductReviewSummariesByProductIds(products.map((product) => product._id));
+
     return res.status(200).json({
       success: true,
-      products: products.map(normalizeProduct),
+      products: products.map((product) => {
+        const reviewSummary = reviewSummaryMap.get(product._id.toString()) || createEmptyReviewSummary();
+
+        return {
+          ...normalizeProduct(product),
+          reviewCount: reviewSummary.reviewCount,
+          reviewAverage: reviewSummary.averageRating,
+          reviewBreakdown: reviewSummary.ratingBreakdown,
+          reviewImageCount: reviewSummary.reviewImageCount,
+        };
+      }),
       pagination: {
         page: pageNum,
         limit: limitNum,
@@ -349,9 +514,17 @@ async function getProductById(req, res, next) {
       });
     }
 
+    const reviewSummary = await getProductReviewSummary(product._id);
+
     return res.status(200).json({
       success: true,
-      product: normalizeProduct(product),
+      product: {
+        ...normalizeProduct(product),
+        reviewCount: reviewSummary.reviewCount,
+        reviewAverage: reviewSummary.averageRating,
+        reviewBreakdown: reviewSummary.ratingBreakdown,
+        reviewImageCount: reviewSummary.reviewImageCount,
+      },
     });
   } catch (error) {
     return next(error);
@@ -533,9 +706,41 @@ async function getProductReviews(req, res, next) {
       $or: [{ moderationStatus: "approved" }, { moderationStatus: { $exists: false } }],
     }).sort({ createdAt: -1 });
 
+    const summary = buildReviewSummary(reviews);
+
     return res.status(200).json({
       success: true,
       reviews: reviews.map(normalizeReview),
+      summary,
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function getReviewEligibility(req, res, next) {
+  try {
+    const product = await Product.findById(req.params.id).select("_id name");
+
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: "Product not found",
+      });
+    }
+
+    const eligibility = await getReviewEligibilityState(product._id, req.auth.sub);
+
+    return res.status(200).json({
+      success: true,
+      productId: product._id.toString(),
+      productName: product.name,
+      ...eligibility,
+      message: eligibility.canReview
+        ? eligibility.hasReviewed
+          ? "You can update your delivered-product review."
+          : "You can review this delivered product."
+        : "Reviews are available after your order is delivered.",
     });
   } catch (error) {
     return next(error);
@@ -553,7 +758,16 @@ async function createProductReview(req, res, next) {
       });
     }
 
-    const { rating, title, comment, tags } = req.body;
+    const eligibility = await getReviewEligibilityState(product._id, req.auth.sub);
+
+    if (!eligibility.canReview) {
+      return res.status(403).json({
+        success: false,
+        message: "Only customers who received this product can submit a review",
+      });
+    }
+
+    const { rating, title, comment, tags, images } = req.body;
     const numericRating = Number(rating);
 
     if (!Number.isFinite(numericRating) || numericRating < 1 || numericRating > 5) {
@@ -578,6 +792,15 @@ async function createProductReview(req, res, next) {
           .slice(0, 5)
       : [];
 
+    if (Array.isArray(images) && images.length > 4) {
+      return res.status(400).json({
+        success: false,
+        message: "You can attach up to 4 review images",
+      });
+    }
+
+    const normalizedImages = normalizeReviewImages(images);
+
     const displayName = await getDisplayNameForUser(req.auth.sub, req.auth.role);
 
     const review = await Review.findOneAndUpdate(
@@ -589,6 +812,7 @@ async function createProductReview(req, res, next) {
           rating: numericRating,
           title: String(title).trim(),
           comment: String(comment).trim(),
+          images: normalizedImages,
           verified: true,
           tags: normalizedTags,
           moderationStatus: "approved",
@@ -788,4 +1012,5 @@ module.exports = {
   getReviewModerationQueue,
   updateReviewModeration,
   getReviewModerationActivity,
+  getReviewEligibility,
 };

@@ -37,7 +37,10 @@ import {
   addProductReviewOnBackend,
   getProductByIdFromBackend,
   getProductReviewsFromBackend,
+  getReviewEligibilityFromBackend,
   ProductReview,
+  ProductReviewSummary,
+  ReviewEligibility,
   ProductReviewTag,
 } from "@/lib/api/products";
 import { addProductToCart, ProductCustomization } from "@/lib/cart";
@@ -54,6 +57,34 @@ const LAST_SUCCESSFUL_PINCODE_KEY = "antariya_last_successful_pincode";
 const APPAREL_CATEGORIES = new Set(["Hoodies", "Blouses"]);
 
 type ReviewTag = "All" | "Quality" | "Fit" | "Delivery" | "Customization";
+type ReviewRatingFilter = "All" | 1 | 2 | 3 | 4 | 5;
+
+const DEFAULT_REVIEW_SUMMARY: ProductReviewSummary = {
+  reviewCount: 0,
+  averageRating: 0,
+  ratingBreakdown: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+  reviewImageCount: 0,
+};
+
+const REVIEW_RATING_FILTERS: ReviewRatingFilter[] = ["All", 5, 4, 3, 2, 1];
+const REVIEW_TAG_FILTERS: ReviewTag[] = ["All", "Quality", "Fit", "Delivery", "Customization"];
+
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === "string" ? reader.result : "";
+      if (!result) {
+        reject(new Error("Failed to read the selected image"));
+        return;
+      }
+
+      resolve(result);
+    };
+    reader.onerror = () => reject(new Error("Failed to read the selected image"));
+    reader.readAsDataURL(file);
+  });
+}
 
 function getErrorMessage(error: unknown, fallback: string) {
   if (error instanceof Error && error.message) {
@@ -189,6 +220,7 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
   const router = useRouter();
   const { toast } = useToast();
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
+  const reviewImageInputRef = useRef<HTMLInputElement | null>(null);
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -220,7 +252,12 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
   const [deliveryPincode, setDeliveryPincode] = useState("");
   const [locatingPincode, setLocatingPincode] = useState(false);
   const [reviewFilter, setReviewFilter] = useState<ReviewTag>("All");
+  const [reviewRatingFilter, setReviewRatingFilter] = useState<ReviewRatingFilter>("All");
+  const [reviewImageOnly, setReviewImageOnly] = useState(false);
+  const [reviewVerifiedOnly, setReviewVerifiedOnly] = useState(false);
   const [reviews, setReviews] = useState<ProductReview[]>([]);
+  const [reviewSummary, setReviewSummary] = useState<ProductReviewSummary>(DEFAULT_REVIEW_SUMMARY);
+  const [reviewEligibility, setReviewEligibility] = useState<ReviewEligibility | null>(null);
   const [reviewsLoading, setReviewsLoading] = useState(true);
   const [submittingReview, setSubmittingReview] = useState(false);
   const [reviewForm, setReviewForm] = useState({
@@ -228,6 +265,7 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
     title: "",
     comment: "",
     tags: [] as ProductReviewTag[],
+    images: [] as string[],
   });
   const [openSizeGuide, setOpenSizeGuide] = useState(false);
   const [openFullscreenGallery, setOpenFullscreenGallery] = useState(false);
@@ -306,14 +344,17 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
         aggregateRating: product.rating
           ? {
               "@type": "AggregateRating",
-              ratingValue: product.rating,
-              reviewCount: reviews.length || 1,
+              ratingValue: reviewSummary.reviewCount > 0 ? reviewSummary.averageRating : product.rating,
+              reviewCount: reviewSummary.reviewCount || product.reviewCount || 1,
             }
           : undefined,
       }
     : null;
   const sellerName = product?.dealerName || "Admin";
   const sellerEmail = product?.dealerEmail || "Not provided";
+  const displayRating = reviewSummary.reviewCount > 0 ? reviewSummary.averageRating : product?.reviewAverage ?? product?.rating ?? 0;
+  const displayReviewCount = reviewSummary.reviewCount > 0 ? reviewSummary.reviewCount : product?.reviewCount ?? reviews.length;
+  const canWriteReview = reviewEligibility ? reviewEligibility.canReview : true;
 
   useEffect(() => {
     if (galleryImages.length > 0) {
@@ -322,18 +363,20 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
   }, [galleryImages]);
 
   const filteredReviews = useMemo(() => {
-    if (reviewFilter === "All") {
-      return reviews;
-    }
+    return reviews.filter((review) => {
+      const matchesTag = reviewFilter === "All" || review.tags.includes(reviewFilter as ProductReviewTag);
+      const matchesRating = reviewRatingFilter === "All" || review.rating === reviewRatingFilter;
+      const matchesImages = !reviewImageOnly || review.images.length > 0;
+      const matchesVerified = !reviewVerifiedOnly || review.verified;
 
-    return reviews.filter((review) => review.tags.includes(reviewFilter as ProductReviewTag));
-  }, [reviewFilter, reviews]);
+      return matchesTag && matchesRating && matchesImages && matchesVerified;
+    });
+  }, [reviewFilter, reviewImageOnly, reviewRatingFilter, reviewVerifiedOnly, reviews]);
 
   const averageRating = useMemo(() => {
-    if (reviews.length === 0) return "0.0";
-    const total = reviews.reduce((sum, review) => sum + review.rating, 0);
-    return (total / reviews.length).toFixed(1);
-  }, [reviews]);
+    if (reviewSummary.reviewCount === 0) return "0.0";
+    return reviewSummary.averageRating.toFixed(1);
+  }, [reviewSummary]);
 
   const recommendedSize = useMemo(() => {
     if (!isApparelProduct || !product) {
@@ -365,7 +408,8 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
 
       try {
         const reviewData = await getProductReviewsFromBackend(id);
-        setReviews(reviewData);
+        setReviews(reviewData.reviews);
+        setReviewSummary(reviewData.summary);
       } catch (reviewError) {
         console.error("Failed to load reviews", reviewError);
       } finally {
@@ -374,6 +418,26 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
     };
 
     void loadReviews();
+  }, [id]);
+
+  useEffect(() => {
+    const loadReviewEligibility = async () => {
+      const token = localStorage.getItem("app_auth_token");
+
+      if (!token) {
+        setReviewEligibility(null);
+        return;
+      }
+
+      try {
+        const eligibility = await getReviewEligibilityFromBackend(token, id);
+        setReviewEligibility(eligibility);
+      } catch (eligibilityError) {
+        console.error("Failed to load review eligibility", eligibilityError);
+      }
+    };
+
+    void loadReviewEligibility();
   }, [id]);
 
   useEffect(() => {
@@ -502,6 +566,37 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
     });
   };
 
+  const handleReviewImageUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) {
+      return;
+    }
+
+    const remainingSlots = Math.max(0, 4 - reviewForm.images.length);
+
+    if (remainingSlots === 0) {
+      toast({
+        title: "Image limit reached",
+        description: "You can attach up to 4 images with a review.",
+      });
+      return;
+    }
+
+    try {
+      const selectedFiles = Array.from(files).slice(0, remainingSlots);
+      const uploadedImages = await Promise.all(selectedFiles.map((file) => readFileAsDataUrl(file)));
+
+      setReviewForm((prev) => ({
+        ...prev,
+        images: [...prev.images, ...uploadedImages].slice(0, 4),
+      }));
+    } catch (uploadError) {
+      toast({
+        title: "Image upload failed",
+        description: getErrorMessage(uploadError, "Please try again."),
+      });
+    }
+  };
+
   const handleSubmitReview = async () => {
     if (!product) return;
 
@@ -524,6 +619,14 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
       return;
     }
 
+    if (reviewEligibility && !reviewEligibility.canReview) {
+      toast({
+        title: "Review not available yet",
+        description: reviewEligibility.message,
+      });
+      return;
+    }
+
     try {
       setSubmittingReview(true);
       await addProductReviewOnBackend(token, product.id, {
@@ -531,6 +634,7 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
         title: reviewForm.title.trim(),
         comment: reviewForm.comment.trim(),
         tags: reviewForm.tags,
+        images: reviewForm.images,
       });
 
       const [reviewData, updatedProduct] = await Promise.all([
@@ -538,12 +642,25 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
         getProductByIdFromBackend(product.id),
       ]);
 
-      setReviews(reviewData);
+      setReviews(reviewData.reviews);
+      setReviewSummary(reviewData.summary);
       if (updatedProduct) {
         setProduct(updatedProduct);
       }
 
-      setReviewForm({ rating: 5, title: "", comment: "", tags: [] });
+      if (token) {
+        try {
+          const eligibility = await getReviewEligibilityFromBackend(token, product.id);
+          setReviewEligibility(eligibility);
+        } catch (eligibilityError) {
+          console.error("Failed to refresh review eligibility", eligibilityError);
+        }
+      }
+
+      setReviewForm({ rating: 5, title: "", comment: "", tags: [], images: [] });
+      if (reviewImageInputRef.current) {
+        reviewImageInputRef.current.value = "";
+      }
       toast({
         title: "Review submitted",
         description: "Thanks for your feedback.",
@@ -812,8 +929,8 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
                 <Badge variant="secondary" className="bg-primary/10 text-primary border-none uppercase tracking-widest px-4 py-1 font-bold">{product.category}</Badge>
                 <div className="flex items-center gap-1.5 text-accent">
                   <Star className="h-5 w-5 fill-current" />
-                  <span className="font-bold text-foreground text-lg">{product.rating}</span>
-                  <span className="text-muted-foreground text-sm">(Verified Purchases)</span>
+                  <span className="font-bold text-foreground text-lg">{displayRating.toFixed(1)}</span>
+                  <span className="text-muted-foreground text-sm">({displayReviewCount} reviews)</span>
                 </div>
               </div>
               
@@ -1103,7 +1220,8 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
                       <p><span className="font-semibold text-foreground">Material:</span> {getMaterialLabel(product.category)}</p>
                       <p><span className="font-semibold text-foreground">Category:</span> {product.category}</p>
                       <p><span className="font-semibold text-foreground">Stock:</span> {product.stock} units available</p>
-                      <p><span className="font-semibold text-foreground">Rating:</span> {product.rating}/5</p>
+                      <p><span className="font-semibold text-foreground">Rating:</span> {displayRating.toFixed(1)}/5</p>
+                      <p><span className="font-semibold text-foreground">Reviews:</span> {displayReviewCount} verified customer reviews</p>
                       <p><span className="font-semibold text-foreground">Customization:</span> {product.customizable ? "Enabled" : "Not available"}</p>
                     </div>
                   </CardContent>
@@ -1181,83 +1299,219 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
 
             <TabsContent value="reviews" className="space-y-6">
               <Card className="rounded-3xl border-border/50 shadow-sm">
-                <CardContent className="p-6 space-y-4">
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                    <h3 className="text-2xl font-bold">Customer Reviews</h3>
-                    <div className="rounded-2xl bg-muted/40 px-4 py-2 text-sm">
-                      <span className="font-semibold text-lg text-foreground">{averageRating}</span>
-                      <span className="text-muted-foreground"> / 5 from {reviews.length} reviews</span>
+                <CardContent className="p-6 space-y-6">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="space-y-2">
+                      <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Customer feedback</p>
+                      <h3 className="text-2xl font-bold">Customer Reviews</h3>
+                      <p className="text-sm text-muted-foreground max-w-2xl">
+                        Reviews are only accepted from customers who ordered and received this product. Ratings, photos, and text feedback all roll into the product score.
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full lg:max-w-3xl">
+                      <div className="rounded-2xl border border-border/50 bg-muted/30 p-4">
+                        <p className="text-xs uppercase tracking-wider text-muted-foreground">Average</p>
+                        <div className="mt-2 flex items-baseline gap-2">
+                          <span className="text-3xl font-black text-foreground">{averageRating}</span>
+                          <span className="text-sm text-muted-foreground">/ 5</span>
+                        </div>
+                      </div>
+                      <div className="rounded-2xl border border-border/50 bg-muted/30 p-4">
+                        <p className="text-xs uppercase tracking-wider text-muted-foreground">Reviews</p>
+                        <div className="mt-2 flex items-baseline gap-2">
+                          <span className="text-3xl font-black text-foreground">{reviewSummary.reviewCount}</span>
+                          <span className="text-sm text-muted-foreground">total</span>
+                        </div>
+                      </div>
+                      <div className="rounded-2xl border border-border/50 bg-muted/30 p-4">
+                        <p className="text-xs uppercase tracking-wider text-muted-foreground">Photos</p>
+                        <div className="mt-2 flex items-baseline gap-2">
+                          <span className="text-3xl font-black text-foreground">{reviewSummary.reviewImageCount}</span>
+                          <span className="text-sm text-muted-foreground">shared</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-border/50 p-4 space-y-3">
-                    <h4 className="font-semibold">Write a Review</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      <div className="space-y-2 md:col-span-1">
-                        <Label>Rating</Label>
-                        <div className="flex gap-1">
-                          {Array.from({ length: 5 }).map((_, idx) => {
-                            const ratingValue = idx + 1;
-                            return (
-                              <Button
-                                key={ratingValue}
-                                type="button"
-                                variant={reviewForm.rating >= ratingValue ? "default" : "outline"}
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => setReviewForm((prev) => ({ ...prev, rating: ratingValue }))}
-                              >
-                                <Star className="h-4 w-4" />
-                              </Button>
-                            );
-                          })}
+                  <div className="grid grid-cols-1 lg:grid-cols-[1.15fr_0.85fr] gap-4">
+                    <div className="rounded-2xl border border-border/50 p-4 space-y-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h4 className="font-semibold">Write a Review</h4>
+                          <p className="text-sm text-muted-foreground">
+                            {reviewEligibility ? reviewEligibility.message : "Sign in to verify whether your delivery qualifies for a verified review."}
+                          </p>
+                        </div>
+                        <Badge variant={reviewEligibility?.canReview ? "default" : "outline"} className="rounded-full">
+                          {reviewEligibility?.canReview ? "Eligible" : reviewEligibility ? "Locked" : "Sign in"}
+                        </Badge>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div className="space-y-2 md:col-span-1">
+                          <Label>Rating</Label>
+                          <div className="flex flex-wrap gap-1">
+                            {Array.from({ length: 5 }).map((_, idx) => {
+                              const ratingValue = idx + 1;
+                              return (
+                                <Button
+                                  key={ratingValue}
+                                  type="button"
+                                  variant={reviewForm.rating >= ratingValue ? "default" : "outline"}
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  disabled={!canWriteReview || submittingReview}
+                                  onClick={() => setReviewForm((prev) => ({ ...prev, rating: ratingValue }))}
+                                >
+                                  <Star className="h-4 w-4" />
+                                </Button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                        <div className="space-y-2 md:col-span-2">
+                          <Label htmlFor="review-title">Title</Label>
+                          <Input
+                            id="review-title"
+                            value={reviewForm.title}
+                            onChange={(e) => setReviewForm((prev) => ({ ...prev, title: e.target.value }))}
+                            placeholder="Summarize your experience"
+                            disabled={!canWriteReview || submittingReview}
+                          />
                         </div>
                       </div>
-                      <div className="space-y-2 md:col-span-2">
-                        <Label htmlFor="review-title">Title</Label>
-                        <Input
-                          id="review-title"
-                          value={reviewForm.title}
-                          onChange={(e) => setReviewForm((prev) => ({ ...prev, title: e.target.value }))}
-                          placeholder="Summarize your experience"
+
+                      <div className="space-y-2">
+                        <Label htmlFor="review-comment">Comment</Label>
+                        <Textarea
+                          id="review-comment"
+                          value={reviewForm.comment}
+                          onChange={(e) => setReviewForm((prev) => ({ ...prev, comment: e.target.value }))}
+                          placeholder="Tell others about quality, fit, customization, delivery, or photos from your order"
+                          disabled={!canWriteReview || submittingReview}
                         />
                       </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="review-comment">Comment</Label>
-                      <Textarea
-                        id="review-comment"
-                        value={reviewForm.comment}
-                        onChange={(e) => setReviewForm((prev) => ({ ...prev, comment: e.target.value }))}
-                        placeholder="Tell others about quality, fit, customization, or delivery experience"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Tags</Label>
-                      <div className="flex flex-wrap gap-2">
-                        {(["Quality", "Fit", "Delivery", "Customization"] as ProductReviewTag[]).map((tag) => (
-                          <Button
-                            key={tag}
-                            type="button"
-                            size="sm"
-                            variant={reviewForm.tags.includes(tag) ? "default" : "outline"}
-                            className="rounded-full"
-                            onClick={() => handleTagToggle(tag)}
-                          >
-                            {tag}
-                          </Button>
-                        ))}
+
+                      <div className="space-y-2">
+                        <Label>Review photos</Label>
+                        <input
+                          ref={reviewImageInputRef}
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          className="hidden"
+                          aria-label="Upload review images"
+                          title="Upload review images"
+                          disabled={!canWriteReview || submittingReview}
+                          onChange={(event) => {
+                            void handleReviewImageUpload(event.target.files);
+                            event.currentTarget.value = "";
+                          }}
+                        />
+                        <div className="rounded-2xl border border-dashed border-border p-4 space-y-3">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-medium">Add up to 4 photos from your delivered order.</p>
+                              <p className="text-xs text-muted-foreground">PNG, JPG, or WEBP. Clear product images help other shoppers compare results.</p>
+                            </div>
+                            <Button type="button" variant="outline" onClick={() => reviewImageInputRef.current?.click()} disabled={!canWriteReview || submittingReview}>
+                              <Upload className="mr-2 h-4 w-4" /> Upload images
+                            </Button>
+                          </div>
+                          {reviewForm.images.length > 0 ? (
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                              {reviewForm.images.map((image, index) => (
+                                <div key={`${image}-${index}`} className="relative overflow-hidden rounded-2xl border border-border/50 bg-muted/30 aspect-square">
+                                  <Image src={image} alt={`Review upload ${index + 1}`} fill className="object-cover" />
+                                  <button
+                                    type="button"
+                                    className="absolute right-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-xs text-white"
+                                    onClick={() =>
+                                      setReviewForm((prev) => ({
+                                        ...prev,
+                                        images: prev.images.filter((_, imageIndex) => imageIndex !== index),
+                                      }))
+                                    }
+                                    disabled={!canWriteReview || submittingReview}
+                                  >
+                                    Remove
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-muted-foreground">No review images selected yet.</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Tags</Label>
+                        <div className="flex flex-wrap gap-2">
+                          {REVIEW_TAG_FILTERS.filter((tag): tag is ProductReviewTag => tag !== "All").map((tag) => (
+                            <Button
+                              key={tag}
+                              type="button"
+                              size="sm"
+                              variant={reviewForm.tags.includes(tag) ? "default" : "outline"}
+                              className="rounded-full"
+                              disabled={!canWriteReview || submittingReview}
+                              onClick={() => handleTagToggle(tag)}
+                            >
+                              {tag}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end">
+                        <Button onClick={handleSubmitReview} disabled={submittingReview || !canWriteReview}>
+                          {submittingReview ? "Submitting..." : canWriteReview ? "Submit Review" : "Review locked"}
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex justify-end">
-                      <Button onClick={handleSubmitReview} disabled={submittingReview}>
-                        {submittingReview ? "Submitting..." : "Submit Review"}
-                      </Button>
+
+                    <div className="rounded-2xl border border-border/50 p-4 space-y-4 bg-muted/15">
+                      <div>
+                        <h4 className="font-semibold">Rating breakdown</h4>
+                        <p className="text-sm text-muted-foreground">Averages update automatically when approved reviews are added or changed.</p>
+                      </div>
+                      <div className="space-y-3">
+                        {([5, 4, 3, 2, 1] as const).map((stars) => {
+                          const count = reviewSummary.ratingBreakdown[String(stars)] || 0;
+                          const percentage = reviewSummary.reviewCount > 0 ? (count / reviewSummary.reviewCount) * 100 : 0;
+
+                          return (
+                            <div key={stars} className="flex items-center gap-3 text-sm">
+                              <div className="flex w-14 items-center gap-1 font-medium">
+                                {stars}
+                                <Star className="h-3.5 w-3.5 fill-current text-amber-500" />
+                              </div>
+                              <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                                <div className="h-full rounded-full bg-amber-500" style={{ width: `${percentage}%` }} />
+                              </div>
+                              <span className="w-10 text-right text-muted-foreground">{count}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      <div className="rounded-2xl border border-border/50 bg-background p-4 space-y-2">
+                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Eligibility</p>
+                        <p className="text-sm font-medium text-foreground">
+                          {reviewEligibility
+                            ? reviewEligibility.message
+                            : "Login to see if your delivered order qualifies for a verified review."}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {reviewSummary.reviewImageCount} customer-uploaded photos are attached to this product&apos;s approved reviews.
+                        </p>
+                      </div>
                     </div>
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    {(["All", "Quality", "Fit", "Delivery", "Customization"] as ReviewTag[]).map((filter) => (
+                    {REVIEW_TAG_FILTERS.map((filter) => (
                       <Button
                         key={filter}
                         type="button"
@@ -1269,6 +1523,36 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
                         {filter}
                       </Button>
                     ))}
+                    {REVIEW_RATING_FILTERS.map((rating) => (
+                      <Button
+                        key={String(rating)}
+                        type="button"
+                        size="sm"
+                        variant={reviewRatingFilter === rating ? "default" : "outline"}
+                        className="rounded-full"
+                        onClick={() => setReviewRatingFilter(rating)}
+                      >
+                        {rating === "All" ? "All stars" : `${rating} star`}
+                      </Button>
+                    ))}
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={reviewVerifiedOnly ? "default" : "outline"}
+                      className="rounded-full"
+                      onClick={() => setReviewVerifiedOnly((value) => !value)}
+                    >
+                      Verified only
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={reviewImageOnly ? "default" : "outline"}
+                      className="rounded-full"
+                      onClick={() => setReviewImageOnly((value) => !value)}
+                    >
+                      With photos
+                    </Button>
                   </div>
 
                   <div className="space-y-4">
@@ -1283,7 +1567,7 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
                       </div>
                     )}
                     {filteredReviews.map((review) => (
-                      <div key={review.id} className="rounded-2xl border border-border/50 p-4 space-y-3">
+                      <div key={review.id} className="rounded-2xl border border-border/50 bg-background p-4 space-y-3">
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                           <div>
                             <p className="font-semibold">{review.userName}</p>
@@ -1300,6 +1584,15 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
                         </div>
                         <p className="font-medium">{review.title}</p>
                         <p className="text-sm text-muted-foreground">{review.comment}</p>
+                        {review.images.length > 0 && (
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            {review.images.map((image, index) => (
+                              <div key={`${review.id}-image-${index}`} className="relative aspect-square overflow-hidden rounded-2xl border border-border/50 bg-muted/30">
+                                <Image src={image} alt={`${review.title} photo ${index + 1}`} fill className="object-cover" />
+                              </div>
+                            ))}
+                          </div>
+                        )}
                         <div className="flex flex-wrap gap-2">
                           {review.tags.map((tag) => (
                             <Badge key={tag} variant="secondary" className="rounded-full">{tag}</Badge>

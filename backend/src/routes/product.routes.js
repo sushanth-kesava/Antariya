@@ -12,6 +12,7 @@ const {
   getReviewModerationQueue,
   updateReviewModeration,
   getReviewModerationActivity,
+  getReviewEligibility,
 } = require("../controllers/product.controller");
 const { requireAuth, requireRole } = require("../middleware/auth.middleware");
 
@@ -23,6 +24,7 @@ router.get("/admin/reviews/activity", requireAuth, requireRole("admin", "superad
 router.get("/admin/reviews", requireAuth, requireRole("admin", "superadmin"), getReviewModerationQueue);
 router.patch("/admin/reviews/:reviewId", requireAuth, requireRole("admin", "superadmin"), updateReviewModeration);
 router.post("/upload-images", requireAuth, requireRole("admin", "superadmin"), productImageUploadMiddleware, uploadProductImages);
+router.get("/:id/review-eligibility", requireAuth, getReviewEligibility);
 router.get("/:id/reviews", getProductReviews);
 router.post("/:id/reviews", requireAuth, createProductReview);
 router.get("/:id", getProductById);

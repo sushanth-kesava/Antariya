@@ -33,6 +33,9 @@ export function ProductCard({ product }: ProductCardProps) {
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const isDesign = product.category === 'Embroidery Designs';
   const isCustomizable = Boolean(product.customizable);
+  const cardRating = product.reviewAverage ?? product.rating;
+  const cardReviewCount = product.reviewCount ?? 0;
+  const showReviewCount = typeof product.reviewCount === "number";
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [wishlistLoading, setWishlistLoading] = useState(false);
   const [openCustomizer, setOpenCustomizer] = useState(false);
@@ -188,7 +191,8 @@ export function ProductCard({ product }: ProductCardProps) {
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{product.category}</p>
           <div className="flex items-center gap-1 text-xs font-bold text-accent">
             <Star className="h-3 w-3 fill-current" />
-            {product.rating}
+            {cardRating.toFixed(1)}
+            {showReviewCount && <span className="text-muted-foreground">({cardReviewCount})</span>}
           </div>
         </div>
 

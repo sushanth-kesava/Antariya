@@ -22,6 +22,10 @@ export interface Product {
   stock: number;
   fileDownloadLink?: string;
   rating: number;
+  reviewCount?: number;
+  reviewAverage?: number;
+  reviewBreakdown?: Record<string, number>;
+  reviewImageCount?: number;
   customizable?: boolean;
 }
 
