@@ -4,12 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Script from "next/script";
 import { Trash2, Plus, Minus, ArrowRight, ShoppingBag, ShieldCheck, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { CartItem, clearCart, getCartItems, setCartItems } from "@/lib/cart";
 import { createOrderOnBackend } from "@/lib/api/orders";
+import { createRazorpayOrderOnBackend, verifyRazorpayPaymentOnBackend } from "@/lib/api/payments";
 import {
   formatINR,
   INDIA_FREE_SHIPPING_THRESHOLD,
@@ -22,6 +24,9 @@ export default function CartPage() {
   const router = useRouter();
   const [items, setItems] = useState<CartItem[]>([]);
   const [placingOrder, setPlacingOrder] = useState(false);
+  const [razorpayReady, setRazorpayReady] = useState(false);
+
+  const razorpayKeyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID?.trim() || "";
 
   useEffect(() => {
     setItems(getCartItems());
@@ -60,23 +65,99 @@ export default function CartPage() {
       return;
     }
 
+    if (!razorpayKeyId) {
+      alert("Razorpay key is missing. Set NEXT_PUBLIC_RAZORPAY_KEY_ID in frontend env.");
+      return;
+    }
+
+    if (!razorpayReady || typeof window === "undefined" || typeof window.Razorpay !== "function") {
+      alert("Payment gateway is still loading. Please try again.");
+      return;
+    }
+
+    const amountInPaise = Math.round(total * 100);
+
+    if (amountInPaise < 100) {
+      alert("Minimum payment amount is Rs. 1.00");
+      return;
+    }
+
+    const sessionRaw = localStorage.getItem("google_auth_user");
+    const session = sessionRaw ? JSON.parse(sessionRaw) : null;
+    const customerName = typeof session?.displayName === "string" ? session.displayName : "Customer";
+    const customerEmail = typeof session?.email === "string" ? session.email : "";
+
     try {
       setPlacingOrder(true);
-      await createOrderOnBackend(
-        token,
-        items.map((item) => ({
-          productId: item.productId,
-          quantity: item.quantity,
-          customization: item.customization,
-        }))
-      );
-      clearCart();
-      setItems([]);
-      router.push("/portal/customer");
+
+      const receipt = `antariya_${Date.now()}`;
+      const order = await createRazorpayOrderOnBackend(token, {
+        amount: amountInPaise,
+        currency: "INR",
+        receipt,
+      });
+
+      const orderItems = items.map((item) => ({
+        productId: item.productId,
+        quantity: item.quantity,
+        customization: item.customization,
+      }));
+
+      const paymentObject = new window.Razorpay({
+        key: razorpayKeyId,
+        amount: order.amount,
+        currency: order.currency,
+        name: "Antariya",
+        description: "Secure checkout",
+        order_id: order.order_id,
+        prefill: {
+          name: customerName,
+          email: customerEmail,
+        },
+        notes: {
+          source: "cart_checkout",
+          items: String(items.length),
+        },
+        handler: async (response: {
+          razorpay_payment_id: string;
+          razorpay_order_id: string;
+          razorpay_signature: string;
+        }) => {
+          try {
+            await verifyRazorpayPaymentOnBackend(token, {
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_signature: response.razorpay_signature,
+            });
+
+            await createOrderOnBackend(token, orderItems);
+            clearCart();
+            setItems([]);
+            router.push("/portal/customer");
+          } catch (error) {
+            console.error("Payment verification failed", error);
+            alert(error instanceof Error ? error.message : "Payment verification failed");
+          } finally {
+            setPlacingOrder(false);
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setPlacingOrder(false);
+            alert("Payment cancelled");
+          },
+        },
+      });
+
+      paymentObject.on("payment.failed", (event: { error?: { description?: string } }) => {
+        setPlacingOrder(false);
+        alert(event?.error?.description || "Payment failed. Please try again.");
+      });
+
+      paymentObject.open();
     } catch (error) {
       console.error("Checkout failed", error);
       alert(error instanceof Error ? error.message : "Failed to place order");
-    } finally {
       setPlacingOrder(false);
     }
   };
@@ -99,7 +180,14 @@ export default function CartPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50/50 py-12">
+    <>
+      <Script
+        src="https://checkout.razorpay.com/v1/checkout.js"
+        strategy="afterInteractive"
+        onLoad={() => setRazorpayReady(true)}
+        onError={() => setRazorpayReady(false)}
+      />
+      <div className="min-h-screen bg-gray-50/50 py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-end justify-between mb-8">
           <h1 className="text-3xl font-bold tracking-tight text-gray-900">Shopping Cart</h1>
@@ -232,11 +320,20 @@ export default function CartPage() {
                 </div>
               </CardContent>
               <CardFooter className="flex-col gap-4 pb-8">
-                <Button className="w-full h-12 text-base rounded-full shadow-md hover:shadow-lg transition-shadow" size="lg" onClick={handleCheckout} disabled={placingOrder}>
+                <Button
+                  className="w-full h-12 text-base rounded-full shadow-md hover:shadow-lg transition-shadow"
+                  size="lg"
+                  onClick={handleCheckout}
+                  disabled={placingOrder || !razorpayReady || !razorpayKeyId}
+                >
                   {placingOrder ? (
                     <>
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Placing Order...
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Processing Payment...
                     </>
+                  ) : !razorpayKeyId ? (
+                    "Razorpay Not Configured"
+                  ) : !razorpayReady ? (
+                    "Loading Payment Gateway..."
                   ) : (
                     <>
                       Proceed to Checkout
@@ -255,5 +352,6 @@ export default function CartPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }
