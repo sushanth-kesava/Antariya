@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -26,7 +27,9 @@ export default function CartPage() {
   const [placingOrder, setPlacingOrder] = useState(false);
   const [razorpayReady, setRazorpayReady] = useState(false);
 
-  const razorpayKeyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID?.trim() || "";
+  const razorpayKeyId =
+    process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID?.trim() ||
+    (typeof window !== "undefined" ? window.__ANTARIYA_RUNTIME_CONFIG__?.razorpayKeyId?.trim() || "" : "");
 
   useEffect(() => {
     setItems(getCartItems());

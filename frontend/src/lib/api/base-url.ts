@@ -2,6 +2,7 @@ const CONFIGURED_API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
 
 type RuntimeConfig = {
   apiBaseUrl?: string;
+  razorpayKeyId?: string;
 };
 
 declare global {
