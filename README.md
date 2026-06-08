@@ -26,17 +26,20 @@ The ultimate premium marketplace for embroidery designs, industrial threads, fab
 
 ## Environment Setup
 
-Create these files from examples:
+Create one env file for each app:
 
 1. Frontend env:
-   - Copy `.env.local.example` to `.env.local`
-   - Fill:
-     - `NEXT_PUBLIC_API_BASE_URL`
-     - `NEXT_PUBLIC_GOOGLE_CLIENT_ID`
+    - Edit `frontend/.env`
+    - Fill:
+       - `NEXT_PUBLIC_API_BASE_URL`
+       - `NEXT_PUBLIC_GOOGLE_CLIENT_ID`
+       - `NEXT_PUBLIC_SITE_URL`
+       - `NEXT_PUBLIC_RAZORPAY_KEY_ID`
+       - `OPENAI_API_KEY`
 
 2. Backend env:
-   - Copy `backend/.env.example` to `backend/.env`
-   - Fill:
+    - Edit `backend/.env`
+    - Fill:
      - `MONGODB_URI`
      - `JWT_SECRET`
      - `FRONTEND_URL`
