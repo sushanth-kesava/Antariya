@@ -134,7 +134,7 @@ Make sure these environment variables are set in Render:
    - `JWT_SECRET`
    - `FRONTEND_URL=https://antariyaofficial.com,https://antariya.onrender.com`
 2. Frontend:
-   - `NEXT_PUBLIC_API_BASE_URL=https://api.antariyaofficial.com/api`
+   - `NEXT_PUBLIC_API_BASE_URL=https://antariya-backend.onrender.com/api`
    - `NEXT_PUBLIC_SITE_URL=https://antariyaofficial.com`
 
 If the frontend builds without `NEXT_PUBLIC_API_BASE_URL`, it will fall back to localhost at build time and the Render site will stay stuck loading because it cannot reach the backend API.

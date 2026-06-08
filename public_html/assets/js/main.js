@@ -185,7 +185,7 @@
         return "http://localhost:5001/api/waitlist/subscribe";
       }
 
-      return "https://api.antariyaofficial.com/api/waitlist/subscribe";
+      return "https://antariya-backend.onrender.com/api/waitlist/subscribe";
     }
 
     forms.forEach((form) => {

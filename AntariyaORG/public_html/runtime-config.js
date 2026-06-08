@@ -3,7 +3,7 @@
 // the production backend without requiring a rebuild.
 
 (function() {
-    const apiBaseUrl = 'https://api.antariyaofficial.com/api';
+    const apiBaseUrl = 'https://antariya-backend.onrender.com/api';
 
   // Export configuration
   window.__ANTARIYA_RUNTIME_CONFIG__ = {
