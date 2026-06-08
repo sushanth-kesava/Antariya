@@ -1,0 +1,22 @@
+{
+  "name": "antariya",
+  "version": "1.0.0",
+  "description": "Antariya - E-commerce platform with customization",
+  "private": true,
+  "workspaces": ["frontend", "backend"],
+  "scripts": {
+    "dev": "concurrently \"npm --prefix frontend run dev\" \"npm --prefix backend run dev\"",
+    "build": "npm --prefix frontend run build && npm --prefix backend run build 2>/dev/null || true",
+    "build:frontend": "npm --prefix frontend run build",
+    "build:backend": "npm --prefix backend run build 2>/dev/null || true",
+    "start": "concurrently \"npm --prefix frontend run start\" \"npm --prefix backend run start\"",
+    "start:frontend": "npm --prefix frontend run start",
+    "start:backend": "npm --prefix backend run start",
+    "lint": "npm --prefix frontend run lint",
+    "typecheck": "npm --prefix frontend run typecheck",
+    "install:all": "npm install && npm --prefix frontend install && npm --prefix backend install"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
