@@ -174,15 +174,10 @@
     }
 
     const configuredApiBase = String(window.ANTARIYA_API_BASE || "").trim().replace(/\/$/, "");
-    const isLocalHost = ["localhost", "127.0.0.1"].includes(window.location.hostname);
 
     function resolveApiEndpoint() {
       if (configuredApiBase) {
         return `${configuredApiBase}/api/waitlist/subscribe`;
-      }
-
-      if (isLocalHost) {
-        return "http://localhost:5001/api/waitlist/subscribe";
       }
 
       return "https://antariya-backend.onrender.com/api/waitlist/subscribe";
