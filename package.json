@@ -17,7 +17,7 @@
     "install:all": "npm install && npm --prefix frontend install && npm --prefix backend install"
   },
   "overrides": {
-    "uuid": ">=11.1.1"
+    "uuid": "11.1.1"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
