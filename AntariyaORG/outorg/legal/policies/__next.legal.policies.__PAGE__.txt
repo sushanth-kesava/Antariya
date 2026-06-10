@@ -1,9 +1,0 @@
-1:"$Sreact.fragment"
-2:I[1076,[],"ClientPageRoot"]
-3:I[17811,["8262","static/chunks/432fac1e-9baebebbfc8ffc37.js","9568","static/chunks/9568-0bfadca4fcb105aa.js","5921","static/chunks/5921-c90cdb98bf03de44.js","308","static/chunks/308-888a1d7b78c528a7.js","1147","static/chunks/1147-ded562ffaf45fcf5.js","2645","static/chunks/2645-7d8eb229850e531f.js","6227","static/chunks/6227-e0cc1e7fa82b0860.js","5922","static/chunks/5922-12a1e8885f8bb231.js","6195","static/chunks/app/legal/policies/page-57da586339214efe.js"],"default"]
-6:I[31872,[],"OutletBoundary"]
-7:"$Sreact.suspense"
-0:{"rsc":["$","$1","c",{"children":[["$","$L2",null,{"Component":"$3","serverProvidedParams":{"searchParams":{},"params":{},"promises":["$@4","$@5"]}}],null,["$","$L6",null,{"children":["$","$7",null,{"name":"Next.MetadataOutlet","children":"$@8"}]}]]}],"isPartial":false,"staleTime":300,"varyParams":null,"buildId":"sVRX-Xi5BhGCgSenWzDhu"}
-4:{}
-5:"$0:rsc:props:children:0:props:serverProvidedParams:params"
-8:null
