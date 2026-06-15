@@ -41,6 +41,8 @@ Create these files from examples:
      - `JWT_SECRET`
      - `FRONTEND_URL`
 
+Note: Example files are included in the repo: `backend/.env.example` and `frontend/.env.local.example`. Copy them and fill values before running locally.
+
 ## How To Create MongoDB Database (Atlas)
 
 1. Open MongoDB Atlas and create account/sign in.
