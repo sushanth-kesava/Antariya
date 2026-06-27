@@ -5,6 +5,8 @@ const Order = require("../models/Order");
 const Product = require("../models/Product");
 const Review = require("../models/Review");
 const WishlistItem = require("../models/WishlistItem");
+const dashboardService = require("../services/odoo/dashboard.service");
+const authService = require("../services/odoo/auth.service");
 const env = require("../config/env");
 
 function normalizeEmail(value) {
@@ -301,28 +303,27 @@ async function getSuperAdminDashboard(req, res, next) {
     }
 
     const [
-      totalOrders,
-      totalRevenueStats,
+      dashboardSnapshot,
       pendingRequests,
       adminProfiles,
       customerProfiles,
       recentRequests,
-      lowStockProducts,
       pendingReviews,
       wishlistItems,
     ] = await Promise.all([
-      Order.countDocuments({}),
-      Order.aggregate([{ $group: { _id: null, totalRevenue: { $sum: "$total" } } }]),
+      dashboardService.getDashboardSnapshot(),
       AccessRequest.countDocuments({ status: "pending" }),
       AdminProfile.find({}).sort({ createdAt: -1 }).limit(100),
       User.find({}).sort({ createdAt: -1 }).limit(100),
       AccessRequest.find({}).sort({ createdAt: -1 }).limit(100),
-      Product.countDocuments({ stock: { $lte: 10 } }),
       Review.countDocuments({ moderationStatus: "pending" }),
       WishlistItem.countDocuments({}),
     ]);
 
-    const totalRevenue = Number(totalRevenueStats?.[0]?.totalRevenue || 0);
+    const client = await authService.getClient();
+    const totalOrders = Number(await client.call("sale.order", "search_count", [["state", "!=", "cancel"]])) || 0;
+    const totalRevenue = Number(dashboardSnapshot?.revenue?.total || 0);
+    const lowStockProducts = Array.isArray(dashboardSnapshot?.lowStock) ? dashboardSnapshot.lowStock.length : 0;
     const normalizedAdminProfiles = adminProfiles.map(normalizeAdminProfile);
     const normalizedCustomerProfiles = customerProfiles.map(normalizeCustomerProfile);
     const portalClassificationAudit = buildPortalClassificationAudit(normalizedAdminProfiles, normalizedCustomerProfiles);

@@ -4,6 +4,7 @@ const bcrypt = require("bcryptjs");
 const User = require("../models/User");
 const AdminProfile = require("../models/AdminProfile");
 const AccessRequest = require("../models/AccessRequest");
+const customerService = require("../services/odoo/customer.service");
 const env = require("../config/env");
 const { sendWelcomeEmail } = require("../services/mail.service");
 
@@ -42,6 +43,25 @@ function issueAuthResponse(authDocument, inferredRole) {
       role: inferredRole || authDocument.role,
     },
   };
+}
+
+async function syncCustomerToOdoo(email, displayName) {
+  try {
+    if (!email || String(email).trim().length === 0) {
+      console.warn("[Auth] Cannot sync customer to Odoo: missing email");
+      return null;
+    }
+
+    const result = await customerService.syncCustomer({
+      email: String(email).trim().toLowerCase(),
+      name: displayName || String(email).split("@")[0] || "Customer",
+    });
+
+    return result?.customer || null;
+  } catch (err) {
+    console.error("[Auth] Failed to sync customer to Odoo:", err.message || err);
+    return null;
+  }
 }
 
 function calculateExpiryDate(expiresInSeconds) {
@@ -322,10 +342,12 @@ async function loginWithGoogle(req, res, next) {
       } else if (existingUser) {
         Object.assign(existingUser, userPayload);
         authDocument = await existingUser.save();
+        await syncCustomerToOdoo(authDocument.email, authDocument.displayName);
       } else {
         try {
           authDocument = await User.create(userPayload);
           shouldSendWelcomeEmail = true;
+          await syncCustomerToOdoo(authDocument.email, authDocument.displayName);
         } catch (createError) {
           if (createError?.code === 11000) {
             const fallbackUser = await User.findOne({ email: userPayload.email });
@@ -333,6 +355,7 @@ async function loginWithGoogle(req, res, next) {
             if (fallbackUser) {
               Object.assign(fallbackUser, userPayload);
               authDocument = await fallbackUser.save();
+              await syncCustomerToOdoo(authDocument.email, authDocument.displayName);
             } else {
               throw createError;
             }
@@ -445,6 +468,8 @@ async function signupWithCredentials(req, res, next) {
       console.error("Welcome email failed:", mailError.message || mailError);
     });
 
+    await syncCustomerToOdoo(savedUser.email, savedUser.displayName);
+
     return res.status(201).json(issueAuthResponse(savedUser, savedUser.role || "customer"));
   } catch (error) {
     if (error?.code === 11000) {
@@ -543,6 +568,8 @@ async function loginWithCredentials(req, res, next) {
       lastLoginAt: new Date(),
     };
     await user.save();
+
+    await syncCustomerToOdoo(user.email, user.displayName);
 
     return res.status(200).json(issueAuthResponse(user, user.role || "customer"));
   } catch (error) {

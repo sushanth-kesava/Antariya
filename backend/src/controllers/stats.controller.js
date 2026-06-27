@@ -1,22 +1,21 @@
-const Product = require("../models/Product");
-const Order = require("../models/Order");
+const authService = require("../services/odoo/auth.service");
+const productService = require("../services/odoo/product.service");
 
 async function getPublicHomeStats(req, res, next) {
   try {
-    const [productCount, dealers, categories, orderCount] = await Promise.all([
-      Product.countDocuments({}),
-      Product.distinct("dealerId"),
-      Product.distinct("category"),
-      Order.countDocuments({}),
+    const client = await authService.getClient();
+    const [catalogSummary, orderCount] = await Promise.all([
+      productService.getCatalogSummary(),
+      client.call("sale.order", "search_count", [["state", "!=", "cancel"]]),
     ]);
 
     return res.status(200).json({
       success: true,
       stats: {
-        products: productCount,
-        dealers: dealers.filter(Boolean).length,
-        categories: categories.filter(Boolean).length,
-        orders: orderCount,
+        products: catalogSummary.totalProducts,
+        dealers: catalogSummary.totalDealers,
+        categories: catalogSummary.totalCategories,
+        orders: Number(orderCount || 0),
       },
     });
   } catch (error) {

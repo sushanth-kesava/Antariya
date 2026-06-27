@@ -1,10 +1,10 @@
-const Product = require("../models/Product");
 const Review = require("../models/Review");
-const User = require("../models/User");
-const Order = require("../models/Order");
 const AdminProfile = require("../models/AdminProfile");
 const multer = require("multer");
 const { hasCloudinaryCredentials, uploadProductImageBuffer } = require("../services/cloudinary.service");
+const productService = require("../services/odoo/product.service");
+const customerService = require("../services/odoo/customer.service");
+const authService = require("../services/odoo/auth.service");
 
 const MAX_PRODUCT_IMAGES = 6;
 const MAX_PRODUCT_IMAGE_SIZE_BYTES = 8 * 1024 * 1024;
@@ -227,6 +227,10 @@ async function getProductReviewSummariesByProductIds(productIds) {
   return buildReviewSummaryMap(reviews);
 }
 
+async function getOdooProductById(productId) {
+  return productService.getProductById(productId);
+}
+
 function normalizeReview(doc) {
   return {
     id: doc._id.toString(),
@@ -327,9 +331,17 @@ async function resolveModeratorNames(reviews) {
     return new Map();
   }
 
-  const [admins, users] = await Promise.all([
+  const [admins, customers] = await Promise.all([
     AdminProfile.find({ _id: { $in: moderatorIds } }).select("displayName"),
-    User.find({ _id: { $in: moderatorIds } }).select("displayName"),
+    Promise.all(
+      moderatorIds.map(async (moderatorId) => {
+        try {
+          return await customerService.getCustomerById(moderatorId);
+        } catch {
+          return null;
+        }
+      })
+    ),
   ]);
 
   const names = new Map();
@@ -338,9 +350,10 @@ async function resolveModeratorNames(reviews) {
     names.set(admin._id.toString(), admin.displayName || "Admin");
   }
 
-  for (const user of users) {
-    if (!names.has(user._id.toString())) {
-      names.set(user._id.toString(), user.displayName || "User");
+  for (const customer of customers.filter(Boolean)) {
+    const customerId = String(customer.id);
+    if (!names.has(customerId)) {
+      names.set(customerId, customer.name || "Customer");
     }
   }
 
@@ -353,8 +366,12 @@ async function getDisplayNameForUser(userId, role) {
     return admin?.displayName || "Admin";
   }
 
-  const user = await User.findById(userId).select("displayName");
-  return user?.displayName || "Customer";
+  try {
+    const customer = await customerService.getCustomerById(userId);
+    return customer?.name || customer?.displayName || "Customer";
+  } catch {
+    return "Customer";
+  }
 }
 
 async function getScopedProductIdsForModerator(auth) {
@@ -362,8 +379,12 @@ async function getScopedProductIdsForModerator(auth) {
     return null;
   }
 
-  const ownedProducts = await Product.find({ dealerId: auth.sub }).select("_id");
-  return ownedProducts.map((product) => product._id);
+  const ownedProducts = await productService.getProducts({
+    limit: 100,
+    filters: { dealerId: auth.sub },
+  });
+
+  return (ownedProducts.products || []).map((product) => product.id);
 }
 
 async function syncProductRating(productId) {
@@ -383,24 +404,38 @@ async function syncProductRating(productId) {
   ]);
 
   const average = stats[0]?.avgRating;
-  const rounded = typeof average === "number" ? Math.round(average * 10) / 10 : 0;
-
-  await Product.findByIdAndUpdate(productId, { rating: rounded });
+  return typeof average === "number" ? Math.round(average * 10) / 10 : 0;
 }
 
 async function getReviewEligibilityState(productId, userId) {
-  const [hasDeliveredOrder, existingReview] = await Promise.all([
-    Order.exists({
-      userId,
-      status: "Delivered",
-      items: {
-        $elemMatch: {
-          productId,
-        },
-      },
-    }),
-    Review.findOne({ productId, userId }).select("_id rating title comment images createdAt"),
+  const client = await authService.getClient();
+  const normalizedProductId = Number(productId);
+  const normalizedUserId = Number(userId);
+
+  const [existingReview, deliveredOrders] = await Promise.all([
+    Review.findOne({ productId: String(productId), userId: String(userId) }).select("_id rating title comment images createdAt"),
+    client.call("sale.order", "search", [
+      [
+        ["partner_id", "=", normalizedUserId],
+        ["state", "in", ["sale", "done"]],
+      ],
+      { limit: 100 },
+    ]),
   ]);
+
+  let hasDeliveredOrder = false;
+
+  if (Array.isArray(deliveredOrders) && deliveredOrders.length > 0) {
+    const orders = await client.call("sale.order", "read", [deliveredOrders, ["order_line"]]);
+    const lineIds = orders.flatMap((order) => (Array.isArray(order.order_line) ? order.order_line : []));
+
+    if (lineIds.length > 0) {
+      const lines = await client.call("sale.order.line", "read", [lineIds, ["product_id"]]);
+      hasDeliveredOrder = Array.isArray(lines)
+        ? lines.some((line) => Number(line.product_id?.[0]) === normalizedProductId)
+        : false;
+    }
+  }
 
   return {
     canReview: Boolean(hasDeliveredOrder),
@@ -416,43 +451,29 @@ async function getProducts(req, res, next) {
 
     const pageNum = Math.max(1, Number.parseInt(String(page), 10) || 1);
     const limitNum = Math.min(100, Math.max(1, Number.parseInt(String(limit), 10) || 20));
-    const skip = (pageNum - 1) * limitNum;
+    const offset = (pageNum - 1) * limitNum;
 
-    const filter = {};
+    const result = await productService.getProducts({
+      offset,
+      limit: limitNum,
+      search: search ? String(search) : "",
+      filters: {
+        categoryId: category || undefined,
+        dealerId: dealerId || undefined,
+        customizable: typeof customizable !== "undefined" ? customizable : undefined,
+      },
+      sort: "id desc",
+    });
 
-    if (category) {
-      filter.category = category;
-    }
-
-    if (dealerId) {
-      filter.dealerId = dealerId;
-    }
-
-    if (typeof customizable !== "undefined") {
-      filter.customizable = customizable === "true";
-    }
-
-    if (search) {
-      filter.$or = [
-        { name: { $regex: search, $options: "i" } },
-        { description: { $regex: search, $options: "i" } },
-      ];
-    }
-
-    const [products, total] = await Promise.all([
-      Product.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limitNum),
-      Product.countDocuments(filter),
-    ]);
-
-    const reviewSummaryMap = await getProductReviewSummariesByProductIds(products.map((product) => product._id));
+    const reviewSummaryMap = await getProductReviewSummariesByProductIds((result.products || []).map((product) => product.id));
 
     return res.status(200).json({
       success: true,
-      products: products.map((product) => {
-        const reviewSummary = reviewSummaryMap.get(product._id.toString()) || createEmptyReviewSummary();
+      products: (result.products || []).map((product) => {
+        const reviewSummary = reviewSummaryMap.get(String(product.id)) || createEmptyReviewSummary();
 
         return {
-          ...normalizeProduct(product),
+          ...product,
           reviewCount: reviewSummary.reviewCount,
           reviewAverage: reviewSummary.averageRating,
           reviewBreakdown: reviewSummary.ratingBreakdown,
@@ -462,8 +483,8 @@ async function getProducts(req, res, next) {
       pagination: {
         page: pageNum,
         limit: limitNum,
-        total,
-        pages: Math.ceil(total / limitNum),
+        total: result.total || 0,
+        pages: Math.ceil((result.total || 0) / limitNum),
       },
     });
   } catch (error) {
@@ -476,8 +497,8 @@ async function getMarketplaceLayout(req, res, next) {
     const role = String(req.query.role || "customer").trim().toLowerCase();
 
     if (role === "superadmin") {
-      const products = await Product.find({}).sort({ createdAt: -1 });
-      const dealerSections = groupProductsByDealerAndCategory(products);
+      const result = await productService.getProducts({ limit: 1000, sort: "id desc" });
+      const dealerSections = groupProductsByDealerAndCategory(result.products || []);
 
       return res.status(200).json({
         success: true,
@@ -486,10 +507,11 @@ async function getMarketplaceLayout(req, res, next) {
       });
     }
 
-    const availableCategories = (await Product.distinct("category")).filter(
-      (category) => typeof category === "string" && category.trim().length > 0
-    );
-    const availableSet = new Set(availableCategories.map((category) => category.trim()));
+    const categoriesResult = await productService.getCategories({ limit: 100 });
+    const availableCategories = (categoriesResult.categories || [])
+      .map((category) => (typeof category?.name === "string" ? category.name.trim() : ""))
+      .filter(Boolean);
+    const availableSet = new Set(availableCategories);
     const preferredCategories = MARKETPLACE_ROLE_CATEGORIES[role] || MARKETPLACE_ROLE_CATEGORIES.customer;
     const categories = preferredCategories.filter((category) => availableSet.has(category));
 
@@ -505,7 +527,7 @@ async function getMarketplaceLayout(req, res, next) {
 
 async function getProductById(req, res, next) {
   try {
-    const product = await Product.findById(req.params.id);
+    const product = await productService.getProductById(req.params.id);
 
     if (!product) {
       return res.status(404).json({
@@ -514,12 +536,12 @@ async function getProductById(req, res, next) {
       });
     }
 
-    const reviewSummary = await getProductReviewSummary(product._id);
+    const reviewSummary = await getProductReviewSummary(product.id);
 
     return res.status(200).json({
       success: true,
       product: {
-        ...normalizeProduct(product),
+        ...product,
         reviewCount: reviewSummary.reviewCount,
         reviewAverage: reviewSummary.averageRating,
         reviewBreakdown: reviewSummary.ratingBreakdown,
@@ -625,16 +647,14 @@ async function createProduct(req, res, next) {
       });
     }
 
-    const primaryImage = normalizedGallery[0];
-
-    const product = await Product.create({
+    const product = await productService.createProduct({
       name,
       description,
       price: Number(price),
       category,
       dealerName,
       dealerEmail,
-      image: primaryImage,
+      image: normalizedGallery[0],
       images: normalizedGallery,
       galleryImages: normalizedGallery,
       stock: Number.isFinite(Number(stock)) ? Number(stock) : 0,
@@ -647,7 +667,7 @@ async function createProduct(req, res, next) {
     return res.status(201).json({
       success: true,
       message: "Product created",
-      product: normalizeProduct(product),
+      product,
     });
   } catch (error) {
     return next(error);
@@ -663,7 +683,7 @@ async function deleteProduct(req, res, next) {
       });
     }
 
-    const product = await Product.findById(req.params.id);
+    const product = await productService.getProductById(req.params.id);
 
     if (!product) {
       return res.status(404).json({
@@ -672,14 +692,14 @@ async function deleteProduct(req, res, next) {
       });
     }
 
-    if (product.dealerId !== req.auth.sub) {
+    if (product.dealerId && product.dealerId !== req.auth.sub) {
       return res.status(403).json({
         success: false,
         message: "You can only delete your own products",
       });
     }
 
-    await Product.findByIdAndDelete(req.params.id);
+    await productService.deleteProduct(req.params.id);
 
     return res.status(200).json({
       success: true,
@@ -692,7 +712,7 @@ async function deleteProduct(req, res, next) {
 
 async function getProductReviews(req, res, next) {
   try {
-    const product = await Product.findById(req.params.id).select("_id");
+    const product = await productService.getProductById(req.params.id);
 
     if (!product) {
       return res.status(404).json({
@@ -702,7 +722,7 @@ async function getProductReviews(req, res, next) {
     }
 
     const reviews = await Review.find({
-      productId: product._id,
+      productId: String(product.id),
       $or: [{ moderationStatus: "approved" }, { moderationStatus: { $exists: false } }],
     }).sort({ createdAt: -1 });
 
@@ -720,7 +740,7 @@ async function getProductReviews(req, res, next) {
 
 async function getReviewEligibility(req, res, next) {
   try {
-    const product = await Product.findById(req.params.id).select("_id name");
+    const product = await productService.getProductById(req.params.id);
 
     if (!product) {
       return res.status(404).json({
@@ -729,11 +749,11 @@ async function getReviewEligibility(req, res, next) {
       });
     }
 
-    const eligibility = await getReviewEligibilityState(product._id, req.auth.sub);
+    const eligibility = await getReviewEligibilityState(product.id, req.auth.sub);
 
     return res.status(200).json({
       success: true,
-      productId: product._id.toString(),
+      productId: String(product.id),
       productName: product.name,
       ...eligibility,
       message: eligibility.canReview
@@ -749,7 +769,7 @@ async function getReviewEligibility(req, res, next) {
 
 async function createProductReview(req, res, next) {
   try {
-    const product = await Product.findById(req.params.id);
+    const product = await productService.getProductById(req.params.id);
 
     if (!product) {
       return res.status(404).json({
@@ -758,7 +778,7 @@ async function createProductReview(req, res, next) {
       });
     }
 
-    const eligibility = await getReviewEligibilityState(product._id, req.auth.sub);
+    const eligibility = await getReviewEligibilityState(product.id, req.auth.sub);
 
     if (!eligibility.canReview) {
       return res.status(403).json({
@@ -804,7 +824,7 @@ async function createProductReview(req, res, next) {
     const displayName = await getDisplayNameForUser(req.auth.sub, req.auth.role);
 
     const review = await Review.findOneAndUpdate(
-      { productId: product._id, userId: req.auth.sub },
+      { productId: String(product.id), userId: req.auth.sub },
       {
         $set: {
           userEmail: req.auth.email,
@@ -828,7 +848,7 @@ async function createProductReview(req, res, next) {
       }
     );
 
-    await syncProductRating(product._id);
+    await syncProductRating(String(product.id));
 
     return res.status(201).json({
       success: true,
@@ -880,14 +900,32 @@ async function getReviewModerationQueue(req, res, next) {
       filter.$or = [{ title: searchRegex }, { comment: searchRegex }, { userName: searchRegex }, { userEmail: searchRegex }];
     }
 
-    const reviews = await Review.find(filter)
-      .populate("productId", "name category")
-      .sort({ createdAt: -1 })
-      .limit(200);
+    const reviews = await Review.find(filter).sort({ createdAt: -1 }).limit(200);
+
+    const productMap = new Map();
+    await Promise.all(
+      reviews.map(async (review) => {
+        const productId = String(review.productId);
+        if (productMap.has(productId)) {
+          return;
+        }
+
+        const product = await productService.getProductById(productId);
+        if (product) {
+          productMap.set(productId, product);
+        }
+      })
+    );
 
     return res.status(200).json({
       success: true,
-      reviews: reviews.map(normalizeModerationReview),
+      reviews: reviews.map((review) => {
+        const product = productMap.get(String(review.productId));
+        return normalizeModerationReview({
+          ...review.toObject(),
+          productId: product ? { _id: product.id, name: product.name, category: product.category } : review.productId,
+        });
+      }),
     });
   } catch (error) {
     return next(error);
@@ -923,9 +961,9 @@ async function updateReviewModeration(req, res, next) {
     }
 
     if (req.auth?.role !== "superadmin") {
-      const product = await Product.findById(review.productId).select("dealerId");
+      const product = await productService.getProductById(review.productId);
 
-      if (!product || product.dealerId !== req.auth.sub) {
+      if (!product || (product.dealerId && product.dealerId !== req.auth.sub)) {
         return res.status(403).json({
           success: false,
           message: "You can only moderate reviews for your own products",
@@ -941,12 +979,16 @@ async function updateReviewModeration(req, res, next) {
 
     await syncProductRating(review.productId);
 
-    const withProduct = await Review.findById(review._id).populate("productId", "name category");
+    const withProduct = await Review.findById(review._id);
+    const product = await productService.getProductById(withProduct.productId);
 
     return res.status(200).json({
       success: true,
       message: "Review moderation updated",
-      review: normalizeModerationReview(withProduct),
+      review: normalizeModerationReview({
+        ...withProduct.toObject(),
+        productId: product ? { _id: product.id, name: product.name, category: product.category } : withProduct.productId,
+      }),
     });
   } catch (error) {
     return next(error);
@@ -979,14 +1021,37 @@ async function getReviewModerationActivity(req, res, next) {
     }
 
     const reviews = await Review.find(activityFilter)
-      .populate("productId", "name category")
       .sort({ moderatedAt: -1 })
       .limit(safeLimit);
+
+    const productMap = new Map();
+    await Promise.all(
+      reviews.map(async (review) => {
+        const productId = String(review.productId);
+        if (productMap.has(productId)) {
+          return;
+        }
+
+        const product = await productService.getProductById(productId);
+        if (product) {
+          productMap.set(productId, product);
+        }
+      })
+    );
 
     const moderatorNames = await resolveModeratorNames(reviews);
 
     const activity = reviews.map((review) => ({
-      ...normalizeModerationReview(review),
+      ...normalizeModerationReview({
+        ...review.toObject(),
+        productId: productMap.get(String(review.productId))
+          ? {
+              _id: productMap.get(String(review.productId)).id,
+              name: productMap.get(String(review.productId)).name,
+              category: productMap.get(String(review.productId)).category,
+            }
+          : review.productId,
+      }),
       moderatorName: review.moderatedBy ? moderatorNames.get(review.moderatedBy) || "Unknown moderator" : "Unknown moderator",
     }));
 
