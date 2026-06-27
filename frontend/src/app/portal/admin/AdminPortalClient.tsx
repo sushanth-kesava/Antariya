@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { Navbar } from "@/components/navbar";
 import { Product } from "@/app/lib/mock-data";
 import { Button } from "@/components/ui/button";
@@ -831,7 +832,14 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
                         <div className="mt-4 grid grid-cols-3 gap-2">
                           {selectedImagePreviews.map(({ file, previewUrl }, index) => (
                             <div key={`${file.name}-${file.lastModified}`} className="relative rounded-xl overflow-hidden border border-gray-200 bg-white">
-                              <img src={previewUrl} alt={file.name} className="h-20 w-full object-cover" />
+                              <Image
+                                src={previewUrl}
+                                alt={file.name}
+                                width={120}
+                                height={80}
+                                unoptimized
+                                className="h-20 w-full object-cover"
+                              />
                               <button
                                 type="button"
                                 className="absolute top-1 right-1 h-6 w-6 rounded-full bg-black/70 text-white flex items-center justify-center"
@@ -928,7 +936,14 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
                   <div key={product.id} className="flex items-center justify-between p-4 bg-white border border-gray-100 shadow-sm rounded-2xl">
                     <div className="flex items-center gap-4">
                       <div className="w-16 h-16 rounded-xl overflow-hidden bg-muted relative">
-                        <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+                        <Image
+                          src={product.image}
+                          alt={product.name}
+                          width={64}
+                          height={64}
+                          unoptimized
+                          className="w-full h-full object-cover"
+                        />
                       </div>
                       <div>
                         <h3 className="font-bold text-gray-900">{product.name}</h3>

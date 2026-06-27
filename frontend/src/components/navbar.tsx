@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { ShoppingCart, Search, User as UserIcon, Menu, Heart, Palette, ShoppingBag, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -204,8 +205,14 @@ export function Navbar() {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="rounded-full overflow-hidden border p-0 h-10 w-10">
                   {user.photoURL ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={user.photoURL} alt="Avatar" className="w-full h-full object-cover" />
+                    <Image
+                      src={user.photoURL}
+                      alt="Avatar"
+                      width={40}
+                      height={40}
+                      unoptimized
+                      className="w-full h-full object-cover"
+                    />
                   ) : (
                     <UserIcon className="h-5 w-5" />
                   )}
@@ -288,8 +295,14 @@ export function Navbar() {
             {user && (
               <div className="px-6 py-4 border-b bg-muted/30 flex items-center gap-3">
                 {user.photoURL ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={user.photoURL} alt="Avatar" className="h-10 w-10 rounded-full object-cover border" />
+                  <Image
+                    src={user.photoURL}
+                    alt="Avatar"
+                    width={40}
+                    height={40}
+                    unoptimized
+                    className="h-10 w-10 rounded-full object-cover border"
+                  />
                 ) : (
                   <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
                     <UserIcon className="h-5 w-5 text-primary" />

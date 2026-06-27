@@ -43,7 +43,7 @@ export default function SuperAdminPortalPage() {
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [authToken, setAuthToken] = useState("");
-  const [user, setUser] = useState<any>(null);
+  const [, setUser] = useState<any>(null);
   const [dashboard, setDashboard] = useState<SuperAdminDashboardPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [roleTargetEmail, setRoleTargetEmail] = useState("");

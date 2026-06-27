@@ -140,7 +140,7 @@ export default function CommonAuthPage({ mode }: { mode: AuthMode }) {
     return () => {
       cancelled = true;
     };
-  }, [forceSwitch, nextPath, router]);
+  }, [API_BASE_URL, forceSwitch, nextPath, router]);
 
   const finishAuth = (token: string, user: AuthSessionUser) => {
     persistAuthSession(token, user);

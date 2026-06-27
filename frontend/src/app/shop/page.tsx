@@ -7,7 +7,6 @@ import { Product } from "@/app/lib/mock-data";
 import { Search, RefreshCw, Sparkles, Filter } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
 import { getProductsFromBackend } from "@/lib/api/products";
 
 export default function ShoppingPage() {

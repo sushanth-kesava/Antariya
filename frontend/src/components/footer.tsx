@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { BRAND_LOGO_URL } from "@/lib/brand";
 
 type FooterVariant = "public" | "customer" | "admin" | "superadmin";
@@ -100,8 +101,14 @@ export function Footer({ variant = "public" }: FooterProps) {
         <div className={variant === "public" ? "grid grid-cols-1 md:grid-cols-4 gap-12 mb-16" : "grid grid-cols-1 md:grid-cols-[1.4fr_1fr] gap-10 items-start mb-12"}>
           <div className="space-y-6 max-w-md">
             <Link href="/" className="flex items-center gap-4">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={BRAND_LOGO_URL} alt="Antariya logo" className="h-24 w-24 rounded-2xl object-cover shadow-sm" />
+              <Image
+                src={BRAND_LOGO_URL}
+                alt="Antariya logo"
+                width={96}
+                height={96}
+                unoptimized
+                className="h-24 w-24 rounded-2xl object-cover shadow-sm"
+              />
               <div>
                 <h3 className="font-theseasons text-5xl font-bold tracking-tight text-foreground leading-[1.05]">Antariya</h3>
                 <p className="text-xs uppercase tracking-[0.28em] text-muted-foreground">Premium embroidery marketplace</p>

@@ -162,7 +162,7 @@ export default function CustomerDashboardClient() {
           clearAuthSession();
           router.replace("/");
           return;
-        } catch (error) {
+            } catch {
           clearAuthSession();
           router.replace("/");
           return;
