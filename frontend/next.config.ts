@@ -1,10 +1,11 @@
 import type { NextConfig } from "next";
+import path from "node:path";
 
 const nextConfig: NextConfig = {
   output: "export",
   trailingSlash: true,
   turbopack: {
-    root: __dirname,
+    root: path.resolve(process.cwd()),
   },
   typescript: {
     ignoreBuildErrors: true,
