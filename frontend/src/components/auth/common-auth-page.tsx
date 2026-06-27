@@ -104,12 +104,16 @@ export default function CommonAuthPage({ mode }: { mode: AuthMode }) {
           headers: {
             Authorization: `Bearer ${token}`,
           },
+          timeout: 5000,
         });
 
         const data = await response.json();
 
         if (!response.ok || !data?.success || !data?.user) {
-          clearAuthSession();
+          // Only clear session on actual auth failure (401), not on server errors
+          if (response.status === 401) {
+            clearAuthSession();
+          }
           return;
         }
 
@@ -129,18 +133,35 @@ export default function CommonAuthPage({ mode }: { mode: AuthMode }) {
           typeof data.token === "string" && data.token.trim().length > 0 ? data.token : token;
 
         persistAuthSession(refreshedToken, normalizedUser);
-        router.replace(nextPath || getPortalPathForRole(normalizedUser.role));
-      } catch {
+        
+        // Only redirect if nextPath is provided (user navigated to portal directly)
+        // Don't redirect from login page during active login flow to avoid race conditions
+        if (nextPath) {
+          router.replace(nextPath);
+        }
+      } catch (error) {
+        // Only clear session on network/parsing errors if it's a clear auth failure
+        // Otherwise, keep the session to avoid clearing auth during temporary backend issues
+        if (error instanceof TypeError && error.message.includes("Failed to fetch")) {
+          // Network error - don't clear, backend might be temporarily down
+          return;
+        }
         clearAuthSession();
       }
     };
 
-    void syncSession();
+    // Add a small delay to avoid race condition with finishAuth redirect
+    const timeoutId = setTimeout(() => {
+      if (!cancelled) {
+        void syncSession();
+      }
+    }, 100);
 
     return () => {
       cancelled = true;
+      clearTimeout(timeoutId);
     };
-  }, [API_BASE_URL, forceSwitch, nextPath, router]);
+  }, [API_BASE_URL, forceSwitch, nextPath]);
 
   const finishAuth = (token: string, user: AuthSessionUser) => {
     persistAuthSession(token, user);
