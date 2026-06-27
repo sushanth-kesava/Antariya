@@ -2,7 +2,7 @@ services:
   - type: web
     name: antariya-backend
     rootDir: backend
-    env: node
+    runtime: node
     buildCommand: npm install
     startCommand: npm start
     autoDeploy: true
@@ -13,9 +13,10 @@ services:
         sync: false
       - key: FRONTEND_URL
         value: https://antariya.onrender.com
-  - type: static_site
+  - type: web
     name: antariya-frontend
     rootDir: frontend
+    runtime: static
     buildCommand: npm ci && npm run build
     staticPublishPath: out
     autoDeploy: true
