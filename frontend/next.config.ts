@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   output: "export",
   trailingSlash: true,
   turbopack: {
-    root: path.resolve(process.cwd()),
+    root: path.resolve(process.cwd(), ".."),
   },
   typescript: {
     ignoreBuildErrors: true,
