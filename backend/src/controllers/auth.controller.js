@@ -193,7 +193,13 @@ async function loginWithGoogle(req, res, next) {
     const isEligibleForAdminRequest =
       env.adminAllowedEmails.length === 0 || env.adminAllowedEmails.includes(normalizedEmail);
 
-    if (requestedRole === "customer" && inferredRole !== "customer") {
+    // Allow superadmin-eligible users to log in even if they request customer role
+    // They will be automatically elevated to superadmin
+    if (requestedRole === "customer" && inferredRole === "superadmin") {
+      // Permit: elevate to superadmin
+    } else if (requestedRole === "customer" && inferredRole === "admin") {
+      // Permit: elevate to admin
+    } else if (requestedRole === "customer" && inferredRole !== "customer") {
       return res.status(409).json({
         success: false,
         message: portalMismatchMessage(normalizedEmail, inferredRole),
