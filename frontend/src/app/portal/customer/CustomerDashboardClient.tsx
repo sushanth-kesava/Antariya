@@ -12,11 +12,10 @@ import { type Product } from "@/app/lib/mock-data";
 import { getMyOrdersFromBackend } from "@/lib/api/orders";
 import { getWishlistFromBackend, WishlistItem } from "@/lib/api/wishlist";
 import { getProductsFromBackend } from "@/lib/api/products";
-import { getApiBaseUrl } from "@/lib/api/base-url";
 import { formatINR, formatIndianDate, normalizeCatalogPriceToINR } from "@/lib/india";
-import { clearAuthSession, getPortalPathForRole, normalizeAppRole, persistAuthSession } from "@/lib/auth-session";
-
-const API_BASE_URL = getApiBaseUrl();
+import { clearAuthSession, getPortalPathForRole } from "@/lib/auth-session";
+import { getCustomerProfileFromBackend, type CustomerProfileData } from "@/lib/api/customerProfile";
+import { useAuth } from "@/context/AuthContext";
 
 type RecommendationCard = {
   product: Product;
@@ -85,100 +84,62 @@ function buildRecommendations(products: Product[], orders: any[], wishlist: Wish
 
 export default function CustomerDashboardClient() {
   const router = useRouter();
-  const [user, setUser] = useState<any>({ name: "Customer", email: "", role: "customer" });
+  const { user: authUser, loading: authLoading } = useAuth();
+  const [customerProfile, setCustomerProfile] = useState<CustomerProfileData | null>(null);
   const [orders, setOrders] = useState<any[]>([]);
   const [wishlist, setWishlist] = useState<WishlistItem[]>([]);
   const [recommendations, setRecommendations] = useState<RecommendationCard[]>([]);
-  const [mounted, setMounted] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
   useEffect(() => {
-    const loadSession = async () => {
-      setMounted(true);
+    if (authLoading) return;
 
-      const token = localStorage.getItem("app_auth_token");
-
-      if (token) {
-        try {
-          const response = await fetch(`${API_BASE_URL}/auth/me`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          });
-
-          const data = await response.json();
-
-          if (response.ok && data?.success && data?.user) {
-            const normalizedUser = {
-              id: data.user.id,
-              email: data.user.email,
-              displayName: data.user.displayName,
-              photoURL: data.user.photoURL || null,
-              role: normalizeAppRole(data.user.role),
-            };
-
-            const sessionToken =
-              typeof data.token === "string" && data.token.trim().length > 0 ? data.token : token;
-
-            persistAuthSession(sessionToken, normalizedUser);
-
-            if (normalizedUser.role !== "customer") {
-              router.replace(getPortalPathForRole(normalizedUser.role));
-              return;
-            }
-
-            const mappedUser = {
-              id: normalizedUser.id,
-              name: normalizedUser.displayName || "Customer",
-              email: normalizedUser.email || "",
-              role: normalizedUser.role,
-            };
-
-            setUser(mappedUser);
-            const backendOrders = await getMyOrdersFromBackend(sessionToken);
-            setOrders(backendOrders);
-            try {
-              const wishlistItems = await getWishlistFromBackend(sessionToken);
-              setWishlist(wishlistItems);
-              try {
-                const catalog = await getProductsFromBackend({ limit: 24 });
-                setRecommendations(buildRecommendations(catalog.products, backendOrders, wishlistItems));
-              } catch (catalogError) {
-                console.error("Failed to load recommendation catalog", catalogError);
-                setRecommendations([]);
-              }
-            } catch (wishlistError) {
-              console.error("Failed to load wishlist", wishlistError);
-              try {
-                const catalog = await getProductsFromBackend({ limit: 24 });
-                setRecommendations(buildRecommendations(catalog.products, backendOrders, []));
-              } catch (catalogError) {
-                console.error("Failed to load recommendation catalog", catalogError);
-                setRecommendations([]);
-              }
-            }
-            return;
-          }
-
-          clearAuthSession();
-          router.replace("/");
-          return;
-        } catch (error) {
-          clearAuthSession();
-          router.replace("/");
-          return;
-        }
-      }
-
+    if (!authUser) {
       router.replace("/");
+      return;
+    }
+
+    if (authUser.role !== "customer") {
+      router.replace(getPortalPathForRole(authUser.role));
+      return;
+    }
+
+    const token = localStorage.getItem("app_auth_token") || "";
+
+    const loadData = async () => {
+      const [backendOrders] = await Promise.all([
+        getMyOrdersFromBackend(token),
+        getCustomerProfileFromBackend(token)
+          .then((profile) => setCustomerProfile(profile))
+          .catch(() => null),
+      ]);
+      setOrders(backendOrders);
+      try {
+        const wishlistItems = await getWishlistFromBackend(token);
+        setWishlist(wishlistItems);
+        try {
+          const catalog = await getProductsFromBackend({ limit: 24 });
+          setRecommendations(buildRecommendations(catalog.products, backendOrders, wishlistItems));
+        } catch { setRecommendations([]); }
+      } catch {
+        try {
+          const catalog = await getProductsFromBackend({ limit: 24 });
+          setRecommendations(buildRecommendations(catalog.products, backendOrders, []));
+        } catch { setRecommendations([]); }
+      }
+      setDataLoaded(true);
     };
 
-    void loadSession();
-  }, [router]);
+    void loadData();
+  }, [authUser, authLoading, router]);
 
-  if (!mounted) return null; // Avoid hydration mismatch
+  if (authLoading || !authUser) return null;
 
+  const user = { name: authUser.displayName || "Customer", email: authUser.email, photoURL: authUser.photoURL };
   const isNewCustomer = orders.length === 0;
   const purchasedItemsCount = orders.reduce((sum, order) => sum + (order.items?.length || 0), 0);
+  const today = new Date().toDateString();
+  const todayOrdersCount = orders.filter((o) => new Date(o.createdAt).toDateString() === today).length;
 
   return (
     <div className="flex-1 flex flex-col w-full">
@@ -187,34 +148,48 @@ export default function CustomerDashboardClient() {
       <aside className="w-full lg:w-64 space-y-4">
         <div className="bg-card border shadow-sm rounded-2xl p-6 space-y-6">
           <div className="flex items-center gap-4">
+            {customerProfile?.photoURL || user.photoURL ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={customerProfile?.photoURL || user.photoURL || undefined}
+                alt="Avatar"
+                className="h-12 w-12 rounded-full object-cover border shrink-0"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+              />
+            ) : (
+              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <span className="text-primary font-bold text-lg">{user.name?.[0]?.toUpperCase() || "C"}</span>
+              </div>
+            )}
             <div>
               <p className="font-bold text-lg leading-tight">{user.name}</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                {isNewCustomer ? "New Member" : "Silver Member"}
+              <p className="text-sm text-muted-foreground mt-1 capitalize">
+                {customerProfile?.membershipTier ?? (isNewCustomer ? "New Member" : "Silver Member")}
               </p>
             </div>
           </div>
           
           <div className="space-y-1">
-            <Button variant="secondary" className="w-full justify-start gap-3 text-primary font-bold bg-primary/10">
-              <LayoutDashboard className="h-4 w-4" />
-              Dashboard
+            <Button variant="secondary" className="w-full justify-start gap-3 text-primary font-bold bg-primary/10" asChild>
+              <Link href="/portal/customer"><LayoutDashboard className="h-4 w-4" />Dashboard</Link>
             </Button>
-            <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground">
-              <Package className="h-4 w-4" />
-              My Orders {orders.length > 0 && <Badge className="ml-auto rounded-full bg-primary/20 text-primary border-none">{orders.length}</Badge>}
+            <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground" asChild>
+              <Link href="/portal/customer#orders">
+                <Package className="h-4 w-4" />
+                My Orders {orders.length > 0 && <Badge className="ml-auto rounded-full bg-primary/20 text-primary border-none">{orders.length}</Badge>}
+              </Link>
             </Button>
-            <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground">
-              <Download className="h-4 w-4" />
-              Purchases {purchasedItemsCount > 0 && <Badge className="ml-auto rounded-full bg-primary/20 text-primary border-none">{purchasedItemsCount}</Badge>}
+            <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground" asChild>
+              <Link href="/portal/customer#orders">
+                <Download className="h-4 w-4" />
+                Purchases {purchasedItemsCount > 0 && <Badge className="ml-auto rounded-full bg-primary/20 text-primary border-none">{purchasedItemsCount}</Badge>}
+              </Link>
             </Button>
-            <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground">
-              <Heart className="h-4 w-4" />
-              Wishlist
+            <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground" asChild>
+              <Link href="/wishlist"><Heart className="h-4 w-4" />Wishlist</Link>
             </Button>
-            <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground">
-              <Settings className="h-4 w-4" />
-              Settings
+            <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground" asChild>
+              <Link href="/portal/customer#settings"><Settings className="h-4 w-4" />Settings</Link>
             </Button>
           </div>
         </div>
@@ -309,7 +284,7 @@ export default function CustomerDashboardClient() {
                   <CardTitle className="text-4xl lg:text-5xl">{orders.length}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-primary-foreground/90 bg-primary-foreground/10 inline-block px-3 py-1 rounded-full">+1 new today</p>
+                  <p className="text-sm text-primary-foreground/90 bg-primary-foreground/10 inline-block px-3 py-1 rounded-full">{todayOrdersCount > 0 ? `+${todayOrdersCount} new today` : "No new orders today"}</p>
                 </CardContent>
               </Card>
               <Card className="shadow-sm">
@@ -363,7 +338,9 @@ export default function CustomerDashboardClient() {
                           <td className="px-6 py-5 font-medium">{order.items?.length || 0}</td>
                           <td className="px-6 py-5 font-bold text-gray-900">{formatINR(Number(order.total || 0))}</td>
                           <td className="px-6 py-5 text-right">
-                            <Button variant="secondary" size="sm" className="rounded-full shadow-sm">Details</Button>
+                            <Button variant="secondary" size="sm" className="rounded-full shadow-sm" asChild>
+                              <Link href={`/portal/customer/orders/${order.id}`}>Details</Link>
+                            </Button>
                           </td>
                         </tr>
                       ))}
@@ -397,7 +374,8 @@ export default function CustomerDashboardClient() {
                 const product = rec.product;
 
                 return (
-                  <Card key={product.id} className="flex flex-col hover:shadow-lg transition-all duration-300 group overflow-hidden border-gray-100 shadow-sm cursor-pointer">
+                  <Card key={product.id} className="flex flex-col hover:shadow-lg transition-all duration-300 group overflow-hidden border-gray-100 shadow-sm">
+                    <Link href={`/product/${product.id}`} className="contents">
                     <div className="relative aspect-square sm:aspect-video w-full overflow-hidden bg-gray-100">
                       <Image
                         src={product.image}
@@ -423,6 +401,7 @@ export default function CustomerDashboardClient() {
                         View Item <ArrowRight className="ml-1 h-3 w-3" />
                       </Button>
                     </div>
+                  </Link>
                   </Card>
                 );
               })}

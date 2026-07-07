@@ -48,6 +48,14 @@ import {
 import { getApiBaseUrl } from "@/lib/api/base-url";
 import { formatINR, formatIndianDate, formatIndianDateTime, normalizeCatalogPriceToINR } from "@/lib/india";
 import { clearAuthSession, getPortalPathForRole, normalizeAppRole, persistAuthSession } from "@/lib/auth-session";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 
 const API_BASE_URL = getApiBaseUrl();
 
@@ -86,6 +94,9 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
   const [selectedImageFiles, setSelectedImageFiles] = useState<File[]>([]);
   const [isDragOverImages, setIsDragOverImages] = useState(false);
   const [marketplaceCategories, setMarketplaceCategories] = useState<string[]>([]);
+  const [noteDialogOpen, setNoteDialogOpen] = useState(false);
+  const [pendingModerationAction, setPendingModerationAction] = useState<{ reviewId: string; status: ReviewModerationStatus } | null>(null);
+  const [moderationNoteInput, setModerationNoteInput] = useState("");
 
   const [formData, setFormData] = useState({
     name: "",
@@ -308,25 +319,23 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
     }
   };
 
-  const handleModerationAction = async (reviewId: string, moderationStatus: ReviewModerationStatus) => {
-    if (!authToken) {
-      return;
+  const handleModerationAction = (reviewId: string, moderationStatus: ReviewModerationStatus) => {
+    const wantsNote = moderationStatus === "hidden" || moderationStatus === "flagged";
+    if (wantsNote) {
+      setPendingModerationAction({ reviewId, status: moderationStatus });
+      setModerationNoteInput("");
+      setNoteDialogOpen(true);
+    } else {
+      void submitModerationAction(reviewId, moderationStatus, undefined);
     }
+  };
 
+  const submitModerationAction = async (reviewId: string, moderationStatus: ReviewModerationStatus, moderationNote: string | undefined) => {
+    if (!authToken) return;
     try {
       setModerationError(null);
       setModeratingReviewId(reviewId);
-
-      const wantsNote = moderationStatus === "hidden" || moderationStatus === "flagged";
-      const moderationNote = wantsNote
-        ? window.prompt("Optional moderation note (visible to admins only):", "")?.trim() || undefined
-        : undefined;
-
-      await updateReviewModerationOnBackend(authToken, reviewId, {
-        moderationStatus,
-        moderationNote,
-      });
-
+      await updateReviewModerationOnBackend(authToken, reviewId, { moderationStatus, moderationNote });
       await loadModerationQueue();
       await loadModerationActivity();
     } catch (err) {
@@ -1122,6 +1131,39 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
 
         </main>
       </div>
+
+      <Dialog open={noteDialogOpen} onOpenChange={setNoteDialogOpen}>
+        <DialogContent className="rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Add Moderation Note</DialogTitle>
+          </DialogHeader>
+          <Textarea
+            placeholder="Optional note visible to admins only..."
+            value={moderationNoteInput}
+            onChange={(e) => setModerationNoteInput(e.target.value)}
+            className="rounded-xl"
+            rows={3}
+          />
+          <DialogFooter className="gap-2">
+            <Button variant="outline" className="rounded-full" onClick={() => setNoteDialogOpen(false)}>Cancel</Button>
+            <Button
+              className="rounded-full"
+              onClick={() => {
+                setNoteDialogOpen(false);
+                if (pendingModerationAction) {
+                  void submitModerationAction(
+                    pendingModerationAction.reviewId,
+                    pendingModerationAction.status,
+                    moderationNoteInput.trim() || undefined
+                  );
+                }
+              }}
+            >
+              Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

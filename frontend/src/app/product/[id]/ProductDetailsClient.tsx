@@ -1,6 +1,5 @@
 "use client";
 
-import Head from "next/head";
 import { Navbar } from "@/components/navbar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -321,10 +320,6 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
 
     return isApparelProduct ? "2-7 business days" : "3-6 business days";
   }, [deliveryResult, isApparelProduct]);
-  const productSeoTitle = product ? `${product.name} | Antariya` : "Antariya | Premium Embroidery Marketplace";
-  const productSeoDescription = product
-    ? `${product.name} from Antariya. ${product.description} Delivered with live pincode checks, customizable options, and trusted delivery updates.`
-    : "Antariya premium embroidery marketplace.";
   const structuredData = product
     ? {
         "@context": "https://schema.org",
@@ -850,17 +845,6 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
 
   return (
     <div className="min-h-screen bg-background">
-      <Head>
-        <title>{productSeoTitle}</title>
-        <meta name="description" content={productSeoDescription} />
-        <meta property="og:type" content="product" />
-        <meta property="og:title" content={productSeoTitle} />
-        <meta property="og:description" content={productSeoDescription} />
-        {product ? <meta property="og:image" content={galleryImages[0] || product.image} /> : null}
-        {product ? <meta property="product:price:amount" content={String(product.price)} /> : null}
-        {product ? <meta property="product:price:currency" content="INR" /> : null}
-        <link rel="canonical" href={`/product/${product?.id || id}`} />
-      </Head>
       {structuredData ? (
         <script
           type="application/ld+json"
@@ -870,11 +854,10 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
       <Navbar />
       
       <main className="w-full max-w-[1760px] mx-auto px-3 sm:px-4 lg:px-6 py-12">
-          <div className="origin-top scale-[0.8] w-[125%] -translate-x-[10%]">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
           {/* Image Display */}
-          <div className="relative mx-auto w-full max-w-[720px] space-y-6 lg:mx-3">
-            <div className="relative aspect-square rounded-[40px] overflow-hidden bg-muted border shadow-2xl">
+          <div className="relative mx-auto w-full max-w-xl space-y-4">
+            <div className="relative aspect-square rounded-3xl overflow-hidden bg-muted border shadow-xl">
               <button
                 type="button"
                 aria-label="Open fullscreen gallery"
@@ -923,7 +906,7 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
           </div>
 
           {/* Product Info */}
-          <div className="flex flex-col space-y-10">
+          <div className="flex flex-col space-y-8">
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <Badge variant="secondary" className="bg-primary/10 text-primary border-none uppercase tracking-widest px-4 py-1 font-bold">{product.category}</Badge>
@@ -934,10 +917,10 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
                 </div>
               </div>
               
-              <h1 className="text-5xl lg:text-6xl font-bold font-headline leading-tight">{product.name}</h1>
+              <h1 className="text-3xl lg:text-4xl font-bold font-headline leading-tight">{product.name}</h1>
               
-              <div className="flex items-center gap-6">
-                <span className="text-4xl font-bold text-primary">{formatINR(normalizeCatalogPriceToINR(Number(product.price || 0)))}</span>
+              <div className="flex items-center gap-4">
+                <span className="text-3xl font-bold text-primary">{formatINR(normalizeCatalogPriceToINR(Number(product.price || 0)))}</span>
                 <Badge className="bg-green-500/10 text-green-600 border-none px-4 py-1 text-sm font-bold">{stockBadgeLabel}</Badge>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -960,7 +943,7 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
               </div>
             </div>
 
-            <div className="p-8 rounded-[32px] bg-card border border-border/50 shadow-sm space-y-8">
+            <div className="p-6 rounded-3xl bg-card border border-border/50 shadow-sm space-y-6">
               <div className="flex flex-col sm:flex-row gap-4">
                 <Button
                   size="lg"
@@ -1196,7 +1179,7 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
         </div>
 
         {/* Detailed Tabs */}
-        <div className="mt-32">
+        <div className="mt-16">
           <Tabs defaultValue="details" className="w-full">
             <TabsList className="w-full justify-start bg-transparent border-b rounded-none h-auto p-0 mb-12 gap-8 overflow-x-auto">
               {["details", "specs", "reviews"].map(tab => (
@@ -1932,7 +1915,6 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
             </div>
           </DialogContent>
         </Dialog>
-      </div>
       </main>
     </div>
   );

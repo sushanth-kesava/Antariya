@@ -4,6 +4,7 @@ const bcrypt = require("bcryptjs");
 const User = require("../models/User");
 const AdminProfile = require("../models/AdminProfile");
 const AccessRequest = require("../models/AccessRequest");
+const CustomerProfile = require("../models/CustomerProfile");
 const env = require("../config/env");
 const { sendWelcomeEmail } = require("../services/mail.service");
 
@@ -352,6 +353,24 @@ async function loginWithGoogle(req, res, next) {
       });
     }
 
+    // Create CustomerProfile for new customers
+    if (shouldSendWelcomeEmail && inferredRole === "customer") {
+      CustomerProfile.findOneAndUpdate(
+        { userId: authDocument._id },
+        {
+          $setOnInsert: {
+            userId: authDocument._id,
+            email: authDocument.email,
+            displayName: authDocument.displayName || "",
+            photoURL: authDocument.photoURL || null,
+          },
+        },
+        { upsert: true, new: true }
+      ).catch((profileError) => {
+        console.error("CustomerProfile creation failed:", profileError.message || profileError);
+      });
+    }
+
     return res.status(200).json(issueAuthResponse(authDocument, inferredRole));
   } catch (error) {
     if (error.response?.status === 401 || error.response?.status === 403) {
@@ -437,6 +456,22 @@ async function signupWithCredentials(req, res, next) {
     };
 
     const savedUser = await userDocument.save();
+
+    // Create CustomerProfile for new credentials customer
+    CustomerProfile.findOneAndUpdate(
+      { userId: savedUser._id },
+      {
+        $setOnInsert: {
+          userId: savedUser._id,
+          email: savedUser.email,
+          displayName: savedUser.displayName || "",
+          photoURL: null,
+        },
+      },
+      { upsert: true, new: true }
+    ).catch((profileError) => {
+      console.error("CustomerProfile creation failed:", profileError.message || profileError);
+    });
 
     sendWelcomeEmail({
       to: savedUser.email,

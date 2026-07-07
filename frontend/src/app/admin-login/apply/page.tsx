@@ -109,7 +109,7 @@ export default function AdminApplicationPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-stone-50 via-white to-amber-50/50 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-b from-stone-50 via-white to-stone-100/50 flex flex-col">
       <Navbar />
       <main className="flex-1 w-full max-w-6xl mx-auto px-4 py-10 lg:py-16">
         <div className="mb-5 flex items-center gap-3 text-sm text-stone-500">
@@ -124,7 +124,7 @@ export default function AdminApplicationPage() {
         <div className="grid gap-8 lg:grid-cols-[1fr_0.72fr]">
           <Card className="rounded-[30px] border-stone-200 shadow-[0_24px_80px_rgba(120,53,15,0.08)]">
             <CardHeader className="space-y-3">
-              <Badge className="rounded-full bg-amber-100 text-amber-900 border border-amber-200 hover:bg-amber-100 w-fit">
+              <Badge className="rounded-full bg-stone-200 text-stone-800 border border-stone-300 hover:bg-stone-200 w-fit">
                 Admin application
               </Badge>
               <CardTitle className="text-3xl sm:text-4xl font-black tracking-tight text-stone-950">
@@ -232,7 +232,7 @@ export default function AdminApplicationPage() {
                     />
                   </div>
 
-                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 leading-6">
+                  <div className="rounded-2xl border border-stone-300 bg-stone-100 p-4 text-sm text-stone-800 leading-6">
                     These details are submitted for superadmin review and approval. Keep the information accurate so the request can be verified quickly.
                   </div>
 
@@ -254,7 +254,7 @@ export default function AdminApplicationPage() {
             <Card className="rounded-[28px] border-stone-200 bg-white shadow-sm">
               <CardContent className="p-6 space-y-4">
                 <div className="flex items-center gap-3">
-                  <div className="rounded-2xl bg-amber-100 p-3 text-amber-900">
+                  <div className="rounded-2xl bg-stone-200 p-3 text-stone-800">
                     <Building2 className="h-5 w-5" />
                   </div>
                   <div>

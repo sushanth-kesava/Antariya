@@ -43,6 +43,7 @@ export const metadata: Metadata = {
 };
 
 import { GoogleOAuthProvider } from '@react-oauth/google';
+import { AuthProvider } from '@/context/AuthContext';
 
 export default function RootLayout({
   children,
@@ -59,8 +60,10 @@ export default function RootLayout({
       </head>
       <body className={`${inter.variable} ${literata.variable} font-body antialiased selection:bg-primary selection:text-white`}>
         <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "YOUR_GOOGLE_CLIENT_ID"}>
-          {children}
-          <Toaster />
+          <AuthProvider>
+            {children}
+            <Toaster />
+          </AuthProvider>
         </GoogleOAuthProvider>
       </body>
     </html>

@@ -33,7 +33,7 @@
   --card-foreground: 20 20% 10%;
   --popover: 0 0% 100%;
   --popover-foreground: 20 20% 10%;
-  --primary: 25 85% 45%; /* Deep saffron-orange #D46311 */
+  --primary: 10 60% 35%; /* Brownish-red #8B3A2A */
   --primary-foreground: 30 20% 98%;
   --secondary: 355 70% 35%; /* Deep berry/maroon #981B25 */
   --secondary-foreground: 30 20% 98%;
@@ -45,7 +45,7 @@
   --destructive-foreground: 0 0% 98%;
   --border: 30 10% 85%;
   --input: 30 10% 85%;
-  --ring: 25 85% 45%;
+  --ring: 10 60% 35%;
   --radius: 0.75rem;
 }
 
@@ -56,7 +56,7 @@
   --card-foreground: 30 20% 98%;
   --popover: 20 20% 8%;
   --popover-foreground: 30 20% 98%;
-  --primary: 25 85% 55%;
+  --primary: 10 60% 45%;
   --primary-foreground: 20 20% 5%;
   --secondary: 355 70% 45%;
   --secondary-foreground: 30 20% 98%;
@@ -68,7 +68,7 @@
   --destructive-foreground: 30 20% 98%;
   --border: 20 20% 15%;
   --input: 20 20% 15%;
-  --ring: 25 85% 55%;
+  --ring: 10 60% 45%;
 }
 
 @layer base {
@@ -80,7 +80,7 @@
   }
   body {
     @apply bg-background text-foreground font-body;
-    background-image: radial-gradient(rgba(212, 99, 17, 0.03) 1px, transparent 1px);
+    background-image: radial-gradient(rgba(139, 58, 42, 0.03) 1px, transparent 1px);
     background-size: 40px 40px;
     zoom: 0.9;
   }
@@ -90,7 +90,7 @@
 }
 
 .indian-motif-bg {
-  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0l15 30-15 30-15-30z' fill='%23d46311' fill-opacity='0.02'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0l15 30-15 30-15-30z' fill='%238b3a2a' fill-opacity='0.02'/%3E%3C/svg%3E");
 }
 
 .font-awesome {

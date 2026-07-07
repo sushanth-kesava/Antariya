@@ -17,22 +17,12 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { googleLogout } from "@react-oauth/google";
 import { CART_UPDATED_EVENT, getCartItemCount } from "@/lib/cart";
-import { clearAuthSession, getPortalPathForRole, normalizeAppRole, persistAuthSession } from "@/lib/auth-session";
-import { getApiBaseUrl } from "@/lib/api/base-url";
-
-type AuthUser = {
-  role?: string;
-  photoURL?: string | null;
-  displayName?: string | null;
-  email?: string | null;
-};
-
-const API_BASE_URL = getApiBaseUrl();
+import { clearAuthSession, getPortalPathForRole } from "@/lib/auth-session";
+import { useAuth } from "@/context/AuthContext";
 
 export function Navbar() {
   const router = useRouter();
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, loading, setUser } = useAuth();
   const [cartCount, setCartCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -41,56 +31,6 @@ export function Navbar() {
 
   const portalHref = user?.role ? getPortalPathForRole(user.role) : "/portal/customer";
   const logoHref = "/#hero";
-
-  // Validate session against backend on mount.
-  useEffect(() => {
-    const loadUser = async () => {
-      const token = localStorage.getItem("app_auth_token");
-
-      if (!token) {
-        clearAuthSession();
-        setUser(null);
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const response = await fetch(`${API_BASE_URL}/auth/me`, {
-            headers: { Authorization: `Bearer ${token}` },
-        });
-
-        const data = await response.json();
-
-        if (!response.ok || !data?.success || !data?.user) {
-          clearAuthSession();
-          setUser(null);
-          setLoading(false);
-          return;
-        }
-
-        const normalizedUser = {
-          id: data.user.id,
-          email: data.user.email,
-          displayName: data.user.displayName,
-          photoURL: data.user.photoURL || null,
-          role: normalizeAppRole(data.user.role),
-        };
-
-        const sessionToken =
-          typeof data.token === "string" && data.token.trim().length > 0 ? data.token : token;
-
-        persistAuthSession(sessionToken, normalizedUser);
-        setUser(normalizedUser);
-      } catch {
-        clearAuthSession();
-        setUser(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    void loadUser();
-  }, []);
 
   useEffect(() => {
     const syncCartCount = () => {
@@ -186,9 +126,11 @@ export function Navbar() {
             <Search className="h-5 w-5" />
           </Button>
           
-          <Button variant="ghost" size="icon" className="relative hidden sm:flex rounded-full">
-            <Heart className="h-5 w-5" />
-          </Button>
+          <Link href="/wishlist">
+            <Button variant="ghost" size="icon" className="relative hidden sm:flex rounded-full" aria-label="Wishlist">
+              <Heart className="h-5 w-5" />
+            </Button>
+          </Link>
 
           <Link href="/cart">
             <Button variant="ghost" size="icon" className="relative rounded-full">
@@ -202,10 +144,15 @@ export function Navbar() {
           {!loading && user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="rounded-full overflow-hidden border p-0 h-10 w-10">
+                <Button variant="ghost" size="icon" className="rounded-full overflow-hidden border p-0 h-10 w-10 shrink-0">
                   {user.photoURL ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={user.photoURL} alt="Avatar" className="w-full h-full object-cover" />
+                    <img
+                      src={user.photoURL}
+                      alt="Avatar"
+                      className="w-10 h-10 rounded-full object-cover"
+                      onError={() => setUser(user ? { ...user, photoURL: null } : null)}
+                    />
                   ) : (
                     <UserIcon className="h-5 w-5" />
                   )}

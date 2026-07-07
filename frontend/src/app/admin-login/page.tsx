@@ -8,14 +8,14 @@ import { ArrowRight, ShieldCheck, FileText, Sparkles } from "lucide-react";
 
 export default function AdminLoginPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-stone-50 via-white to-amber-50/60 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-b from-stone-50 via-white to-stone-100/60 flex flex-col">
       <Navbar />
       <main className="flex-1 w-full max-w-6xl mx-auto px-4 py-10 lg:py-16">
         <section className="relative overflow-hidden rounded-[32px] border border-stone-200 bg-white shadow-[0_24px_80px_rgba(120,53,15,0.08)]">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(245,158,11,0.18),transparent_35%),radial-gradient(circle_at_bottom_left,rgba(120,53,15,0.08),transparent_28%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(120,53,15,0.18),transparent_35%),radial-gradient(circle_at_bottom_left,rgba(80,30,20,0.08),transparent_28%)]" />
           <div className="relative grid gap-8 lg:grid-cols-[1.1fr_0.9fr] p-6 sm:p-8 lg:p-12">
             <div className="space-y-6">
-              <Badge className="rounded-full bg-amber-100 text-amber-900 hover:bg-amber-100 w-fit border border-amber-200">
+              <Badge className="rounded-full bg-stone-200 text-stone-800 hover:bg-stone-200 w-fit border border-stone-300">
                 Admin portal
               </Badge>
               <div className="space-y-4 max-w-2xl">
@@ -42,17 +42,17 @@ export default function AdminLoginPage() {
 
               <div className="grid gap-3 sm:grid-cols-3">
                 <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                  <ShieldCheck className="h-5 w-5 text-amber-700" />
+                  <ShieldCheck className="h-5 w-5 text-stone-700" />
                   <p className="mt-3 text-sm font-semibold text-stone-900">Superadmin review</p>
                   <p className="mt-1 text-sm text-stone-600">Requests are routed to the superadmin dashboard for approval.</p>
                 </div>
                 <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                  <FileText className="h-5 w-5 text-amber-700" />
+                  <FileText className="h-5 w-5 text-stone-700" />
                   <p className="mt-3 text-sm font-semibold text-stone-900">Business details</p>
                   <p className="mt-1 text-sm text-stone-600">Add your company, address, and tax identity information.</p>
                 </div>
                 <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                  <Sparkles className="h-5 w-5 text-amber-700" />
+                  <Sparkles className="h-5 w-5 text-stone-700" />
                   <p className="mt-3 text-sm font-semibold text-stone-900">No redirect loop</p>
                   <p className="mt-1 text-sm text-stone-600">The request form lives on its own page now.</p>
                 </div>

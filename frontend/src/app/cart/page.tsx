@@ -10,6 +10,8 @@ import { Trash2, Plus, Minus, ArrowRight, ShoppingBag, ShieldCheck, Loader2 } fr
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Navbar } from "@/components/navbar";
+import { useToast } from "@/hooks/use-toast";
 import { CartItem, clearCart, getCartItems, setCartItems } from "@/lib/cart";
 import { createOrderOnBackend } from "@/lib/api/orders";
 import { createRazorpayOrderOnBackend, verifyRazorpayPaymentOnBackend } from "@/lib/api/payments";
@@ -23,9 +25,24 @@ import {
 
 export default function CartPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [items, setItems] = useState<CartItem[]>([]);
   const [placingOrder, setPlacingOrder] = useState(false);
   const [razorpayReady, setRazorpayReady] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && typeof window.Razorpay === "function") {
+      setRazorpayReady(true);
+      return;
+    }
+    const interval = setInterval(() => {
+      if (typeof window !== "undefined" && typeof window.Razorpay === "function") {
+        setRazorpayReady(true);
+        clearInterval(interval);
+      }
+    }, 300);
+    return () => clearInterval(interval);
+  }, []);
 
   const razorpayKeyId =
     process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID?.trim() ||
@@ -69,19 +86,19 @@ export default function CartPage() {
     }
 
     if (!razorpayKeyId) {
-      alert("Razorpay key is missing. Set NEXT_PUBLIC_RAZORPAY_KEY_ID in frontend env.");
+      toast({ title: "Configuration error", description: "Razorpay key is missing. Set NEXT_PUBLIC_RAZORPAY_KEY_ID in frontend env." });
       return;
     }
 
     if (!razorpayReady || typeof window === "undefined" || typeof window.Razorpay !== "function") {
-      alert("Payment gateway is still loading. Please try again.");
+      toast({ title: "Payment gateway loading", description: "Please wait a moment and try again." });
       return;
     }
 
     const amountInPaise = Math.round(total * 100);
 
     if (amountInPaise < 100) {
-      alert("Minimum payment amount is Rs. 1.00");
+      toast({ title: "Amount too low", description: "Minimum payment amount is ₹1.00" });
       return;
     }
 
@@ -139,7 +156,7 @@ export default function CartPage() {
             router.push("/portal/customer");
           } catch (error) {
             console.error("Payment verification failed", error);
-            alert(error instanceof Error ? error.message : "Payment verification failed");
+            toast({ title: "Payment verification failed", description: error instanceof Error ? error.message : "Please contact support." });
           } finally {
             setPlacingOrder(false);
           }
@@ -147,37 +164,40 @@ export default function CartPage() {
         modal: {
           ondismiss: () => {
             setPlacingOrder(false);
-            alert("Payment cancelled");
+            toast({ title: "Payment cancelled", description: "Your order was not placed." });
           },
         },
       });
 
       paymentObject.on("payment.failed", (event: { error?: { description?: string } }) => {
         setPlacingOrder(false);
-        alert(event?.error?.description || "Payment failed. Please try again.");
+        toast({ title: "Payment failed", description: event?.error?.description || "Please try again." });
       });
 
       paymentObject.open();
     } catch (error) {
       console.error("Checkout failed", error);
-      alert(error instanceof Error ? error.message : "Failed to place order");
+      toast({ title: "Checkout failed", description: error instanceof Error ? error.message : "Failed to place order." });
       setPlacingOrder(false);
     }
   };
 
   if (items.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
-        <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mb-6">
-          <ShoppingBag className="w-12 h-12 text-primary" />
+      <div className="min-h-screen bg-gray-50 flex flex-col">
+        <Navbar />
+        <div className="flex-1 flex flex-col items-center justify-center p-4">
+          <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mb-6">
+            <ShoppingBag className="w-12 h-12 text-primary" />
+          </div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Your cart is empty</h1>
+          <p className="text-gray-500 mb-8 max-w-md text-center">
+            Looks like you haven&apos;t added any premium embroidery supplies to your cart yet.
+          </p>
+          <Button asChild size="lg" className="rounded-full px-8">
+            <Link href="/">Continue Shopping</Link>
+          </Button>
         </div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Your cart is empty</h1>
-        <p className="text-gray-500 mb-8 max-w-md text-center">
-          Looks like you haven&apos;t added any premium embroidery supplies to your cart yet.
-        </p>
-        <Button asChild size="lg" className="rounded-full px-8">
-          <Link href="/">Continue Shopping</Link>
-        </Button>
       </div>
     );
   }
@@ -190,6 +210,7 @@ export default function CartPage() {
         onLoad={() => setRazorpayReady(true)}
         onError={() => setRazorpayReady(false)}
       />
+      <Navbar />
       <div className="min-h-screen bg-gray-50/50 py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-end justify-between mb-8">

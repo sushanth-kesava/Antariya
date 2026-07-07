@@ -19,6 +19,7 @@ import {
 } from "@/lib/api/products";
 import { getApiBaseUrl } from "@/lib/api/base-url";
 import { normalizeAppRole } from "@/lib/auth-session";
+import { useAuth } from "@/context/AuthContext";
 
 type SortOption = "relevance" | "price_asc" | "price_desc" | "rating" | "newest";
 
@@ -29,8 +30,6 @@ const SORT_LABELS: Record<SortOption, string> = {
   rating: "Highest Rated",
   newest: "Newest First",
 };
-
-const API_BASE_URL = getApiBaseUrl();
 
 const ROLE_TITLES: Record<MarketplaceRole, { eyebrow: string; title: string; description: string; ctaHref: string; ctaLabel: string }> = {
   customer: {
@@ -96,6 +95,7 @@ export default function MarketplaceContent() {
   const sortRef = useRef<HTMLDivElement>(null);
   const ITEMS_PER_PAGE = 20;
 
+  const { user: authUser } = useAuth();
   const [role, setRole] = useState<MarketplaceRole>("customer");
   const [marketplaceLayout, setMarketplaceLayout] = useState<MarketplaceLayoutResponse | null>(null);
 
@@ -124,42 +124,13 @@ export default function MarketplaceContent() {
         return;
       }
 
-      const resolveSessionRole = async () => {
-        const token = localStorage.getItem("app_auth_token");
-
-        if (!token) {
-          setRole("customer");
-          setRoleResolved(true);
-          return;
-        }
-
-        try {
-          const response = await fetch(`${API_BASE_URL}/auth/me`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          });
-
-          const data = await response.json();
-
-          if (response.ok && data?.success && data?.user) {
-            setRole(normalizeAppRole(data.user.role));
-          } else {
-            setRole("customer");
-          }
-        } catch {
-          setRole("customer");
-        } finally {
-          setRoleResolved(true);
-        }
-      };
-
-      void resolveSessionRole();
+      setRole(authUser ? normalizeAppRole(authUser.role) : "customer");
+      setRoleResolved(true);
     } catch {
       setRole("customer");
       setRoleResolved(true);
     }
-  }, [pathname]);
+  }, [pathname, authUser]);
 
   useEffect(() => {
     if (!roleResolved) {

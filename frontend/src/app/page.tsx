@@ -202,7 +202,7 @@ export default function Home() {
         {/* Admin Upgrade Request */}
         <section className="py-20">
           <div className="w-full max-w-[1760px] mx-auto px-3 sm:px-4 lg:px-6">
-            <div className="relative overflow-hidden bg-gradient-to-br from-stone-950 via-red-950 to-amber-900 rounded-3xl p-8 lg:p-16 shadow-2xl border border-stone-900/20">
+            <div className="relative overflow-hidden bg-gradient-to-br from-stone-950 via-red-950 to-stone-800 rounded-3xl p-8 lg:p-16 shadow-2xl border border-stone-900/20">
               <div className="absolute top-0 right-0 w-72 h-72 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
               <div className="absolute bottom-0 left-0 w-40 h-40 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
 

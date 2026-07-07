@@ -14,6 +14,8 @@ const wishlistRoutes = require("./routes/wishlist.routes");
 const waitlistRoutes = require("./routes/waitlist.routes");
 const statsRoutes = require("./routes/stats.routes");
 const paymentRoutes = require("./routes/payment.routes");
+const odooProductRoutes = require("./routes/odoo-products.routes");
+const customerProfileRoutes = require("./routes/customerProfile.routes");
 const { notFound, errorHandler } = require("./middleware/error.middleware");
 
 const app = express();
@@ -70,6 +72,8 @@ app.use("/api/wishlist", wishlistRoutes);
 app.use("/api/waitlist", waitlistRoutes);
 app.use("/api/stats", statsRoutes);
 app.use("/api", paymentRoutes);
+app.use("/api/odoo/products", odooProductRoutes);
+app.use("/api/customer", customerProfileRoutes);
 app.use(notFound);
 app.use(errorHandler);
 
