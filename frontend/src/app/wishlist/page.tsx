@@ -176,10 +176,16 @@ export default function WishlistPage() {
           try {
             await verifyRazorpayPaymentOnBackend(token, response);
             await createOrderOnBackend(token, orderItems);
-            toast({ title: "Order placed!", description: "Your wishlist order has been confirmed." });
-            router.push("/portal/customer");
+            const params = new URLSearchParams({
+              status: "success",
+              paymentId: response.razorpay_payment_id,
+              orderId: response.razorpay_order_id,
+              amount: String(total),
+            });
+            router.push(`/order-status?${params.toString()}`);
           } catch (err) {
-            toast({ title: "Payment verification failed", description: err instanceof Error ? err.message : "Please contact support.", variant: "destructive" });
+            const reason = err instanceof Error ? err.message : "Payment verification failed. Please contact support.";
+            router.push(`/order-status?${new URLSearchParams({ status: "failed", reason }).toString()}`);
           } finally {
             setPlacingOrder(false);
           }
@@ -187,14 +193,15 @@ export default function WishlistPage() {
         modal: {
           ondismiss: () => {
             setPlacingOrder(false);
-            toast({ title: "Payment cancelled", description: "Your order was not placed." });
+            router.push("/order-status?status=cancelled");
           },
         },
       });
 
       paymentObject.on("payment.failed", (event: { error?: { description?: string } }) => {
         setPlacingOrder(false);
-        toast({ title: "Payment failed", description: event?.error?.description || "Please try again.", variant: "destructive" });
+        const reason = event?.error?.description || "Your payment could not be completed. Please try again.";
+        router.push(`/order-status?${new URLSearchParams({ status: "failed", reason }).toString()}`);
       });
 
       paymentObject.open();
@@ -389,10 +396,6 @@ export default function WishlistPage() {
                           Free shipping above {formatINR(INDIA_FREE_SHIPPING_THRESHOLD)}
                         </p>
                       )}
-                      <div className="flex justify-between text-gray-600">
-                        <span>GST (18%)</span>
-                        <span className="font-medium text-gray-900">{formatINR(tax)}</span>
-                      </div>
                       <Separator />
                       <div className="flex justify-between items-center">
                         <span className="text-lg font-bold text-gray-900">Total</span>

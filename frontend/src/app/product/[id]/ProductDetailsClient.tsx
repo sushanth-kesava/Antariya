@@ -1933,7 +1933,7 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
         </Dialog>
 
         <Dialog open={openFullscreenGallery} onOpenChange={setOpenFullscreenGallery}>
-          <DialogContent className="sm:max-w-5xl">
+          <DialogContent className="sm:max-w-[819px]">
             <DialogHeader>
               <DialogTitle>{product.name} Gallery</DialogTitle>
               <DialogDescription>View the full set of product images in a larger viewer.</DialogDescription>

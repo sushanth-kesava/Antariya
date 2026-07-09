@@ -2,7 +2,8 @@ export const INDIA_LOCALE = "en-IN";
 export const INDIA_CURRENCY = "INR";
 export const LEGACY_USD_TO_INR_RATE = 83;
 
-export const INDIA_GST_RATE = 0.18;
+// GST set to 0 — business is not GST-registered (no GSTIN).
+export const INDIA_GST_RATE = 0;
 export const INDIA_FREE_SHIPPING_THRESHOLD = 1499;
 export const INDIA_STANDARD_SHIPPING = 99;
 

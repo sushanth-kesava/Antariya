@@ -6,7 +6,8 @@ const WishlistItem = require("../models/WishlistItem");
 
 const INDIA_FREE_SHIPPING_THRESHOLD = 1499;
 const INDIA_STANDARD_SHIPPING = 99;
-const INDIA_GST_RATE = 0.18;
+// GST set to 0 — business is not GST-registered (no GSTIN).
+const INDIA_GST_RATE = 0;
 const LEGACY_USD_TO_INR_RATE = 83;
 
 function normalizeCatalogPriceToINR(price) {

@@ -13,6 +13,7 @@ import {
   PlusCircle,
   PackageCheck,
   AlertCircle,
+  CheckCircle2,
   Loader2,
   MessageSquareWarning,
   ShieldCheck,
@@ -103,7 +104,7 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
     reason: "",
   });
   const [adjusting, setAdjusting] = useState(false);
-  const [adjustMessage, setAdjustMessage] = useState<string | null>(null);
+  const [adjustMessage, setAdjustMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [loadingDashboard, setLoadingDashboard] = useState(false);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
   const [orderStatusFilter, setOrderStatusFilter] = useState<"all" | "Processing" | "Shipped" | "Delivered" | "Cancelled">("all");
@@ -322,6 +323,19 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
     }
   };
 
+  const loadCatalog = async () => {
+    if (!authToken) return;
+    try {
+      setLoadingCatalog(true);
+      const productsResponse = await getProductsFromBackend({ dealerId: adminUser?.id });
+      setCatalog(productsResponse.products);
+    } catch (err) {
+      console.error("Failed to reload catalog", err);
+    } finally {
+      setLoadingCatalog(false);
+    }
+  };
+
   const loadStockHistory = async () => {
     if (!authToken) return;
     try {
@@ -338,11 +352,11 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
     setAdjustMessage(null);
     const quantity = parseInt(adjustForm.quantity, 10);
     if (!adjustForm.productId) {
-      setAdjustMessage("Please select a product.");
+      setAdjustMessage({ type: "error", text: "Please select a product." });
       return;
     }
     if (!Number.isFinite(quantity)) {
-      setAdjustMessage("Enter a valid quantity.");
+      setAdjustMessage({ type: "error", text: "Enter a valid quantity." });
       return;
     }
     try {
@@ -356,11 +370,19 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
       // Reflect updated stock in the catalog list.
       setCatalog((current) => current.map((item) => (item.id === product.id ? product : item)));
       setAdjustForm((current) => ({ ...current, quantity: "", reason: "" }));
-      setAdjustMessage("Stock updated.");
+      setAdjustMessage({ type: "success", text: "Stock updated successfully." });
+      void loadCatalog();
       void loadStockHistory();
       void loadInventory();
     } catch (err) {
-      setAdjustMessage(err instanceof Error ? err.message : "Failed to adjust stock.");
+      const raw = err instanceof Error ? err.message : "Failed to adjust stock.";
+      if (/product not found/i.test(raw)) {
+        await loadCatalog();
+        setAdjustForm((current) => ({ ...current, productId: "", variantSku: "" }));
+        setAdjustMessage({ type: "error", text: "That product was out of sync, so I reloaded your live catalog. Please re-select the product and try again." });
+      } else {
+        setAdjustMessage({ type: "error", text: raw });
+      }
     } finally {
       setAdjusting(false);
     }
@@ -378,7 +400,7 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
       link.click();
       URL.revokeObjectURL(url);
     } catch (err) {
-      setAdjustMessage(err instanceof Error ? err.message : "Failed to export CSV.");
+      setAdjustMessage({ type: "error", text: err instanceof Error ? err.message : "Failed to export CSV." });
     }
   };
 
@@ -389,13 +411,13 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
       try {
         const csv = typeof reader.result === "string" ? reader.result : "";
         const result = await importInventoryCsvToBackend(authToken, csv);
-        setAdjustMessage(`Imported ${result.updated} row(s).${result.errors.length ? ` ${result.errors.length} skipped.` : ""}`);
+        setAdjustMessage({ type: "success", text: `Imported ${result.updated} row(s).${result.errors.length ? ` ${result.errors.length} skipped.` : ""}` });
         void loadInventory();
         void loadStockHistory();
         const productsResponse = await getProductsFromBackend({ dealerId: adminUser?.id });
         setCatalog(productsResponse.products);
       } catch (err) {
-        setAdjustMessage(err instanceof Error ? err.message : "Failed to import CSV.");
+        setAdjustMessage({ type: "error", text: err instanceof Error ? err.message : "Failed to import CSV." });
       }
     };
     reader.readAsText(file);
@@ -1043,7 +1065,24 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
                       </Button>
                     </div>
                   </form>
-                  {adjustMessage && <p className="mt-2 text-xs text-muted-foreground">{adjustMessage}</p>}
+                  {adjustMessage && (
+                    <div
+                      role="status"
+                      aria-live="polite"
+                      className={`mt-3 flex items-start gap-2 rounded-xl border px-3 py-2 text-sm ${
+                        adjustMessage.type === "success"
+                          ? "border-green-200 bg-green-50 text-green-800"
+                          : "border-red-200 bg-red-50 text-red-800"
+                      }`}
+                    >
+                      {adjustMessage.type === "success" ? (
+                        <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
+                      ) : (
+                        <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                      )}
+                      <span>{adjustMessage.text}</span>
+                    </div>
+                  )}
 
                   {stockHistory.length > 0 && (
                     <div className="mt-4">

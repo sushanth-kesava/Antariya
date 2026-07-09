@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const Product = require("../models/Product");
 const Review = require("../models/Review");
 const User = require("../models/User");
@@ -1214,7 +1215,21 @@ async function getInventoryReport(req, res, next) {
 async function canManageProduct(req, product) {
   if (!product) return false;
   if (req.auth?.role === "superadmin") return true;
-  return product.dealerId === req.auth?.sub;
+  if (product.dealerId === req.auth?.sub) return true;
+  // Allow an admin to claim an "orphaned" product — one whose dealerId is not a
+  // real existing admin id (e.g. seed/imported products with placeholder owners
+  // like "antariyaofficial"). This keeps stock management live without a manual
+  // data migration.
+  return isOrphanedDealerId(product.dealerId);
+}
+
+// A dealerId is considered orphaned when it is not a valid ObjectId of an
+// existing AdminProfile. Such products cannot be managed by their "owner"
+// because no such owner exists.
+async function isOrphanedDealerId(dealerId) {
+  if (!mongoose.Types.ObjectId.isValid(dealerId)) return true;
+  const owner = await AdminProfile.findById(dealerId).select("_id");
+  return !owner;
 }
 
 async function adjustStock(req, res, next) {
@@ -1231,12 +1246,35 @@ async function adjustStock(req, res, next) {
       return res.status(400).json({ success: false, message: "Quantity must be a number" });
     }
 
+    // Guard against malformed ids so Mongoose does not throw a CastError (500).
+    // A malformed id can only mean the client sent a stale/invalid product ref.
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(404).json({
+        success: false,
+        message: "Product not found",
+      });
+    }
+
     const product = await Product.findById(productId);
     if (!product) {
       return res.status(404).json({ success: false, message: "Product not found" });
     }
     if (!(await canManageProduct(req, product))) {
       return res.status(403).json({ success: false, message: "You can only adjust your own products" });
+    }
+
+    // Self-heal: if this product was orphaned (placeholder/seed owner) and a
+    // non-superadmin admin is adjusting it, claim it for them so it appears in
+    // their scoped catalog and stays adjustable going forward.
+    if (req.auth?.role === "admin" && product.dealerId !== req.auth?.sub) {
+      if (await isOrphanedDealerId(product.dealerId)) {
+        const claimer = await AdminProfile.findById(req.auth.sub).select("displayName email");
+        product.dealerId = req.auth.sub;
+        if (claimer) {
+          product.dealerName = claimer.displayName || product.dealerName;
+          product.dealerEmail = (claimer.email || product.dealerEmail || "").toLowerCase();
+        }
+      }
     }
 
     const applyDelta = (current) => {
