@@ -8,7 +8,7 @@ import { ProductCard } from "@/components/product-card";
 import { Product } from "@/app/lib/mock-data";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ChevronRight, Zap, ShieldCheck, Truck, RefreshCcw, ArrowRight, FileText } from "lucide-react";
+import { Zap, ShieldCheck, Truck, RefreshCcw, ArrowRight, FileText } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getProductsFromBackend } from "@/lib/api/products";
@@ -27,7 +27,6 @@ export default function Home() {
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [heroProduct, setHeroProduct] = useState<Product | null>(null);
   const [heroMetrics, setHeroMetrics] = useState<HeroMetrics>({ products: 0, dealers: 0, categories: 0, orders: 0 });
-  const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -60,7 +59,6 @@ export default function Home() {
         const fetchedCategories = layoutResponse.length > 0 ? layoutResponse : Array.from(new Set(liveProducts.map((product) => product.category).filter(Boolean)));
 
         setFeaturedProducts(liveProducts.slice(0, 4));
-        setCategories(fetchedCategories);
         setHeroProduct(
           [...liveProducts].sort((left, right) => {
             const ratingDelta = (Number(right.rating || 0) - Number(left.rating || 0));
@@ -94,40 +92,6 @@ export default function Home() {
       <main className="flex-grow">
         <Hero metrics={heroMetrics} featuredProduct={heroProduct} />
 
-        {/* Categories Section */}
-        <section className="py-16 bg-muted/30">
-          <div className="w-full max-w-[1760px] mx-auto px-3 sm:px-4 lg:px-6">
-            <div className="flex items-end justify-between mb-8">
-              <div className="space-y-2">
-                <h2 className="text-3xl font-bold font-headline">Shop by Category</h2>
-                <p className="text-muted-foreground">Find specialized tools and materials for your embroidery business.</p>
-              </div>
-              <Button variant="link" className="text-primary font-semibold" asChild>
-                <Link href="/marketplace">View All Categories <ChevronRight className="h-4 w-4 ml-1" /></Link>
-              </Button>
-            </div>
-            
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
-              {categories.length > 0 ? categories.map((cat) => (
-                <Link 
-                  key={cat} 
-                  href={`/marketplace?category=${encodeURIComponent(cat)}`}
-                  className="flex flex-col items-center gap-3 p-4 rounded-2xl bg-card border border-border/50 hover:border-primary/50 hover:shadow-lg transition-all text-center group"
-                >
-                  <div className="w-12 h-12 bg-primary/5 rounded-full flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-colors">
-                    <Zap className="h-6 w-6" />
-                  </div>
-                  <span className="text-xs font-bold leading-tight line-clamp-2">{cat}</span>
-                </Link>
-              )) : (
-                <div className="col-span-full py-8 text-center text-muted-foreground">
-                  <p>No categories available. Create your first product from the admin portal.</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
-
         {/* Featured Products */}
         <section className="py-20">
           <div className="w-full max-w-[1760px] mx-auto px-3 sm:px-4 lg:px-6">
@@ -149,8 +113,14 @@ export default function Home() {
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-                {featuredProducts.map(product => (
-                  <ProductCard key={product.id} product={product} />
+                {featuredProducts.map((product, index) => (
+                  <div
+                    key={product.id}
+                    style={{ animationDelay: `${index * 100}ms` }}
+                    className="animate-fade-in opacity-0"
+                  >
+                    <ProductCard product={product} />
+                  </div>
                 ))}
               </div>
             )}
@@ -168,28 +138,28 @@ export default function Home() {
           <div className="w-full max-w-[1760px] mx-auto px-3 sm:px-4 lg:px-6">
             <div className="grid md:grid-cols-4 gap-8 text-center">
               <div className="space-y-4">
-                <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center mx-auto text-primary">
+                <div className="w-16 h-16 bg-card rounded-2xl shadow-sm border border-border/50 flex items-center justify-center mx-auto text-primary">
                   <ShieldCheck className="h-8 w-8" />
                 </div>
                 <h3 className="font-bold text-lg">Quality Assured</h3>
                 <p className="text-sm text-muted-foreground">All products from verified dealers and manufacturers.</p>
               </div>
               <div className="space-y-4">
-                <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center mx-auto text-primary">
+                <div className="w-16 h-16 bg-card rounded-2xl shadow-sm border border-border/50 flex items-center justify-center mx-auto text-primary">
                   <Truck className="h-8 w-8" />
                 </div>
                 <h3 className="font-bold text-lg">Pan India Delivery</h3>
                 <p className="text-sm text-muted-foreground">Fastest shipping to every corner of India for your peace of mind.</p>
               </div>
               <div className="space-y-4">
-                <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center mx-auto text-primary">
+                <div className="w-16 h-16 bg-card rounded-2xl shadow-sm border border-border/50 flex items-center justify-center mx-auto text-primary">
                   <RefreshCcw className="h-8 w-8" />
                 </div>
                 <h3 className="font-bold text-lg">Hassle-free Returns</h3>
                 <p className="text-sm text-muted-foreground">Easy 7-day return policy for physical tools and threads.</p>
               </div>
               <div className="space-y-4">
-                <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center mx-auto text-primary">
+                <div className="w-16 h-16 bg-card rounded-2xl shadow-sm border border-border/50 flex items-center justify-center mx-auto text-primary">
                   <Zap className="h-8 w-8" />
                 </div>
                 <h3 className="font-bold text-lg">Instant Downloads</h3>

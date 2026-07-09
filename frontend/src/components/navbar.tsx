@@ -19,6 +19,7 @@ import { googleLogout } from "@react-oauth/google";
 import { CART_UPDATED_EVENT, getCartItemCount } from "@/lib/cart";
 import { clearAuthSession, getPortalPathForRole } from "@/lib/auth-session";
 import { useAuth } from "@/context/AuthContext";
+import { ProfileSidebar } from "@/components/profile-sidebar";
 
 export function Navbar() {
   const router = useRouter();
@@ -27,6 +28,7 @@ export function Navbar() {
   const [searchQuery, setSearchQuery] = useState("");
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const portalHref = user?.role ? getPortalPathForRole(user.role) : "/portal/customer";
@@ -51,6 +53,12 @@ export function Navbar() {
     document.body.style.overflow = mobileOpen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
   }, [mobileOpen]);
+
+  useEffect(() => {
+    const openProfile = () => setProfileOpen(true);
+    window.addEventListener("antariya-open-profile", openProfile);
+    return () => window.removeEventListener("antariya-open-profile", openProfile);
+  }, []);
 
   const handleLogout = () => {
     googleLogout();
@@ -166,6 +174,12 @@ export function Navbar() {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="rounded-xl p-3 cursor-pointer"
+                    onSelect={(e) => { e.preventDefault(); setProfileOpen(true); }}
+                  >
+                    My Profile
+                  </DropdownMenuItem>
                   <DropdownMenuItem asChild className="rounded-xl p-3 cursor-pointer">
                     <Link href={portalHref}>My Portal</Link>
                 </DropdownMenuItem>
@@ -304,6 +318,16 @@ export function Navbar() {
           </div>
         </div>
       )}
+
+      <ProfileSidebar
+        open={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        onSaved={(profile) => {
+          if (user) {
+            setUser({ ...user, displayName: profile.displayName, photoURL: profile.photoURL });
+          }
+        }}
+      />
     </>
   );
 }

@@ -13,9 +13,19 @@ export type ProductCustomization = {
   notes?: string;
 };
 
+export type OrderVariant = {
+  sku?: string;
+  size?: string;
+  color?: string;
+  gender?: string;
+  neckType?: string;
+  pattern?: string;
+};
+
 export type OrderItemInput = {
   productId: string;
   quantity: number;
+  variantSku?: string;
   customization?: ProductCustomization;
 };
 
@@ -28,6 +38,8 @@ export type OrderItem = {
   image: string;
   price: number;
   quantity: number;
+  variantSku?: string;
+  variant?: OrderVariant;
   customization?: ProductCustomization;
 };
 

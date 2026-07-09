@@ -77,7 +77,7 @@ export default function MarketplaceContent() {
   const router = useRouter();
   const pathname = usePathname();
 
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(searchParams.get("category") || null);
+
   const [searchQuery, setSearchQuery] = useState(searchParams.get("search") || "");
   const [activeSearch, setActiveSearch] = useState(searchParams.get("search") || "");
   const [products, setProducts] = useState<Product[]>([]);
@@ -170,7 +170,6 @@ export default function MarketplaceContent() {
       setLoading(true);
       try {
         const { products: data, pagination } = await getProductsFromBackend({
-          category: selectedCategory || undefined,
           search: activeSearch || undefined,
           page: 1,
           limit: ITEMS_PER_PAGE,
@@ -197,11 +196,10 @@ export default function MarketplaceContent() {
     return () => {
       cancelled = true;
     };
-  }, [selectedCategory, activeSearch, role, roleResolved]);
+  }, [activeSearch, role, roleResolved]);
 
   useEffect(() => {
     if (role === "superadmin") {
-      setSelectedCategory(null);
       setPriceMin("");
       setPriceMax("");
       setMinRating(null);
@@ -217,7 +215,6 @@ export default function MarketplaceContent() {
     try {
       const nextPage = currentPage + 1;
       const { products: data } = await getProductsFromBackend({
-        category: selectedCategory || undefined,
         search: activeSearch || undefined,
         page: nextPage,
         limit: ITEMS_PER_PAGE,
@@ -237,12 +234,7 @@ export default function MarketplaceContent() {
     setActiveSearch(searchQuery.trim());
   };
 
-  const handleCategoryChange = (cat: string | null) => {
-    setSelectedCategory(cat);
-  };
-
   const handleClearAll = () => {
-    setSelectedCategory(null);
     setSearchQuery("");
     setActiveSearch("");
     setSortBy("relevance");
@@ -267,20 +259,14 @@ export default function MarketplaceContent() {
   displayProducts = sortProducts(displayProducts, sortBy);
 
   const activeFilterCount =
-    (selectedCategory ? 1 : 0) +
     (priceMin ? 1 : 0) +
     (priceMax ? 1 : 0) +
     (minRating ? 1 : 0);
 
-  const marketplaceCategories =
-    role !== "superadmin" && marketplaceLayout && marketplaceLayout.success && "categories" in marketplaceLayout
-      ? marketplaceLayout.categories
-      : [];
   const marketplaceDealerSections =
     role === "superadmin" && marketplaceLayout && marketplaceLayout.success && "dealerSections" in marketplaceLayout
       ? marketplaceLayout.dealerSections
       : [];
-  const quickPickCategories = marketplaceCategories.slice(0, 3);
 
   return (
     <div className="min-h-screen bg-background">
@@ -456,56 +442,13 @@ export default function MarketplaceContent() {
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  <p className="font-semibold text-sm">Quick Picks</p>
-                  <div className="flex flex-wrap gap-2">
-                    {quickPickCategories.length > 0 ? (
-                      quickPickCategories.map((category) => (
-                        <Button
-                          key={category}
-                          size="sm"
-                          variant="outline"
-                          className="rounded-full"
-                          onClick={() => {
-                            setSelectedCategory(category);
-                            setFilterOpen(false);
-                          }}
-                        >
-                          {category}
-                        </Button>
-                      ))
-                    ) : (
-                      <span className="text-sm text-muted-foreground">Loading categories...</span>
-                    )}
-                  </div>
-                </div>
               </div>
             </div>
           )}
 
-          {/* Role-specific categories */}
-          <div className="flex flex-col gap-4">
-            {role !== "superadmin" ? (
-              <div className="flex flex-wrap gap-2">
-                <Badge
-                  variant={selectedCategory === null ? "default" : "outline"}
-                  className="cursor-pointer px-4 py-2 rounded-full border-primary/20"
-                  onClick={() => handleCategoryChange(null)}
-                >
-                  All Items
-                </Badge>
-                {marketplaceCategories.map((cat: string) => (
-                  <Badge
-                    key={cat}
-                    variant={selectedCategory === cat ? "default" : "outline"}
-                    className="cursor-pointer px-4 py-2 rounded-full border-primary/20"
-                    onClick={() => handleCategoryChange(cat)}
-                  >
-                    {cat}
-                  </Badge>
-                ))}
-              </div>
-            ) : (
+          {/* Superadmin dealer sections */}
+          {role === "superadmin" && (
+            <div className="flex flex-col gap-4">
               <div className="space-y-6">
                 {marketplaceDealerSections.length === 0 && !loading ? (
                   <p className="text-sm text-muted-foreground">No dealer data available.</p>
@@ -532,8 +475,8 @@ export default function MarketplaceContent() {
                   ))
                 )}
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {(activeSearch || activeFilterCount > 0) && (
             <div className="flex flex-wrap items-center gap-2">
@@ -548,14 +491,6 @@ export default function MarketplaceContent() {
                     }}
                     className="hover:text-destructive ml-1"
                   >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              )}
-              {selectedCategory && (
-                <Badge variant="secondary" className="rounded-full gap-1 pl-3 pr-2 py-1">
-                  {selectedCategory}
-                  <button onClick={() => setSelectedCategory(null)} className="hover:text-destructive ml-1">
                     <X className="h-3 w-3" />
                   </button>
                 </Badge>

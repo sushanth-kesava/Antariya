@@ -120,6 +120,7 @@ export default function CartPage() {
       const orderItems = items.map((item) => ({
         productId: item.productId,
         quantity: item.quantity,
+        variantSku: item.variantSku || undefined,
         customization: item.customization,
       }));
 

@@ -4,10 +4,17 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Package, Heart, Download, Settings, Star, LayoutDashboard, Sparkles, ShoppingBag, ArrowRight } from "lucide-react";
+import { Package, Heart, Download, Settings, Star, LayoutDashboard, Sparkles, ShoppingBag, ArrowRight, ChevronDown, Mail, Phone, MessageCircle, MessageSquare, User as UserIcon } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { type Product } from "@/app/lib/mock-data";
 import { getMyOrdersFromBackend } from "@/lib/api/orders";
 import { getWishlistFromBackend, WishlistItem } from "@/lib/api/wishlist";
@@ -90,6 +97,20 @@ export default function CustomerDashboardClient() {
   const [wishlist, setWishlist] = useState<WishlistItem[]>([]);
   const [recommendations, setRecommendations] = useState<RecommendationCard[]>([]);
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const [supportOpen, setSupportOpen] = useState(false);
+
+  const scrollToSection = (id: string) => {
+    if (typeof document === "undefined") return;
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const openProfile = () => {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("antariya-open-profile"));
+    }
+  };
 
   useEffect(() => {
     if (authLoading) return;
@@ -173,23 +194,19 @@ export default function CustomerDashboardClient() {
             <Button variant="secondary" className="w-full justify-start gap-3 text-primary font-bold bg-primary/10" asChild>
               <Link href="/portal/customer"><LayoutDashboard className="h-4 w-4" />Dashboard</Link>
             </Button>
-            <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground" asChild>
-              <Link href="/portal/customer#orders">
-                <Package className="h-4 w-4" />
-                My Orders {orders.length > 0 && <Badge className="ml-auto rounded-full bg-primary/20 text-primary border-none">{orders.length}</Badge>}
-              </Link>
+            <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground" onClick={() => scrollToSection("orders")}>
+              <Package className="h-4 w-4" />
+              My Orders {orders.length > 0 && <Badge className="ml-auto rounded-full bg-primary/20 text-primary border-none">{orders.length}</Badge>}
             </Button>
-            <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground" asChild>
-              <Link href="/portal/customer#orders">
-                <Download className="h-4 w-4" />
-                Purchases {purchasedItemsCount > 0 && <Badge className="ml-auto rounded-full bg-primary/20 text-primary border-none">{purchasedItemsCount}</Badge>}
-              </Link>
+            <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground" onClick={() => scrollToSection("wishlist")}>
+              <Download className="h-4 w-4" />
+              Purchases {purchasedItemsCount > 0 && <Badge className="ml-auto rounded-full bg-primary/20 text-primary border-none">{purchasedItemsCount}</Badge>}
             </Button>
             <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground" asChild>
               <Link href="/wishlist"><Heart className="h-4 w-4" />Wishlist</Link>
             </Button>
-            <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground" asChild>
-              <Link href="/portal/customer#settings"><Settings className="h-4 w-4" />Settings</Link>
+            <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground" onClick={openProfile}>
+              <Settings className="h-4 w-4" />Settings
             </Button>
           </div>
         </div>
@@ -197,7 +214,7 @@ export default function CustomerDashboardClient() {
         <div className="bg-primary p-6 rounded-2xl text-primary-foreground space-y-4 hidden lg:block shadow-lg shadow-primary/20">
           <p className="text-lg font-bold">Need Help?</p>
           <p className="text-sm text-primary-foreground/90 leading-relaxed">Our support team is available for embroidery orders, customization, and product help.</p>
-          <Button size="sm" variant="secondary" className="w-full mt-2 rounded-full font-bold">
+          <Button size="sm" variant="secondary" className="w-full mt-2 rounded-full font-bold" onClick={() => setSupportOpen(true)}>
             Contact Support
           </Button>
         </div>
@@ -267,7 +284,7 @@ export default function CustomerDashboardClient() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-muted-foreground mb-4">Complete your profile to unlock loyalty rewards tied to your live orders.</p>
-                  <Button variant="outline" size="sm" className="rounded-full w-full">Complete Profile</Button>
+                  <Button variant="outline" size="sm" className="rounded-full w-full" onClick={openProfile}>Complete Profile</Button>
                 </CardContent>
               </Card>
             </div>
@@ -307,7 +324,7 @@ export default function CustomerDashboardClient() {
               </Card>
             </div>
 
-            <section className="space-y-4">
+            <section id="orders" className="space-y-4 scroll-mt-24">
               <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-bold tracking-tight">Recent Purchases</h2>
                 <Button variant="outline" size="sm" className="rounded-full" asChild>
@@ -328,7 +345,10 @@ export default function CustomerDashboardClient() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {orders.map((order, i) => (
+                      {orders.map((order, i) => {
+                        const isOpen = expandedOrderId === order.id;
+                        return (
+                        <>
                         <tr key={i} className="hover:bg-gray-50/50 transition-colors">
                           <td className="px-6 py-5 font-mono font-medium text-gray-900">{order.id}</td>
                           <td className="px-6 py-5 text-muted-foreground">{formatIndianDate(order.createdAt)}</td>
@@ -338,12 +358,56 @@ export default function CustomerDashboardClient() {
                           <td className="px-6 py-5 font-medium">{order.items?.length || 0}</td>
                           <td className="px-6 py-5 font-bold text-gray-900">{formatINR(Number(order.total || 0))}</td>
                           <td className="px-6 py-5 text-right">
-                            <Button variant="secondary" size="sm" className="rounded-full shadow-sm" asChild>
-                              <Link href={`/portal/customer/orders/${order.id}`}>Details</Link>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              className="rounded-full shadow-sm gap-1"
+                              onClick={() => setExpandedOrderId(isOpen ? null : order.id)}
+                            >
+                              Details <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isOpen ? "rotate-180" : ""}`} />
                             </Button>
                           </td>
                         </tr>
-                      ))}
+                        {isOpen && (
+                          <tr key={`${i}-details`} className="bg-gray-50/40">
+                            <td colSpan={6} className="px-6 py-4">
+                              <div className="space-y-3">
+                                <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Items in this order</p>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                  {(order.items || []).map((item: any, idx: number) => (
+                                    <div key={idx} className="flex items-center gap-3 rounded-xl border border-gray-100 bg-white p-3">
+                                      {item.image ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img src={item.image} alt={item.name} className="h-14 w-14 rounded-lg object-cover border shrink-0" />
+                                      ) : (
+                                        <div className="h-14 w-14 rounded-lg bg-gray-100 flex items-center justify-center shrink-0"><Package className="h-5 w-5 text-gray-400" /></div>
+                                      )}
+                                      <div className="min-w-0 flex-1">
+                                        <p className="text-sm font-semibold truncate">{item.name}</p>
+                                        {item.variant && (item.variant.size || item.variant.color) ? (
+                                          <p className="text-xs text-muted-foreground truncate">
+                                            {[item.variant.size, item.variant.color, item.variant.gender].filter(Boolean).join(" · ")}
+                                          </p>
+                                        ) : null}
+                                        <p className="text-xs text-muted-foreground">Qty {item.quantity} · {formatINR(Number(item.price || 0))}</p>
+                                      </div>
+                                      <Link href={`/product/${item.productId}`} className="text-xs font-semibold text-primary hover:underline shrink-0">View</Link>
+                                    </div>
+                                  ))}
+                                </div>
+                                <div className="flex flex-wrap gap-4 pt-2 text-sm">
+                                  <span className="text-muted-foreground">Subtotal: <span className="font-semibold text-foreground">{formatINR(Number(order.subtotal || 0))}</span></span>
+                                  <span className="text-muted-foreground">Shipping: <span className="font-semibold text-foreground">{formatINR(Number(order.shipping || 0))}</span></span>
+                                  <span className="text-muted-foreground">Tax: <span className="font-semibold text-foreground">{formatINR(Number(order.tax || 0))}</span></span>
+                                  <span className="text-muted-foreground">Total: <span className="font-bold text-foreground">{formatINR(Number(order.total || 0))}</span></span>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                        </>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -397,7 +461,7 @@ export default function CustomerDashboardClient() {
                     </CardContent>
                     <div className="p-5 pt-0 mt-auto flex items-center justify-between">
                       <span className="font-bold text-lg">{formatINR(normalizeCatalogPriceToINR(Number(product.price || 0)))}</span>
-                      <Button size="sm" className="rounded-full opacity-0 group-hover:opacity-100 transition-opacity translate-y-2 group-hover:translate-y-0 shadow-md">
+                      <Button size="sm" className="rounded-full shadow-md">
                         View Item <ArrowRight className="ml-1 h-3 w-3" />
                       </Button>
                     </div>
@@ -409,7 +473,7 @@ export default function CustomerDashboardClient() {
           )}
         </section>
 
-            <section className="space-y-4">
+            <section id="wishlist" className="space-y-4 scroll-mt-24">
               <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
                   <Heart className="h-5 w-5 text-rose-600" />
@@ -450,6 +514,63 @@ export default function CustomerDashboardClient() {
 
       </main>
     </div>
+
+    {/* Contact Support dialog */}
+    <Dialog open={supportOpen} onOpenChange={setSupportOpen}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2"><MessageSquare className="h-5 w-5 text-primary" /> Contact Support</DialogTitle>
+          <DialogDescription>
+            We&apos;re here to help with orders, customization, and product questions.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <a
+            href="mailto:antariyaofficial@gmail.com?subject=Support%20request%20from%20my%20account"
+            className="flex items-center gap-3 rounded-xl border border-border bg-muted/40 px-4 py-3 hover:border-primary/50 transition-colors"
+          >
+            <Mail className="h-5 w-5 text-primary shrink-0" />
+            <div>
+              <p className="text-sm font-semibold">Email us</p>
+              <p className="text-xs text-muted-foreground">antariyaofficial@gmail.com</p>
+            </div>
+          </a>
+          <a
+            href="tel:+917013296469"
+            className="flex items-center gap-3 rounded-xl border border-border bg-muted/40 px-4 py-3 hover:border-primary/50 transition-colors"
+          >
+            <Phone className="h-5 w-5 text-primary shrink-0" />
+            <div>
+              <p className="text-sm font-semibold">Call us</p>
+              <p className="text-xs text-muted-foreground">+91 70132 96469 · Available 24/7 for orders</p>
+            </div>
+          </a>
+          <a
+            href="https://wa.me/917013296469?text=Hi%20Antariya%2C%20I%20need%20help%20with%20my%20order"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 rounded-xl border border-border bg-muted/40 px-4 py-3 hover:border-primary/50 transition-colors"
+          >
+            <MessageCircle className="h-5 w-5 text-emerald-600 shrink-0" />
+            <div>
+              <p className="text-sm font-semibold">WhatsApp chat</p>
+              <p className="text-xs text-muted-foreground">Chat with us on WhatsApp · fastest replies</p>
+            </div>
+          </a>
+          <Link
+            href="/legal/policies"
+            onClick={() => setSupportOpen(false)}
+            className="flex items-center gap-3 rounded-xl border border-border bg-muted/40 px-4 py-3 hover:border-primary/50 transition-colors"
+          >
+            <UserIcon className="h-5 w-5 text-primary shrink-0" />
+            <div>
+              <p className="text-sm font-semibold">Policies &amp; FAQs</p>
+              <p className="text-xs text-muted-foreground">Shipping, returns, and account help</p>
+            </div>
+          </Link>
+        </div>
+      </DialogContent>
+    </Dialog>
     </div>
   );
 }

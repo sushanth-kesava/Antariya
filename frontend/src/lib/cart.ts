@@ -14,6 +14,15 @@ export type ProductCustomization = {
   notes?: string;
 };
 
+export type CartVariant = {
+  sku: string;
+  size?: string;
+  color?: string;
+  gender?: string;
+  neckType?: string;
+  pattern?: string;
+};
+
 export type CartItem = {
   lineId: string;
   productId: string;
@@ -22,6 +31,8 @@ export type CartItem = {
   price: number;
   quantity: number;
   category: string;
+  variantSku?: string;
+  variant?: CartVariant;
   customization?: ProductCustomization;
 };
 
@@ -54,6 +65,8 @@ export function getCartItems(): CartItem[] {
       price: Number(item.price || 0),
       quantity: Number(item.quantity || 1),
       category: item.category || "General",
+      variantSku: item.variantSku || (item.variant ? item.variant.sku : ""),
+      variant: item.variant,
       customization: item.customization,
     }));
   } catch {
@@ -74,11 +87,15 @@ export function getCartItemCount(): number {
   return getCartItems().reduce((sum, item) => sum + item.quantity, 0);
 }
 
-export function addProductToCart(product: Product, quantity = 1, customization?: ProductCustomization) {
+export function addProductToCart(product: Product, quantity = 1, customization?: ProductCustomization, variant?: CartVariant) {
   const existing = getCartItems();
   const customizationKey = buildCustomizationKey(customization);
+  const variantKey = variant ? variant.sku : "none";
   const index = existing.findIndex(
-    (item) => item.productId === product.id && buildCustomizationKey(item.customization) === customizationKey
+    (item) =>
+      item.productId === product.id &&
+      buildCustomizationKey(item.customization) === customizationKey &&
+      (item.variantSku || "none") === variantKey
   );
 
   if (index >= 0) {
@@ -95,6 +112,8 @@ export function addProductToCart(product: Product, quantity = 1, customization?:
       price: product.price,
       quantity,
       category: product.category,
+      variantSku: variant ? variant.sku : "",
+      variant,
       customization,
     });
   }

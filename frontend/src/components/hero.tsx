@@ -53,8 +53,10 @@ export function Hero({ metrics, featuredProduct }: HeroProps) {
                   Explore Marketplace <ArrowRight className="ml-2 h-5 w-5" />
                 </Link>
               </Button>
-              <Button variant="outline" size="lg" className="rounded-full px-8 border-primary text-primary hover:bg-primary/5">
-                Join as Dealer
+              <Button variant="outline" size="lg" className="rounded-full px-8 border-primary text-primary hover:bg-primary/5" asChild>
+                <Link href="/admin-login/apply">
+                  Join as Dealer
+                </Link>
               </Button>
             </div>
 
@@ -94,12 +96,12 @@ export function Hero({ metrics, featuredProduct }: HeroProps) {
               <div className="h-full w-full bg-gradient-to-br from-muted via-background to-muted" />
             )}
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end p-8">
-              <div className="bg-white/90 backdrop-blur-sm p-4 rounded-xl flex items-center gap-4 max-w-xs">
+              <div className="bg-card/90 backdrop-blur-sm p-4 rounded-xl flex items-center gap-4 max-w-xs border border-border/50 shadow-lg">
                 <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center text-primary">
                   <Sparkles className="h-6 w-6" />
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-black">{heroTitle}</p>
+                  <p className="text-sm font-bold text-card-foreground">{heroTitle}</p>
                   <p className="text-xs text-muted-foreground">{heroDescription}</p>
                 </div>
               </div>

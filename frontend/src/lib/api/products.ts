@@ -8,6 +8,18 @@ export type ProductInput = {
   description: string;
   price: number;
   category: string;
+  subCategory?: string;
+  size?: string;
+  color?: string;
+  gender?: string;
+  neckType?: string;
+  pattern?: string;
+  sizes?: string[];
+  colors?: string[];
+  genders?: string[];
+  neckTypes?: string[];
+  patterns?: string[];
+  variants?: { sku?: string; size?: string; color?: string; gender?: string; neckType?: string; pattern?: string; price?: number; stock: number }[];
   image?: string;
   images?: string[];
   galleryImages?: string[];
@@ -117,6 +129,12 @@ function toQueryString(params: Record<string, string | boolean | undefined>) {
 
 export async function getProductsFromBackend(filters?: {
   category?: string | null;
+  subCategory?: string | null;
+  size?: string | null;
+  color?: string | null;
+  gender?: string | null;
+  neckType?: string | null;
+  pattern?: string | null;
   search?: string;
   dealerId?: string;
   customizable?: boolean;
@@ -125,6 +143,12 @@ export async function getProductsFromBackend(filters?: {
 }): Promise<{ products: Product[]; pagination: { page: number; limit: number; total: number; pages: number } }> {
   const query = toQueryString({
     category: filters?.category || undefined,
+    subCategory: filters?.subCategory || undefined,
+    size: filters?.size || undefined,
+    color: filters?.color || undefined,
+    gender: filters?.gender || undefined,
+    neckType: filters?.neckType || undefined,
+    pattern: filters?.pattern || undefined,
     search: filters?.search || undefined,
     dealerId: filters?.dealerId,
     customizable: typeof filters?.customizable === "boolean" ? filters.customizable : undefined,
@@ -357,3 +381,129 @@ export async function deleteProductOnBackend(token: string, productId: string): 
   }
 }
 
+
+export type InventoryEntry = {
+  productId: string;
+  name: string;
+  sku: string;
+  variantLabel: string;
+  stock: number;
+  reorderPoint: number;
+  image: string;
+};
+
+export type InventoryReport = {
+  summary: {
+    totalProducts: number;
+    totalVariants: number;
+    totalUnits: number;
+    totalValue: number;
+    lowStockCount: number;
+    outOfStockCount: number;
+  };
+  lowStock: InventoryEntry[];
+  outOfStock: InventoryEntry[];
+};
+
+export async function getInventoryReportFromBackend(token: string): Promise<InventoryReport> {
+  const response = await fetch(`${API_BASE_URL}/products/admin/inventory`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await response.json();
+  if (!response.ok || !data?.success) {
+    throw new Error(data?.message || "Failed to load inventory report");
+  }
+  return {
+    summary: data.summary,
+    lowStock: data.lowStock || [],
+    outOfStock: data.outOfStock || [],
+  };
+}
+
+
+export type StockAdjustmentEntry = {
+  id: string;
+  productId: string;
+  productName: string;
+  variantSku: string;
+  type: string;
+  quantity: number;
+  previousStock: number;
+  newStock: number;
+  reason: string;
+  performedByEmail: string;
+  createdAt: string;
+};
+
+export async function adjustStockOnBackend(
+  token: string,
+  productId: string,
+  payload: { type: "add" | "remove" | "set"; quantity: number; variantSku?: string; reason?: string }
+): Promise<{ adjustment: StockAdjustmentEntry; product: Product }> {
+  const response = await fetch(`${API_BASE_URL}/products/${productId}/adjust-stock`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+  const data = await response.json();
+  if (!response.ok || !data?.success) {
+    throw new Error(data?.message || "Failed to adjust stock");
+  }
+  return { adjustment: data.adjustment as StockAdjustmentEntry, product: data.product as Product };
+}
+
+export async function getStockHistoryFromBackend(token: string, productId?: string): Promise<StockAdjustmentEntry[]> {
+  const query = productId ? `?productId=${encodeURIComponent(productId)}` : "";
+  const response = await fetch(`${API_BASE_URL}/products/admin/stock-history${query}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await response.json();
+  if (!response.ok || !data?.success) {
+    throw new Error(data?.message || "Failed to load stock history");
+  }
+  return (data.history || []) as StockAdjustmentEntry[];
+}
+
+export async function updateInventorySettingsOnBackend(
+  token: string,
+  productId: string,
+  payload: { reorderPoint?: number; variantReorderPoints?: Record<string, number> }
+): Promise<Product> {
+  const response = await fetch(`${API_BASE_URL}/products/${productId}/inventory-settings`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+  const data = await response.json();
+  if (!response.ok || !data?.success) {
+    throw new Error(data?.message || "Failed to update inventory settings");
+  }
+  return data.product as Product;
+}
+
+
+export async function exportInventoryCsvFromBackend(token: string): Promise<string> {
+  const response = await fetch(`${API_BASE_URL}/products/admin/inventory/export`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    throw new Error("Failed to export inventory");
+  }
+  return await response.text();
+}
+
+export async function importInventoryCsvToBackend(
+  token: string,
+  csv: string
+): Promise<{ updated: number; errors: string[] }> {
+  const response = await fetch(`${API_BASE_URL}/products/admin/inventory/import`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ csv }),
+  });
+  const data = await response.json();
+  if (!response.ok || !data?.success) {
+    throw new Error(data?.message || "Failed to import inventory");
+  }
+  return { updated: data.updated || 0, errors: data.errors || [] };
+}

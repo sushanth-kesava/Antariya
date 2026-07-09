@@ -7,12 +7,36 @@ export interface User {
   role: Role;
 }
 
+export interface ProductVariant {
+  sku?: string;
+  size?: string;
+  color?: string;
+  gender?: string;
+  neckType?: string;
+  pattern?: string;
+  price?: number;
+  stock: number;
+  reorderPoint?: number;
+}
+
 export interface Product {
   id: string;
   name: string;
   description: string;
   price: number;
   category: string;
+  subCategory?: string;
+  size?: string;
+  color?: string;
+  gender?: string;
+  neckType?: string;
+  pattern?: string;
+  sizes?: string[];
+  colors?: string[];
+  genders?: string[];
+  neckTypes?: string[];
+  patterns?: string[];
+  variants?: ProductVariant[];
   dealerId: string;
   dealerName?: string;
   dealerEmail?: string | null;

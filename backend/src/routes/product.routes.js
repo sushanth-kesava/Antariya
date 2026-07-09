@@ -13,6 +13,12 @@ const {
   updateReviewModeration,
   getReviewModerationActivity,
   getReviewEligibility,
+  getInventoryReport,
+  adjustStock,
+  getStockHistory,
+  updateInventorySettings,
+  exportInventoryCsv,
+  importInventoryCsv,
 } = require("../controllers/product.controller");
 const { requireAuth, requireRole } = require("../middleware/auth.middleware");
 
@@ -20,6 +26,12 @@ const router = express.Router();
 
 router.get("/", getProducts);
 router.get("/marketplace", getMarketplaceLayout);
+router.get("/admin/inventory", requireAuth, requireRole("admin", "superadmin"), getInventoryReport);
+router.get("/admin/stock-history", requireAuth, requireRole("admin", "superadmin"), getStockHistory);
+router.get("/admin/inventory/export", requireAuth, requireRole("admin", "superadmin"), exportInventoryCsv);
+router.post("/admin/inventory/import", requireAuth, requireRole("admin", "superadmin"), importInventoryCsv);
+router.post("/:id/adjust-stock", requireAuth, requireRole("admin", "superadmin"), adjustStock);
+router.patch("/:id/inventory-settings", requireAuth, requireRole("admin", "superadmin"), updateInventorySettings);
 router.get("/admin/reviews/activity", requireAuth, requireRole("admin", "superadmin"), getReviewModerationActivity);
 router.get("/admin/reviews", requireAuth, requireRole("admin", "superadmin"), getReviewModerationQueue);
 router.patch("/admin/reviews/:reviewId", requireAuth, requireRole("admin", "superadmin"), updateReviewModeration);

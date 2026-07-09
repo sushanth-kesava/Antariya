@@ -10,6 +10,15 @@ const orderItemSchema = new mongoose.Schema(
     image: { type: String, required: true },
     price: { type: Number, required: true, min: 0 },
     quantity: { type: Number, required: true, min: 1 },
+    variantSku: { type: String, default: "", trim: true },
+    variant: {
+      sku: { type: String, default: "", trim: true },
+      size: { type: String, default: "", trim: true },
+      color: { type: String, default: "", trim: true },
+      gender: { type: String, default: "", trim: true },
+      neckType: { type: String, default: "", trim: true },
+      pattern: { type: String, default: "", trim: true },
+    },
     customization: {
       symbol: { type: String, trim: true },
       threadColor: { type: String, trim: true },

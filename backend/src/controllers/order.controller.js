@@ -29,6 +29,17 @@ function normalizeOrder(order) {
       image: item.image,
       price: item.price,
       quantity: item.quantity,
+      variantSku: item.variantSku || "",
+      variant: item.variant && item.variant.sku
+        ? {
+            sku: item.variant.sku || "",
+            size: item.variant.size || "",
+            color: item.variant.color || "",
+            gender: item.variant.gender || "",
+            neckType: item.variant.neckType || "",
+            pattern: item.variant.pattern || "",
+          }
+        : undefined,
       customization: item.customization || undefined,
     })),
     subtotal: order.subtotal,
@@ -63,6 +74,17 @@ function normalizeOrderForDealer(order, dealerId) {
       image: item.image,
       price: item.price,
       quantity: item.quantity,
+      variantSku: item.variantSku || "",
+      variant: item.variant && item.variant.sku
+        ? {
+            sku: item.variant.sku || "",
+            size: item.variant.size || "",
+            color: item.variant.color || "",
+            gender: item.variant.gender || "",
+            neckType: item.variant.neckType || "",
+            pattern: item.variant.pattern || "",
+          }
+        : undefined,
       customization: item.customization || undefined,
     })),
     subtotal: scopedSubtotal,
@@ -119,10 +141,12 @@ async function createOrder(req, res, next) {
 
       const productId = String(item.productId);
       const quantity = Number(item.quantity);
+      const variantSku = item.variantSku ? String(item.variantSku).trim() : "";
       quantitiesByProductId.set(productId, (quantitiesByProductId.get(productId) || 0) + quantity);
       requestedItems.push({
         productId,
         quantity,
+        variantSku,
         customization: sanitizeCustomization(item.customization),
       });
     }
@@ -159,6 +183,28 @@ async function createOrder(req, res, next) {
       }
     }
 
+    // Variant-level stock validation: sum requested quantity per (productId, variantSku)
+    // and ensure the matching variant has enough stock.
+    const variantDemand = new Map();
+    for (const item of requestedItems) {
+      if (!item.variantSku) continue;
+      const mapKey = `${item.productId}::${item.variantSku}`;
+      variantDemand.set(mapKey, (variantDemand.get(mapKey) || 0) + item.quantity);
+    }
+    for (const [mapKey, demand] of variantDemand.entries()) {
+      const [productId, sku] = mapKey.split("::");
+      const product = productMap.get(productId);
+      const variant = Array.isArray(product?.variants)
+        ? product.variants.find((entry) => entry.sku === sku)
+        : null;
+      if (variant && Number(variant.stock) < demand) {
+        return res.status(409).json({
+          success: false,
+          message: `Insufficient stock for ${product.name} (${sku})`,
+        });
+      }
+    }
+
     for (const item of requestedItems) {
       const product = productMap.get(item.productId);
 
@@ -169,7 +215,14 @@ async function createOrder(req, res, next) {
         });
       }
 
-      const unitPriceINR = normalizeCatalogPriceToINR(product.price);
+      const matchedVariant = item.variantSku && Array.isArray(product.variants)
+        ? product.variants.find((entry) => entry.sku === item.variantSku)
+        : null;
+
+      const basePrice = matchedVariant && Number(matchedVariant.price) > 0
+        ? Number(matchedVariant.price)
+        : product.price;
+      const unitPriceINR = normalizeCatalogPriceToINR(basePrice);
 
       orderItems.push({
         productId: product._id,
@@ -180,6 +233,17 @@ async function createOrder(req, res, next) {
         image: product.image,
         price: unitPriceINR,
         quantity: item.quantity,
+        variantSku: matchedVariant ? matchedVariant.sku : "",
+        variant: matchedVariant
+          ? {
+              sku: matchedVariant.sku || "",
+              size: matchedVariant.size || "",
+              color: matchedVariant.color || "",
+              gender: matchedVariant.gender || "",
+              neckType: matchedVariant.neckType || "",
+              pattern: matchedVariant.pattern || "",
+            }
+          : undefined,
         customization: item.customization,
       });
 
@@ -191,11 +255,28 @@ async function createOrder(req, res, next) {
     const total = subtotal + shipping + tax;
 
     await Promise.all(
-      orderItems.map((item) =>
-        Product.findByIdAndUpdate(item.productId, {
-          $inc: { stock: -item.quantity },
-        })
-      )
+      orderItems.map((item) => {
+        const update = { $inc: { stock: -item.quantity } };
+        // If this line item is a specific variant, decrement that variant's stock too.
+        if (item.variantSku) {
+          return Product.updateOne(
+            { _id: item.productId, "variants.sku": item.variantSku },
+            {
+              $inc: {
+                stock: -item.quantity,
+                "variants.$.stock": -item.quantity,
+              },
+            }
+          ).then((result) => {
+            // If no variant matched (e.g. legacy product), still decrement product stock.
+            if (result.matchedCount === 0) {
+              return Product.findByIdAndUpdate(item.productId, update);
+            }
+            return result;
+          });
+        }
+        return Product.findByIdAndUpdate(item.productId, update);
+      })
     );
 
     const order = await Order.create({
@@ -414,6 +495,27 @@ async function updateAdminOrderStatus(req, res, next) {
           message: "You can update only orders that include your products",
         });
       }
+    }
+
+    // Restock when an order is newly cancelled (real IMS behavior).
+    const isNewlyCancelled = status === "Cancelled" && order.status !== "Cancelled";
+    if (isNewlyCancelled) {
+      await Promise.all(
+        order.items.map((item) => {
+          if (item.variantSku) {
+            return Product.updateOne(
+              { _id: item.productId, "variants.sku": item.variantSku },
+              { $inc: { stock: item.quantity, "variants.$.stock": item.quantity } }
+            ).then((result) => {
+              if (result.matchedCount === 0) {
+                return Product.findByIdAndUpdate(item.productId, { $inc: { stock: item.quantity } });
+              }
+              return result;
+            });
+          }
+          return Product.findByIdAndUpdate(item.productId, { $inc: { stock: item.quantity } });
+        })
+      );
     }
 
     const updatedOrder = await Order.findByIdAndUpdate(orderId, { status }, { new: true });

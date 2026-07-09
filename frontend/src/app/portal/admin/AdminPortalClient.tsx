@@ -31,6 +31,13 @@ import {
   createProductOnBackend,
   deleteProductOnBackend,
   getProductsFromBackend,
+  getInventoryReportFromBackend,
+  InventoryReport,
+  adjustStockOnBackend,
+  getStockHistoryFromBackend,
+  StockAdjustmentEntry,
+  exportInventoryCsvFromBackend,
+  importInventoryCsvToBackend,
   getReviewModerationActivityFromBackend,
   getReviewModerationQueueFromBackend,
   getMarketplaceLayoutFromBackend,
@@ -47,6 +54,8 @@ import {
 } from "@/lib/api/orders";
 import { getApiBaseUrl } from "@/lib/api/base-url";
 import { formatINR, formatIndianDate, formatIndianDateTime, normalizeCatalogPriceToINR } from "@/lib/india";
+import { PRODUCT_ATTRIBUTES } from "@/lib/categories";
+import { MultiSelectCreatable } from "@/components/multi-select-creatable";
 import { clearAuthSession, getPortalPathForRole, normalizeAppRole, persistAuthSession } from "@/lib/auth-session";
 import {
   Dialog,
@@ -83,6 +92,18 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
   const [loadingModerationActivity, setLoadingModerationActivity] = useState(false);
   const [moderationActivityError, setModerationActivityError] = useState<string | null>(null);
   const [dashboardData, setDashboardData] = useState<AdminDashboardPayload | null>(null);
+  const [inventory, setInventory] = useState<InventoryReport | null>(null);
+  const [loadingInventory, setLoadingInventory] = useState(false);
+  const [stockHistory, setStockHistory] = useState<StockAdjustmentEntry[]>([]);
+  const [adjustForm, setAdjustForm] = useState<{ productId: string; variantSku: string; type: "add" | "remove" | "set"; quantity: string; reason: string }>({
+    productId: "",
+    variantSku: "",
+    type: "add",
+    quantity: "",
+    reason: "",
+  });
+  const [adjusting, setAdjusting] = useState(false);
+  const [adjustMessage, setAdjustMessage] = useState<string | null>(null);
   const [loadingDashboard, setLoadingDashboard] = useState(false);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
   const [orderStatusFilter, setOrderStatusFilter] = useState<"all" | "Processing" | "Shipped" | "Delivered" | "Cancelled">("all");
@@ -102,11 +123,32 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
     name: "",
     description: "",
     price: "",
-    category: "",
     stock: "100",
     customizable: false,
     rating: "0",
   });
+
+  // Multi-select attribute values (Size/Color/Gender/Neck/Pattern) -> variant axes.
+  const [attrValues, setAttrValues] = useState<Record<string, string[]>>({
+    size: [],
+    color: [],
+    gender: [],
+    neckType: [],
+    pattern: [],
+  });
+
+  type VariantRow = {
+    key: string;
+    sku: string;
+    size: string;
+    color: string;
+    gender: string;
+    neckType: string;
+    pattern: string;
+    price: string;
+    stock: string;
+  };
+  const [variants, setVariants] = useState<VariantRow[]>([]);
 
   const selectedImagePreviews = useMemo(
     () => selectedImageFiles.map((file) => ({ file, previewUrl: URL.createObjectURL(file) })),
@@ -169,51 +211,74 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
 
         setAuthToken(sessionToken);
         setAdminUser(normalizedUser);
-        const [productsResponse, adminDashboard] = await Promise.all([
-          getProductsFromBackend({ dealerId: normalizedUser.id }),
-          getAdminDashboardFromBackend(sessionToken),
-        ]);
-        setCatalog(productsResponse.products);
-        setDashboardData(adminDashboard);
 
-        try {
-          const layout = await getMarketplaceLayoutFromBackend("admin");
-          if (layout.success && "categories" in layout) {
-            setMarketplaceCategories(layout.categories);
-            setFormData((current) => ({
-              ...current,
-              category: current.category || layout.categories[0] || "",
-            }));
-          }
-        } catch (layoutError) {
-          console.error("Failed to load marketplace categories", layoutError);
-          setMarketplaceCategories([]);
-        }
-
-        try {
-          setLoadingModeration(true);
-          const reviews = await getReviewModerationQueueFromBackend(sessionToken, { status: "pending" });
-          setModerationQueue(reviews);
-        } catch (moderationLoadError) {
-          console.error("Failed to preload moderation queue", moderationLoadError);
-          setModerationError("Moderation queue could not be loaded right now. You can retry below.");
-        } finally {
-          setLoadingModeration(false);
-        }
-
-        try {
-          setLoadingModerationActivity(true);
-          const activity = await getReviewModerationActivityFromBackend(sessionToken, 20);
-          setModerationActivity(activity);
-        } catch (activityLoadError) {
-          console.error("Failed to preload moderation activity", activityLoadError);
-          setModerationActivityError("Moderation activity could not be loaded right now.");
-        } finally {
-          setLoadingModerationActivity(false);
-        }
-
-        setLoadingCatalog(false);
+        // Unblock the page as soon as auth is confirmed. Essential data (products,
+        // dashboard) and secondary data (categories, moderation) load in the
+        // background so a single slow endpoint can no longer freeze the portal.
         setAuthChecked(true);
+
+        // Essential data — fills the dashboard/catalog, but does not gate the shell.
+        getProductsFromBackend({ dealerId: normalizedUser.id })
+          .then((productsResponse) => setCatalog(productsResponse.products))
+          .catch((productsError) => {
+            console.error("Failed to load catalog", productsError);
+          })
+          .finally(() => setLoadingCatalog(false));
+
+        setLoadingDashboard(true);
+        getAdminDashboardFromBackend(sessionToken)
+          .then((adminDashboard) => setDashboardData(adminDashboard))
+          .catch((dashboardLoadError) => {
+            console.error("Failed to load admin dashboard", dashboardLoadError);
+            setDashboardError("Dashboard data could not be loaded right now. Use Refresh to retry.");
+          })
+          .finally(() => setLoadingDashboard(false));
+
+        setLoadingInventory(true);
+        getInventoryReportFromBackend(sessionToken)
+          .then((report) => setInventory(report))
+          .catch((inventoryError) => console.error("Failed to load inventory", inventoryError))
+          .finally(() => setLoadingInventory(false));
+
+        getStockHistoryFromBackend(sessionToken)
+          .then((history) => setStockHistory(history))
+          .catch((historyError) => console.error("Failed to load stock history", historyError));
+
+        // Marketplace categories (background).
+        getMarketplaceLayoutFromBackend("admin")
+          .then((layout) => {
+            if (layout.success && "categories" in layout) {
+              setMarketplaceCategories(layout.categories);
+              setFormData((current) => ({
+                ...current,
+                category: current.category || layout.categories[0] || "",
+              }));
+            }
+          })
+          .catch((layoutError) => {
+            console.error("Failed to load marketplace categories", layoutError);
+            setMarketplaceCategories([]);
+          });
+
+        // Moderation queue (background — must not block the portal).
+        setLoadingModeration(true);
+        getReviewModerationQueueFromBackend(sessionToken, { status: "pending" })
+          .then((reviews) => setModerationQueue(reviews))
+          .catch((moderationLoadError) => {
+            console.error("Failed to preload moderation queue", moderationLoadError);
+            setModerationError("Moderation queue could not be loaded right now. You can retry below.");
+          })
+          .finally(() => setLoadingModeration(false));
+
+        // Moderation activity (background).
+        setLoadingModerationActivity(true);
+        getReviewModerationActivityFromBackend(sessionToken, 20)
+          .then((activity) => setModerationActivity(activity))
+          .catch((activityLoadError) => {
+            console.error("Failed to preload moderation activity", activityLoadError);
+            setModerationActivityError("Moderation activity could not be loaded right now.");
+          })
+          .finally(() => setLoadingModerationActivity(false));
       } catch {
         clearAuthSession();
         setLoadingCatalog(false);
@@ -242,6 +307,98 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
     } finally {
       setLoadingModeration(false);
     }
+  };
+
+  const loadInventory = async () => {
+    if (!authToken) return;
+    try {
+      setLoadingInventory(true);
+      const report = await getInventoryReportFromBackend(authToken);
+      setInventory(report);
+    } catch (err) {
+      console.error("Failed to load inventory", err);
+    } finally {
+      setLoadingInventory(false);
+    }
+  };
+
+  const loadStockHistory = async () => {
+    if (!authToken) return;
+    try {
+      const history = await getStockHistoryFromBackend(authToken);
+      setStockHistory(history);
+    } catch (err) {
+      console.error("Failed to load stock history", err);
+    }
+  };
+
+  const handleAdjustStock = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!authToken) return;
+    setAdjustMessage(null);
+    const quantity = parseInt(adjustForm.quantity, 10);
+    if (!adjustForm.productId) {
+      setAdjustMessage("Please select a product.");
+      return;
+    }
+    if (!Number.isFinite(quantity)) {
+      setAdjustMessage("Enter a valid quantity.");
+      return;
+    }
+    try {
+      setAdjusting(true);
+      const { product } = await adjustStockOnBackend(authToken, adjustForm.productId, {
+        type: adjustForm.type,
+        quantity,
+        variantSku: adjustForm.variantSku || undefined,
+        reason: adjustForm.reason || undefined,
+      });
+      // Reflect updated stock in the catalog list.
+      setCatalog((current) => current.map((item) => (item.id === product.id ? product : item)));
+      setAdjustForm((current) => ({ ...current, quantity: "", reason: "" }));
+      setAdjustMessage("Stock updated.");
+      void loadStockHistory();
+      void loadInventory();
+    } catch (err) {
+      setAdjustMessage(err instanceof Error ? err.message : "Failed to adjust stock.");
+    } finally {
+      setAdjusting(false);
+    }
+  };
+
+  const handleExportCsv = async () => {
+    if (!authToken) return;
+    try {
+      const csv = await exportInventoryCsvFromBackend(authToken);
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "antariya-inventory.csv";
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setAdjustMessage(err instanceof Error ? err.message : "Failed to export CSV.");
+    }
+  };
+
+  const handleImportCsv = (file: File | undefined) => {
+    if (!file || !authToken) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const csv = typeof reader.result === "string" ? reader.result : "";
+        const result = await importInventoryCsvToBackend(authToken, csv);
+        setAdjustMessage(`Imported ${result.updated} row(s).${result.errors.length ? ` ${result.errors.length} skipped.` : ""}`);
+        void loadInventory();
+        void loadStockHistory();
+        const productsResponse = await getProductsFromBackend({ dealerId: adminUser?.id });
+        setCatalog(productsResponse.products);
+      } catch (err) {
+        setAdjustMessage(err instanceof Error ? err.message : "Failed to import CSV.");
+      }
+    };
+    reader.readAsText(file);
   };
 
   const loadDashboard = async () => {
@@ -391,6 +548,130 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
     setSelectedImageFiles((current) => current.filter((_, idx) => idx !== index));
   };
 
+  // Cartesian product of the selected attribute axes -> one row per combination.
+  const generateVariants = () => {
+    const axes = PRODUCT_ATTRIBUTES.map((attr) => ({
+      key: attr.key,
+      values: attrValues[attr.key]?.length ? attrValues[attr.key] : [""],
+    }));
+
+    let combos: Record<string, string>[] = [{}];
+    for (const axis of axes) {
+      const next: Record<string, string>[] = [];
+      for (const combo of combos) {
+        for (const val of axis.values) {
+          next.push({ ...combo, [axis.key]: val });
+        }
+      }
+      combos = next;
+    }
+
+    // Preserve existing values for combos that already exist.
+    const existingByKey = new Map(variants.map((row) => [row.key, row]));
+
+    const skuBase = (formData.name || "SKU")
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 12) || "SKU";
+
+    const rows: VariantRow[] = combos.map((combo) => {
+      const key = ["size", "color", "gender", "neckType", "pattern"].map((k) => combo[k] || "").join("|");
+      const existing = existingByKey.get(key);
+      const skuSuffix = [combo.size, combo.color, combo.gender, combo.neckType, combo.pattern]
+        .filter(Boolean)
+        .map((part) => String(part).toUpperCase().replace(/[^A-Z0-9]+/g, "").slice(0, 4))
+        .join("-");
+      return {
+        key,
+        sku: existing?.sku || (skuSuffix ? `${skuBase}-${skuSuffix}` : skuBase),
+        size: combo.size || "",
+        color: combo.color || "",
+        gender: combo.gender || "",
+        neckType: combo.neckType || "",
+        pattern: combo.pattern || "",
+        price: existing?.price ?? (formData.price || ""),
+        stock: existing?.stock ?? "0",
+      };
+    });
+
+    setVariants(rows);
+  };
+
+  const updateVariantField = (key: string, field: "sku" | "price" | "stock", value: string) => {
+    setVariants((current) => current.map((row) => (row.key === key ? { ...row, [field]: value } : row)));
+  };
+
+  const totalVariantStock = variants.reduce((sum, row) => sum + (parseInt(row.stock, 10) || 0), 0);
+
+  const selectedAxisCount = PRODUCT_ATTRIBUTES.reduce(
+    (product, attr) => product * (attrValues[attr.key]?.length || 1),
+    1
+  );
+
+  // Compress an image in the browser so it fits under the backend's 50MB limit.
+  // Downscales to a max dimension and re-encodes as JPEG, stepping quality down
+  // until the file is under the target size. Returns the original if it's already small.
+  const MAX_UPLOAD_BYTES = 50 * 1024 * 1024; // must match backend MAX_PRODUCT_IMAGE_SIZE_BYTES
+  const COMPRESS_TARGET_BYTES = 45 * 1024 * 1024; // aim comfortably under the limit
+
+  const compressImage = (file: File): Promise<File> =>
+    new Promise((resolve) => {
+      // Skip tiny files and non-raster types (e.g. SVG) — return as-is.
+      if (file.size <= COMPRESS_TARGET_BYTES || !file.type.startsWith("image/") || file.type === "image/svg+xml") {
+        resolve(file);
+        return;
+      }
+
+      const url = URL.createObjectURL(file);
+      const img = new window.Image();
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const maxDimension = 2000;
+        let { width, height } = img;
+        if (width > maxDimension || height > maxDimension) {
+          const scale = Math.min(maxDimension / width, maxDimension / height);
+          width = Math.round(width * scale);
+          height = Math.round(height * scale);
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          resolve(file);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const tryQuality = (quality: number) => {
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) {
+                resolve(file);
+                return;
+              }
+              if (blob.size <= MAX_UPLOAD_BYTES || quality <= 0.4) {
+                const newName = file.name.replace(/\.[^.]+$/, "") + ".jpg";
+                resolve(new File([blob], newName, { type: "image/jpeg", lastModified: Date.now() }));
+              } else {
+                tryQuality(quality - 0.15);
+              }
+            },
+            "image/jpeg",
+            quality
+          );
+        };
+        tryQuality(0.85);
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve(file);
+      };
+      img.src = url;
+    });
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -404,7 +685,17 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
     setSuccess(false);
 
     try {
-      const uploadedImages = await uploadProductImagesToBackend(authToken, selectedImageFiles);
+      // Compress large images client-side so they fit under the 50MB backend limit.
+      const preparedImages = await Promise.all(selectedImageFiles.map((file) => compressImage(file)));
+
+      const stillTooLarge = preparedImages.find((file) => file.size > MAX_UPLOAD_BYTES);
+      if (stillTooLarge) {
+        setError(`"${stillTooLarge.name}" is still larger than 50MB after compression. Please use a smaller image.`);
+        setLoading(false);
+        return;
+      }
+
+      const uploadedImages = await uploadProductImagesToBackend(authToken, preparedImages);
 
       if (uploadedImages.length === 0) {
         throw new Error("Image upload failed. Please try again.");
@@ -416,8 +707,24 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
         price: parseFloat(formData.price),
         image: uploadedImages[0],
         images: uploadedImages,
-        category: formData.category,
-        stock: parseInt(formData.stock, 10),
+        sizes: attrValues.size,
+        colors: attrValues.color,
+        genders: attrValues.gender,
+        neckTypes: attrValues.neckType,
+        patterns: attrValues.pattern,
+        variants: variants.map((row) => ({
+          sku: row.sku,
+          size: row.size,
+          color: row.color,
+          gender: row.gender,
+          neckType: row.neckType,
+          pattern: row.pattern,
+          price: parseFloat(row.price) || 0,
+          stock: parseInt(row.stock, 10) || 0,
+        })),
+        stock: variants.length > 0
+          ? variants.reduce((sum, row) => sum + (parseInt(row.stock, 10) || 0), 0)
+          : parseInt(formData.stock, 10),
         customizable: formData.customizable,
         rating: parseFloat(formData.rating),
       });
@@ -430,13 +737,14 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
         name: "",
         description: "",
         price: "",
-        category: formData.category,
         stock: "100",
         customizable: false,
         rating: "0",
       });
       setSelectedImageFiles([]);
-      
+      setAttrValues({ size: [], color: [], gender: [], neckType: [], pattern: [] });
+      setVariants([]);
+
       setTimeout(() => setSuccess(false), 5000);
     } catch (err: any) {
       console.error("Error adding product:", err);
@@ -526,7 +834,7 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
         </aside>
 
         {/* Main Content Area */}
-        <main className="flex-1 max-w-3xl">
+        <main className="flex-1 max-w-5xl">
           {activeView === "operations-overview" ? (
           <div>
             <h2 className="text-2xl font-bold font-headline tracking-tight text-gray-900 mb-4">Operations Overview</h2>
@@ -588,6 +896,180 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
                       {dashboardData?.summary.lowStockProducts || 0} low stock, {dashboardData?.summary.pendingReviews || 0} pending reviews
                     </p>
                   </div>
+                </div>
+
+                {/* Inventory Snapshot */}
+                <div className="rounded-2xl border border-border bg-card p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <p className="text-sm font-bold">Inventory Snapshot</p>
+                      <p className="text-xs text-muted-foreground">Stock on hand, value, and low-stock alerts.</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button type="button" variant="outline" className="h-9 rounded-xl" onClick={handleExportCsv}>
+                        Export CSV
+                      </Button>
+                      <label className="h-9 rounded-xl border border-border bg-background px-3 flex items-center text-sm font-medium cursor-pointer hover:bg-muted">
+                        Import CSV
+                        <input
+                          type="file"
+                          accept=".csv,text/csv"
+                          className="hidden"
+                          onChange={(e) => { handleImportCsv(e.target.files?.[0]); e.currentTarget.value = ""; }}
+                        />
+                      </label>
+                      <Button type="button" variant="secondary" className="h-9 rounded-xl" onClick={() => loadInventory()} disabled={loadingInventory}>
+                        {loadingInventory ? <Loader2 className="h-4 w-4 animate-spin" /> : "Refresh"}
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                    <div className="rounded-xl border border-border bg-muted/40 p-3">
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">On Hand</p>
+                      <p className="text-xl font-black mt-1">{inventory?.summary.totalUnits ?? 0}</p>
+                      <p className="text-[11px] text-muted-foreground">units</p>
+                    </div>
+                    <div className="rounded-xl border border-border bg-muted/40 p-3">
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Inventory Value</p>
+                      <p className="text-xl font-black mt-1">{formatINR(Number(inventory?.summary.totalValue || 0))}</p>
+                    </div>
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+                      <p className="text-[11px] uppercase tracking-wide text-amber-700 font-semibold">Low Stock</p>
+                      <p className="text-xl font-black mt-1 text-amber-800">{inventory?.summary.lowStockCount ?? 0}</p>
+                    </div>
+                    <div className="rounded-xl border border-rose-200 bg-rose-50 p-3">
+                      <p className="text-[11px] uppercase tracking-wide text-rose-700 font-semibold">Out of Stock</p>
+                      <p className="text-xl font-black mt-1 text-rose-800">{inventory?.summary.outOfStockCount ?? 0}</p>
+                    </div>
+                  </div>
+
+                  {inventory && (inventory.lowStock.length > 0 || inventory.outOfStock.length > 0) ? (
+                    <div className="space-y-2 max-h-64 overflow-auto">
+                      {[...inventory.outOfStock, ...inventory.lowStock].map((entry, idx) => (
+                        <div key={`${entry.productId}-${entry.sku}-${idx}`} className="flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2">
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold truncate">{entry.name}</p>
+                            <p className="text-xs text-muted-foreground truncate">
+                              {entry.sku ? entry.sku : "No variant"}{entry.variantLabel ? ` · ${entry.variantLabel}` : ""}
+                            </p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className={`text-sm font-bold ${entry.stock <= 0 ? "text-rose-600" : "text-amber-600"}`}>
+                              {entry.stock <= 0 ? "Out of stock" : `${entry.stock} left`}
+                            </p>
+                            <p className="text-[11px] text-muted-foreground">reorder at {entry.reorderPoint}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">{loadingInventory ? "Loading inventory…" : "All stock levels are healthy."}</p>
+                  )}
+                </div>
+
+                {/* Stock Management */}
+                <div className="rounded-2xl border border-border bg-card p-4">
+                  <p className="text-sm font-bold mb-1">Stock Management</p>
+                  <p className="text-xs text-muted-foreground mb-3">Manually add, remove, or set stock. Every change is logged below.</p>
+
+                  <form onSubmit={handleAdjustStock} className="grid grid-cols-1 md:grid-cols-6 gap-2 items-end">
+                    <div className="md:col-span-2">
+                      <label className="block text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Product</label>
+                      <select
+                        title="Product"
+                        aria-label="Product"
+                        value={adjustForm.productId}
+                        onChange={(e) => setAdjustForm((c) => ({ ...c, productId: e.target.value, variantSku: "" }))}
+                        className="w-full h-10 rounded-xl border border-border bg-background px-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+                      >
+                        <option value="">Select…</option>
+                        {catalog.map((product) => (
+                          <option key={product.id} value={product.id}>{product.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Variant</label>
+                      <select
+                        title="Variant"
+                        aria-label="Variant"
+                        value={adjustForm.variantSku}
+                        onChange={(e) => setAdjustForm((c) => ({ ...c, variantSku: e.target.value }))}
+                        className="w-full h-10 rounded-xl border border-border bg-background px-2 text-sm outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
+                        disabled={!adjustForm.productId}
+                      >
+                        <option value="">Whole product</option>
+                        {(catalog.find((p) => p.id === adjustForm.productId)?.variants || []).map((v) => (
+                          <option key={v.sku} value={v.sku}>{v.sku || [v.size, v.color].filter(Boolean).join(" ")}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Action</label>
+                      <select
+                        title="Action"
+                        aria-label="Action"
+                        value={adjustForm.type}
+                        onChange={(e) => setAdjustForm((c) => ({ ...c, type: e.target.value as "add" | "remove" | "set" }))}
+                        className="w-full h-10 rounded-xl border border-border bg-background px-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+                      >
+                        <option value="add">Add</option>
+                        <option value="remove">Remove</option>
+                        <option value="set">Set to</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Qty</label>
+                      <Input
+                        type="number"
+                        value={adjustForm.quantity}
+                        onChange={(e) => setAdjustForm((c) => ({ ...c, quantity: e.target.value }))}
+                        className="h-10 rounded-xl border-border bg-background text-sm"
+                      />
+                    </div>
+                    <div className="md:col-span-6 grid grid-cols-1 md:grid-cols-6 gap-2 items-end">
+                      <div className="md:col-span-5">
+                        <label className="block text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Reason (optional)</label>
+                        <Input
+                          value={adjustForm.reason}
+                          onChange={(e) => setAdjustForm((c) => ({ ...c, reason: e.target.value }))}
+                          placeholder="e.g. New shipment received, damaged units removed…"
+                          className="h-10 rounded-xl border-border bg-background text-sm"
+                        />
+                      </div>
+                      <Button type="submit" disabled={adjusting} className="h-10 rounded-xl">
+                        {adjusting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Apply"}
+                      </Button>
+                    </div>
+                  </form>
+                  {adjustMessage && <p className="mt-2 text-xs text-muted-foreground">{adjustMessage}</p>}
+
+                  {stockHistory.length > 0 && (
+                    <div className="mt-4">
+                      <p className="text-xs font-semibold text-muted-foreground mb-2">Recent stock changes</p>
+                      <div className="max-h-56 overflow-auto divide-y divide-border rounded-xl border border-border">
+                        {stockHistory.slice(0, 20).map((entry) => (
+                          <div key={entry.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                            <div className="min-w-0">
+                              <p className="font-medium truncate">
+                                {entry.productName}{entry.variantSku ? ` · ${entry.variantSku}` : ""}
+                              </p>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {entry.type} · {entry.reason || "no reason"} · {entry.performedByEmail}
+                              </p>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <p className={`text-sm font-bold ${entry.quantity >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                                {entry.quantity >= 0 ? "+" : ""}{entry.quantity}
+                              </p>
+                              <p className="text-[11px] text-muted-foreground">{entry.previousStock} → {entry.newStock}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
@@ -860,26 +1342,97 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2">Marketplace Category <span className="text-red-500">*</span></label>
-                    <select 
-                      title="Marketplace Category"
-                      aria-label="Marketplace Category"
-                      className="w-full h-12 rounded-xl border-gray-200 bg-gray-50 focus:bg-white px-4 text-base font-medium outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                      value={formData.category}
-                      onChange={e => setFormData({...formData, category: e.target.value})}
-                      disabled={marketplaceCategories.length === 0}
-                    >
-                      {marketplaceCategories.length === 0 ? (
-                        <option value="">Loading categories from backend...</option>
-                      ) : marketplaceCategories.map(cat => (
-                        <option key={cat} value={cat}>{cat}</option>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">Product Attributes &amp; Variants</label>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      Select multiple values per attribute (or type your own, e.g. a custom color). Then generate the variant matrix and set stock per combination.
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {PRODUCT_ATTRIBUTES.map((attr) => (
+                        <MultiSelectCreatable
+                          key={attr.key}
+                          label={attr.label}
+                          options={attr.options}
+                          value={attrValues[attr.key] || []}
+                          onChange={(next) => setAttrValues((current) => ({ ...current, [attr.key]: next }))}
+                        />
                       ))}
-                    </select>
-                    {marketplaceCategories.length === 0 ? (
-                      <p className="mt-2 text-xs text-gray-500">
-                        If this stays empty, the backend catalog has not loaded yet. Refresh after the backend is available.
-                      </p>
-                    ) : null}
+                    </div>
+
+                    {/* Variant generator */}
+                    <div className="mt-4 flex items-center justify-between gap-3 flex-wrap">
+                      <div className="text-xs text-muted-foreground">
+                        {selectedAxisCount > 1 ? (
+                          <span>This will create <span className="font-bold text-foreground">{selectedAxisCount}</span> variant{selectedAxisCount === 1 ? "" : "s"}.</span>
+                        ) : (
+                          <span>Select attribute values above to build variants.</span>
+                        )}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="h-10 rounded-xl"
+                        onClick={generateVariants}
+                        disabled={selectedAxisCount <= 1}
+                      >
+                        Generate {selectedAxisCount} Variant{selectedAxisCount === 1 ? "" : "s"}
+                      </Button>
+                    </div>
+
+                    {variants.length > 0 && (
+                      <div className="mt-4 rounded-2xl border border-border overflow-hidden">
+                        <div className="flex items-center justify-between px-4 py-2 bg-muted/50 border-b border-border">
+                          <p className="text-sm font-semibold">Variants ({variants.length})</p>
+                          <p className="text-xs text-muted-foreground">Total stock: <span className="font-bold text-foreground">{totalVariantStock}</span></p>
+                        </div>
+                        <div className="max-h-[36rem] overflow-auto divide-y divide-border">
+                          {variants.map((row) => {
+                            const labelParts = [row.size, row.color, row.gender, row.neckType, row.pattern].filter(Boolean);
+                            return (
+                              <div key={row.key} className="px-4 py-3 space-y-2">
+                                <div className="flex flex-wrap gap-1.5">
+                                  {labelParts.length > 0 ? labelParts.map((part, idx) => (
+                                    <span key={idx} className="inline-flex items-center rounded-lg bg-muted px-2 py-0.5 text-xs font-medium">{part}</span>
+                                  )) : (
+                                    <span className="text-xs text-muted-foreground">Default</span>
+                                  )}
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px_120px] gap-2">
+                                  <div>
+                                    <label className="block text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">SKU</label>
+                                    <Input
+                                      value={row.sku}
+                                      onChange={(e) => updateVariantField(row.key, "sku", e.target.value)}
+                                      className="h-9 rounded-lg border-border bg-background text-sm font-mono"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Price (₹)</label>
+                                    <Input
+                                      type="number"
+                                      min={0}
+                                      step="0.01"
+                                      value={row.price}
+                                      onChange={(e) => updateVariantField(row.key, "price", e.target.value)}
+                                      className="h-9 rounded-lg border-border bg-background text-sm"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Stock</label>
+                                    <Input
+                                      type="number"
+                                      min={0}
+                                      value={row.stock}
+                                      onChange={(e) => updateVariantField(row.key, "stock", e.target.value)}
+                                      className="h-9 rounded-lg border-border bg-background text-sm"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 

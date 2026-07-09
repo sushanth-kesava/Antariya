@@ -42,7 +42,7 @@ import {
   ReviewEligibility,
   ProductReviewTag,
 } from "@/lib/api/products";
-import { addProductToCart, ProductCustomization } from "@/lib/cart";
+import { addProductToCart, ProductCustomization, CartVariant } from "@/lib/cart";
 import { checkDeliveryByPincode } from "@/lib/api/delivery";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -246,6 +246,7 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
   const [visualizedImg, setVisualizedImg] = useState<string | null>(null);
   const [openCustomizer, setOpenCustomizer] = useState(false);
   const [quantity, setQuantity] = useState(1);
+  const [selectedVariantSku, setSelectedVariantSku] = useState<string>("");
   const [referencePreview, setReferencePreview] = useState<string | null>(null);
   const [referenceFileName, setReferenceFileName] = useState<string | null>(null);
   const [deliveryPincode, setDeliveryPincode] = useState("");
@@ -482,13 +483,41 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
     reader.readAsDataURL(file);
   };
 
+  const productVariants = product?.variants || [];
+  const hasVariants = productVariants.length > 0;
+
+  const resolveSelectedVariant = (): CartVariant | undefined => {
+    if (!hasVariants || !selectedVariantSku) return undefined;
+    const match = productVariants.find((entry) => entry.sku === selectedVariantSku);
+    if (!match) return undefined;
+    return {
+      sku: match.sku || "",
+      size: match.size || "",
+      color: match.color || "",
+      gender: match.gender || "",
+      neckType: match.neckType || "",
+      pattern: match.pattern || "",
+    };
+  };
+
+  const requireVariantSelected = (): boolean => {
+    if (hasVariants && !selectedVariantSku) {
+      toast({
+        title: "Select an option",
+        description: "Please choose a variant before adding to cart.",
+      });
+      return false;
+    }
+    return true;
+  };
+
   const handleAddCustomizedItem = () => {
     if (!product) return;
 
     addProductToCart(product, quantity, {
       ...customization,
       notes: customization.notes?.trim() || undefined,
-    });
+    }, resolveSelectedVariant());
     setOpenCustomizer(false);
     setQuantity(1);
     setReferencePreview(null);
@@ -501,8 +530,9 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
 
   const handleAddToCart = () => {
     if (!product) return;
+    if (!requireVariantSelected()) return;
 
-    addProductToCart(product, 1);
+    addProductToCart(product, 1, undefined, resolveSelectedVariant());
     toast({
       title: "Added to cart",
       description: `${product.name} has been added.`,
@@ -545,8 +575,9 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
 
   const handleBuyNow = () => {
     if (!product) return;
+    if (!requireVariantSelected()) return;
 
-    addProductToCart(product, 1);
+    addProductToCart(product, 1, undefined, resolveSelectedVariant());
     router.push("/cart");
   };
 
@@ -874,7 +905,7 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
                 src={displayImage} 
                 alt={product.name} 
                 fill 
-                className="object-cover"
+                className="object-contain p-2"
               />
               </div>
               {visualizedImg && (
@@ -942,6 +973,47 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
                 <p className="text-xs text-slate-600">Dealer contact: {sellerEmail}</p>
               </div>
             </div>
+
+            {hasVariants && (
+              <div className="p-5 rounded-3xl bg-card border border-border/50 shadow-sm space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-bold">Choose a variant</p>
+                  {selectedVariantSku && (
+                    <span className="text-xs text-muted-foreground">Selected: <span className="font-semibold text-foreground">{selectedVariantSku}</span></span>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {productVariants.map((variant) => {
+                    const parts = [variant.size, variant.color, variant.gender, variant.neckType, variant.pattern].filter(Boolean);
+                    const outOfStock = Number(variant.stock) <= 0;
+                    const active = selectedVariantSku === variant.sku;
+                    return (
+                      <button
+                        key={variant.sku}
+                        type="button"
+                        disabled={outOfStock}
+                        onClick={() => setSelectedVariantSku(active ? "" : (variant.sku || ""))}
+                        className={`px-3 py-2 rounded-xl border text-sm font-medium transition-all text-left ${
+                          active
+                            ? "border-primary bg-primary/10 text-primary"
+                            : outOfStock
+                            ? "border-border/50 bg-muted/40 text-muted-foreground line-through cursor-not-allowed opacity-60"
+                            : "border-border hover:border-primary/50 hover:bg-primary/5"
+                        }`}
+                      >
+                        <span>{parts.length > 0 ? parts.join(" · ") : (variant.sku || "Variant")}</span>
+                        {typeof variant.price === "number" && variant.price > 0 && (
+                          <span className="block text-xs text-muted-foreground">{formatINR(variant.price)}</span>
+                        )}
+                        <span className={`block text-[11px] ${outOfStock ? "text-destructive" : "text-muted-foreground"}`}>
+                          {outOfStock ? "Out of stock" : `${variant.stock} in stock`}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             <div className="p-6 rounded-3xl bg-card border border-border/50 shadow-sm space-y-6">
               <div className="flex flex-col sm:flex-row gap-4">
