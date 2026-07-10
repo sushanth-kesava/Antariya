@@ -1,8 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Sparkles } from "lucide-react";
 import Link from "next/link";
-import Image from "next/image";
 import type { Product } from "@/app/lib/mock-data";
+import { LiveProductScroller } from "@/components/live-product-scroller";
 
 type HeroMetrics = {
   products: number;
@@ -21,12 +21,6 @@ function formatMetric(value: number) {
 }
 
 export function Hero({ metrics, featuredProduct }: HeroProps) {
-  const heroImage = featuredProduct?.image;
-  const heroTitle = featuredProduct?.name || "Live catalog highlight";
-  const heroDescription = featuredProduct
-    ? `${featuredProduct.category} · ${featuredProduct.dealerName || "Verified dealer"}`
-    : "Live catalog content will appear here once products load.";
-
   return (
     <div id="hero" className="relative overflow-hidden bg-background pt-16 pb-24 lg:pt-32 lg:pb-40">
       <div className="absolute inset-0 z-0 indian-motif-bg opacity-10" />
@@ -44,7 +38,7 @@ export function Hero({ metrics, featuredProduct }: HeroProps) {
             </h1>
             
             <p className="text-xl text-muted-foreground max-w-xl leading-relaxed">
-              Discover premium embroidery designs, industrial threads, and professional machine accessories. From traditional motifs to modern patterns, find everything your machine needs.
+              Discover premium streetwear crafted for those who value quality, comfort, and individuality. From bold graphic prints to timeless essentials, Antariya delivers apparel that blends modern style with everyday confidence.
             </p>
             
             <div className="flex flex-wrap gap-4 pt-4">
@@ -83,29 +77,8 @@ export function Hero({ metrics, featuredProduct }: HeroProps) {
             </div>
           </div>
           
-          <div className="flex-1 relative w-full aspect-[4/3] rounded-2xl overflow-hidden shadow-2xl animate-fade-in [animation-delay:200ms]">
-            {heroImage ? (
-              <Image
-                src={heroImage}
-                alt={heroTitle}
-                fill
-                className="object-cover"
-                priority
-              />
-            ) : (
-              <div className="h-full w-full bg-gradient-to-br from-muted via-background to-muted" />
-            )}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end p-8">
-              <div className="bg-card/90 backdrop-blur-sm p-4 rounded-xl flex items-center gap-4 max-w-xs border border-border/50 shadow-lg">
-                <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center text-primary">
-                  <Sparkles className="h-6 w-6" />
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-card-foreground">{heroTitle}</p>
-                  <p className="text-xs text-muted-foreground">{heroDescription}</p>
-                </div>
-              </div>
-            </div>
+          <div className="flex-1 relative w-full aspect-[4/3] rounded-2xl overflow-hidden shadow-2xl border border-border/50 animate-fade-in [animation-delay:200ms]">
+            <LiveProductScroller initialProducts={featuredProduct ? [featuredProduct] : []} />
           </div>
         </div>
       </div>

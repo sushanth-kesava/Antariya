@@ -14,9 +14,13 @@ const wishlistRoutes = require("./routes/wishlist.routes");
 const waitlistRoutes = require("./routes/waitlist.routes");
 const statsRoutes = require("./routes/stats.routes");
 const paymentRoutes = require("./routes/payment.routes");
-const odooProductRoutes = require("./routes/odoo-products.routes");
 const customerProfileRoutes = require("./routes/customerProfile.routes");
+const inventoryRoutes = require("./routes/inventory.routes");
 const { notFound, errorHandler } = require("./middleware/error.middleware");
+const { attachRealtime } = require("./services/realtime.service");
+const { startInventoryJobs } = require("./services/inventory.jobs");
+const { ensureDefaultWarehouse } = require("./services/inventory.service");
+const http = require("http");
 
 const app = express();
 
@@ -72,8 +76,8 @@ app.use("/api/wishlist", wishlistRoutes);
 app.use("/api/waitlist", waitlistRoutes);
 app.use("/api/stats", statsRoutes);
 app.use("/api", paymentRoutes);
-app.use("/api/odoo/products", odooProductRoutes);
 app.use("/api/customer", customerProfileRoutes);
+app.use("/api/inventory", inventoryRoutes);
 app.use(notFound);
 app.use(errorHandler);
 
@@ -81,9 +85,21 @@ async function startServer() {
   try {
     await connectDb(env.mongoUri);
 
-    app.listen(env.port, () => {
+    // Guarantee the DEFAULT warehouse exists before serving traffic, so the
+    // inventory system never needs a manual migration to function.
+    await ensureDefaultWarehouse();
+
+    const httpServer = http.createServer(app);
+
+    // Attach the real-time layer (no-op if socket.io isn't installed yet).
+    attachRealtime(httpServer, { allowedOrigins });
+
+    httpServer.listen(env.port, () => {
       console.log(`Server Started on port ${env.port}`);
     });
+
+    // Start inventory background jobs (expiry sweeper, verification, low-stock).
+    startInventoryJobs();
   } catch (error) {
     console.error("Failed to start backend:", error.message);
     process.exit(1);

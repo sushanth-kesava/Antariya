@@ -3,12 +3,23 @@ const Order = require("../models/Order");
 const User = require("../models/User");
 const Review = require("../models/Review");
 const WishlistItem = require("../models/WishlistItem");
+const CustomerProfile = require("../models/CustomerProfile");
+const { isValidRazorpaySignature, isRazorpayConfigured } = require("./payment.controller");
+const { sendOrderInvoiceEmail } = require("../services/mail.service");
+const {
+  reserveForOrder,
+  releaseForOrder,
+  commitForOrder,
+} = require("../services/inventory.service");
 
 const INDIA_FREE_SHIPPING_THRESHOLD = 1499;
 const INDIA_STANDARD_SHIPPING = 99;
 // GST set to 0 — business is not GST-registered (no GSTIN).
 const INDIA_GST_RATE = 0;
 const LEGACY_USD_TO_INR_RATE = 83;
+// Minutes an unpaid online order holds its reserved stock before the expiry
+// sweeper releases it back to available.
+const ORDER_HOLD_MINUTES = Number(process.env.ORDER_HOLD_MINUTES || 30);
 
 function normalizeCatalogPriceToINR(price) {
   const value = Number(price || 0);
@@ -48,6 +59,9 @@ function normalizeOrder(order) {
     tax: order.tax,
     total: order.total,
     status: order.status,
+    paymentMethod: order.paymentMethod,
+    paymentStatus: order.paymentStatus,
+    razorpayPaymentId: order.razorpayPaymentId || "",
     createdAt: order.createdAt,
   };
 }
@@ -93,6 +107,9 @@ function normalizeOrderForDealer(order, dealerId) {
     tax: scopedTax,
     total: scopedTotal,
     status: order.status,
+    paymentMethod: order.paymentMethod,
+    paymentStatus: order.paymentStatus,
+    razorpayPaymentId: order.razorpayPaymentId || "",
     createdAt: order.createdAt,
   };
 }
@@ -128,6 +145,40 @@ async function createOrder(req, res, next) {
         message: "Order items are required",
       });
     }
+
+    // --- Payment method + verification gate -------------------------------
+    // An order must never be persisted without a valid payment. For online
+    // (UPI/card/netbanking) payments we re-verify the Razorpay signature
+    // server-side; only Cash-on-Delivery may skip a payment id.
+    const rawMethod = String(req.body?.paymentMethod || "").toLowerCase();
+    const paymentMethod = rawMethod === "cod" ? "cod" : "upi";
+    const razorpayOrderId = String(req.body?.razorpay_order_id || "").trim();
+    const razorpayPaymentId = String(req.body?.razorpay_payment_id || "").trim();
+    const razorpaySignature = String(req.body?.razorpay_signature || "").trim();
+    let paymentStatus = "pending";
+
+    if (paymentMethod === "upi") {
+      if (!isRazorpayConfigured()) {
+        return res.status(500).json({
+          success: false,
+          message: "Online payments are not configured",
+        });
+      }
+      if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
+        return res.status(400).json({
+          success: false,
+          message: "Payment verification details are required for online payment",
+        });
+      }
+      if (!isValidRazorpaySignature({ razorpayOrderId, razorpayPaymentId, razorpaySignature })) {
+        return res.status(400).json({
+          success: false,
+          message: "Payment could not be verified. Order was not created.",
+        });
+      }
+      paymentStatus = "paid";
+    }
+    // --------------------------------------------------------------------
 
     const quantitiesByProductId = new Map();
     const requestedItems = [];
@@ -255,31 +306,11 @@ async function createOrder(req, res, next) {
     const tax = subtotal * INDIA_GST_RATE;
     const total = subtotal + shipping + tax;
 
-    await Promise.all(
-      orderItems.map((item) => {
-        const update = { $inc: { stock: -item.quantity } };
-        // If this line item is a specific variant, decrement that variant's stock too.
-        if (item.variantSku) {
-          return Product.updateOne(
-            { _id: item.productId, "variants.sku": item.variantSku },
-            {
-              $inc: {
-                stock: -item.quantity,
-                "variants.$.stock": -item.quantity,
-              },
-            }
-          ).then((result) => {
-            // If no variant matched (e.g. legacy product), still decrement product stock.
-            if (result.matchedCount === 0) {
-              return Product.findByIdAndUpdate(item.productId, update);
-            }
-            return result;
-          });
-        }
-        return Product.findByIdAndUpdate(item.productId, update);
-      })
-    );
-
+    // Persist the order first (status Processing), then atomically reserve
+    // stock via the inventory service. Reservation is the ONLY thing that
+    // touches physical stock, inside an ACID transaction with row guards that
+    // prevent overselling. If it fails, we roll the order back so no orphan
+    // order is left behind.
     const order = await Order.create({
       userId: req.auth.sub,
       userEmail: req.auth.email,
@@ -290,7 +321,70 @@ async function createOrder(req, res, next) {
       tax,
       total,
       status: "Processing",
+      paymentMethod,
+      paymentStatus,
+      razorpayOrderId: paymentMethod === "upi" ? razorpayOrderId : "",
+      razorpayPaymentId: paymentMethod === "upi" ? razorpayPaymentId : "",
     });
+
+    // Unpaid online (UPI) orders get a hold the expiry sweeper releases if
+    // payment never completes. Paid orders and COD do not auto-expire.
+    const shouldExpire = paymentMethod === "upi" && paymentStatus !== "paid";
+    const expiresAt = shouldExpire ? new Date(Date.now() + ORDER_HOLD_MINUTES * 60 * 1000) : null;
+
+    try {
+      await reserveForOrder({
+        orderId: order._id,
+        lines: orderItems.map((item) => ({
+          productId: item.productId,
+          variantSku: item.variantSku || "",
+          quantity: item.quantity,
+          productName: item.name,
+        })),
+        actor: { userId: req.auth.sub, email: req.auth.email, role: req.auth.role },
+        expiresAt,
+      });
+    } catch (reserveError) {
+      // Roll back the just-created order so a failed reservation leaves no trace.
+      await Order.deleteOne({ _id: order._id }).catch(() => {});
+      if (reserveError && reserveError.code === "OUT_OF_STOCK") {
+        return res.status(409).json({
+          success: false,
+          message: "One or more items just went out of stock. Your order was not placed and you were not charged.",
+          code: "OUT_OF_STOCK",
+        });
+      }
+      throw reserveError;
+    }
+
+    // Fire-and-forget: email the customer a branded invoice PDF. Never let an
+    // email failure break order placement, so we don't await the result.
+    (async () => {
+      try {
+        const normalized = normalizeOrder(order);
+        const profile = await CustomerProfile.findOne({ userId: req.auth.sub }).lean();
+        const defaultAddress =
+          (profile?.addresses || []).find((a) => a.isDefault) || (profile?.addresses || [])[0];
+        const addressText = defaultAddress
+          ? [defaultAddress.line1, defaultAddress.line2, `${defaultAddress.city}, ${defaultAddress.state} ${defaultAddress.pincode}`]
+              .filter(Boolean)
+              .join(", ")
+          : null;
+        await sendOrderInvoiceEmail({
+          to: req.auth.email,
+          displayName: profile?.displayName || req.auth.email,
+          order: normalized,
+          buyer: {
+            name: profile?.displayName || "Valued Customer",
+            email: req.auth.email,
+            phone: profile?.phone || null,
+            address: addressText,
+          },
+        });
+      } catch (mailError) {
+        console.error("Failed to send invoice email:", mailError.message);
+      }
+    })();
 
     return res.status(201).json({
       success: true,
@@ -498,25 +592,33 @@ async function updateAdminOrderStatus(req, res, next) {
       }
     }
 
-    // Restock when an order is newly cancelled (real IMS behavior).
+    // Inventory transitions are delegated to the transactional inventory
+    // service and are idempotent (safe against duplicate status updates):
+    //   -> Cancelled (before dispatch): release reserved stock to available.
+    //   -> Shipped   (dispatch):        commit the reservation (stock leaves).
+    // Delivered makes no inventory change (already committed at dispatch).
+    const wasDispatched = ["Shipped", "Delivered"].includes(order.status);
     const isNewlyCancelled = status === "Cancelled" && order.status !== "Cancelled";
+    const isNewlyDispatched = status === "Shipped" && !wasDispatched;
+
     if (isNewlyCancelled) {
-      await Promise.all(
-        order.items.map((item) => {
-          if (item.variantSku) {
-            return Product.updateOne(
-              { _id: item.productId, "variants.sku": item.variantSku },
-              { $inc: { stock: item.quantity, "variants.$.stock": item.quantity } }
-            ).then((result) => {
-              if (result.matchedCount === 0) {
-                return Product.findByIdAndUpdate(item.productId, { $inc: { stock: item.quantity } });
-              }
-              return result;
-            });
-          }
-          return Product.findByIdAndUpdate(item.productId, { $inc: { stock: item.quantity } });
-        })
-      );
+      if (wasDispatched) {
+        return res.status(409).json({
+          success: false,
+          message: "Order already dispatched and cannot be cancelled. Use the return flow instead.",
+        });
+      }
+      await releaseForOrder({
+        orderId: order._id,
+        reason: "Order cancelled before dispatch",
+        actor: { userId: req.auth?.sub, email: req.auth?.email, role: req.auth?.role },
+      });
+    } else if (isNewlyDispatched) {
+      await commitForOrder({
+        orderId: order._id,
+        reason: "Order dispatched",
+        actor: { userId: req.auth?.sub, email: req.auth?.email, role: req.auth?.role },
+      });
     }
 
     const updatedOrder = await Order.findByIdAndUpdate(orderId, { status }, { new: true });

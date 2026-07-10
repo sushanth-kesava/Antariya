@@ -43,7 +43,20 @@ const orderSchema = new mongoose.Schema(
     shipping: { type: Number, required: true, min: 0 },
     tax: { type: Number, required: true, min: 0 },
     total: { type: Number, required: true, min: 0 },
-    status: { type: String, enum: ["Processing", "Shipped", "Delivered", "Cancelled"], default: "Processing" },
+    status: {
+      type: String,
+      enum: ["Processing", "Shipped", "Delivered", "Cancelled", "Returned", "Refunded", "Expired"],
+      default: "Processing",
+    },
+    paymentMethod: { type: String, enum: ["upi", "cod"], required: true, default: "cod" },
+    paymentStatus: { type: String, enum: ["pending", "paid", "failed"], required: true, default: "pending" },
+    razorpayOrderId: { type: String, default: "", trim: true },
+    razorpayPaymentId: { type: String, default: "", trim: true, index: true },
+    // Idempotency key binding this order to its inventory reservation, so
+    // reserve/commit/release stay exactly-once across retries.
+    reservationKey: { type: String, default: "", trim: true, index: true },
+    // Whether the held stock has been committed (physically deducted on dispatch).
+    inventoryCommitted: { type: Boolean, default: false },
   },
   {
     timestamps: true,

@@ -23,6 +23,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { formatINR, normalizeCatalogPriceToINR } from "@/lib/india";
+import { useInventoryUpdates } from "@/hooks/use-inventory-updates";
 
 interface ProductCardProps {
   product: Product;
@@ -33,6 +34,7 @@ export function ProductCard({ product }: ProductCardProps) {
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const isDesign = product.category === 'Embroidery Designs';
   const isCustomizable = Boolean(product.customizable);
+  const hasVariants = Array.isArray(product.variants) && product.variants.length > 0;
   const cardRating = product.reviewAverage ?? product.rating;
   const cardReviewCount = product.reviewCount ?? 0;
   const showReviewCount = typeof product.reviewCount === "number";
@@ -53,7 +55,17 @@ export function ProductCard({ product }: ProductCardProps) {
   });
   const [quantity, setQuantity] = useState(1);
   const lowStockThreshold = 10;
-  const isLowStock = product.stock > 0 && product.stock <= lowStockThreshold;
+  // Live inventory: subscribe to backend pushes for this product. When an
+  // update arrives, the aggregate `available` overrides the initial prop so
+  // every grid that renders a ProductCard reflects stock in real time.
+  const liveUpdates = useInventoryUpdates({ productId: product.id });
+  const liveAggregate = liveUpdates[""];
+  const liveStock =
+    liveAggregate && typeof liveAggregate.available === "number"
+      ? liveAggregate.available
+      : product.stock;
+  const isLowStock = liveStock > 0 && liveStock <= lowStockThreshold;
+  const isOutOfStock = liveStock <= 0;
 
   const symbols = ["Lotus Mandala", "Peacock Crest", "Floral Vine", "Royal Monogram", "Om Motif"];
   const threadColors = ["Gold", "Silver", "Ruby Red", "Emerald", "Royal Blue", "Ivory"];
@@ -157,13 +169,13 @@ export function ProductCard({ product }: ProductCardProps) {
             </Badge>
           </div>
         )}
-        {product.stock === 0 ? (
+        {isOutOfStock ? (
           <div className="absolute top-2 left-2">
             <Badge className="bg-red-500/90 text-white border-none shadow-sm">Out of stock</Badge>
           </div>
         ) : isLowStock ? (
           <div className="absolute top-2 left-2">
-            <Badge className="bg-amber-500/90 text-white border-none shadow-sm">Only {product.stock} left</Badge>
+            <Badge className="bg-amber-500/90 text-white border-none shadow-sm">Only {liveStock} left</Badge>
           </div>
         ) : null}
         <div className="absolute bottom-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -397,6 +409,25 @@ export function ProductCard({ product }: ProductCardProps) {
               </DialogContent>
             </Dialog>
           </>
+        ) : isOutOfStock ? (
+          <Button
+            className="w-full gap-2 rounded-full font-semibold"
+            variant="secondary"
+            disabled
+          >
+            Out of Stock
+          </Button>
+        ) : hasVariants ? (
+          <Button
+            className="w-full gap-2 rounded-full font-semibold shadow-sm hover:shadow-md transition-all active:scale-95"
+            variant="default"
+            asChild
+          >
+            <Link href={`/product/${product.id}`}>
+              <ShoppingCart className="h-4 w-4" />
+              Select Options
+            </Link>
+          </Button>
         ) : (
           <Button
             className="w-full gap-2 rounded-full font-semibold shadow-sm hover:shadow-md transition-all active:scale-95"

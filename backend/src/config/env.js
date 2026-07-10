@@ -91,12 +91,6 @@ const env = {
   cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET,
   razorpayKeyId: process.env.RAZORPAY_KEY_ID,
   razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET,
-  odooUrl: process.env.ODOO_URL || "",
-  odooDb: process.env.ODOO_DB || "",
-  odooUsername: process.env.ODOO_USERNAME || "",
-  odooPassword: process.env.ODOO_PASSWORD || "",
-  odooMaxRetries: Number(process.env.ODOO_MAX_RETRIES || 3),
-  odooTimeout: Number(process.env.ODOO_TIMEOUT || 30000),
 };
 
 const requiredVars = ["MONGODB_URI", "JWT_SECRET"];

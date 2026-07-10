@@ -22,6 +22,18 @@ function normalizeWishlistItem(doc) {
           fileDownloadLink: product.fileDownloadLink,
           rating: product.rating,
           customizable: product.customizable,
+          variants: Array.isArray(product.variants)
+            ? product.variants.map((v) => ({
+                sku: v.sku || "",
+                size: v.size || "",
+                color: v.color || "",
+                gender: v.gender || "",
+                neckType: v.neckType || "",
+                pattern: v.pattern || "",
+                price: v.price || 0,
+                stock: v.stock || 0,
+              }))
+            : [],
         }
       : null,
     createdAt: doc.createdAt,

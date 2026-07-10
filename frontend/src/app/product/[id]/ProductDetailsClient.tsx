@@ -51,6 +51,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { getWishlistFromBackend, setWishlistItemOnBackend } from "@/lib/api/wishlist";
 import { formatINR, normalizeCatalogPriceToINR } from "@/lib/india";
+import { useInventoryUpdates } from "@/hooks/use-inventory-updates";
 
 const LAST_SUCCESSFUL_PINCODE_KEY = "antariya_last_successful_pincode";
 const APPAREL_CATEGORIES = new Set(["Hoodies", "Blouses"]);
@@ -242,6 +243,27 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
     void loadProduct();
   }, [id]);
 
+  // Live inventory: patch stock in place whenever the backend pushes an update
+  // for this product (order placed elsewhere, admin adjustment, restock, etc.).
+  useInventoryUpdates({
+    productId: id,
+    onUpdate: (update) => {
+      setProduct((prev) => {
+        if (!prev) return prev;
+        const next: Product = { ...prev };
+        if (update.variantSku && Array.isArray(next.variants)) {
+          next.variants = next.variants.map((v) =>
+            v.sku === update.variantSku ? { ...v, stock: update.available } : v
+          );
+          next.stock = next.variants.reduce((sum, v) => sum + (Number(v.stock) || 0), 0);
+        } else {
+          next.stock = update.available;
+        }
+        return next;
+      });
+    },
+  });
+
   const [visualizing, setVisualizing] = useState(false);
   const [visualizedImg, setVisualizedImg] = useState<string | null>(null);
   const [openCustomizer, setOpenCustomizer] = useState(false);
@@ -313,6 +335,7 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
   const displayImage = visualizedImg || activeImage || product?.image || "";
   const lowStockThreshold = 10;
   const isLowStock = Boolean(product && product.stock > 0 && product.stock <= lowStockThreshold);
+  const isOutOfStock = Boolean(product && product.stock <= 0);
   const stockBadgeLabel = product?.stock === 0 ? "Out of stock" : isLowStock ? `Only ${product?.stock} left` : `In stock: ${product?.stock}`;
   const expectedDeliveryRange = useMemo(() => {
     if (deliveryResult.status === "available") {
@@ -530,6 +553,10 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
 
   const handleAddToCart = () => {
     if (!product) return;
+    if (isOutOfStock) {
+      toast({ title: "Out of stock", description: "This product is currently unavailable." });
+      return;
+    }
     if (!requireVariantSelected()) return;
 
     addProductToCart(product, 1, undefined, resolveSelectedVariant());
@@ -575,6 +602,10 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
 
   const handleBuyNow = () => {
     if (!product) return;
+    if (isOutOfStock) {
+      toast({ title: "Out of stock", description: "This product is currently unavailable." });
+      return;
+    }
     if (!requireVariantSelected()) return;
 
     addProductToCart(product, 1, undefined, resolveSelectedVariant());
@@ -952,7 +983,13 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
               
               <div className="flex items-center gap-4">
                 <span className="text-3xl font-bold text-primary">{formatINR(normalizeCatalogPriceToINR(Number(product.price || 0)))}</span>
-                <Badge className="bg-green-500/10 text-green-600 border-none px-4 py-1 text-sm font-bold">{stockBadgeLabel}</Badge>
+                <Badge className={`border-none px-4 py-1 text-sm font-bold ${
+                  isOutOfStock
+                    ? "bg-red-500/10 text-red-700"
+                    : isLowStock
+                    ? "bg-amber-500/10 text-amber-700"
+                    : "bg-green-500/10 text-green-600"
+                }`}>{stockBadgeLabel}</Badge>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 {product.stock === 0 ? (
@@ -1020,13 +1057,14 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
                 <Button
                   size="lg"
                   variant="outline"
-                  className="flex-1 h-14 rounded-2xl text-lg font-bold border-primary/40 text-primary hover:bg-primary/5 transition-all"
+                  disabled={isOutOfStock}
+                  className="flex-1 h-14 rounded-2xl text-lg font-bold border-primary/40 text-primary hover:bg-primary/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={handleAddToCart}
                 >
-                  <ShoppingCart className="mr-2 h-5 w-5" /> Add to Cart
+                  <ShoppingCart className="mr-2 h-5 w-5" /> {isOutOfStock ? "Out of Stock" : "Add to Cart"}
                 </Button>
-                <Button size="lg" className="flex-1 h-14 rounded-2xl text-lg font-bold shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all" onClick={handleBuyNow}>
-                  Buy Now
+                <Button size="lg" disabled={isOutOfStock} className="flex-1 h-14 rounded-2xl text-lg font-bold shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100" onClick={handleBuyNow}>
+                  {isOutOfStock ? "Unavailable" : "Buy Now"}
                 </Button>
                 <Button
                   size="lg"
@@ -1150,26 +1188,6 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
                           <p className="font-semibold">{deliveryResult.shipping}</p>
                         </div>
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
-                        <div className="rounded-xl bg-white/60 px-3 py-2">
-                          <p className="text-xs uppercase tracking-wider opacity-70 flex items-center gap-1">
-                            <CalendarDays className="h-3 w-3" /> Dispatch
-                          </p>
-                          <p className="font-semibold">{new Date(deliveryResult.estimatedDispatchDate).toLocaleDateString()}</p>
-                        </div>
-                        <div className="rounded-xl bg-white/60 px-3 py-2">
-                          <p className="text-xs uppercase tracking-wider opacity-70 flex items-center gap-1">
-                            <Truck className="h-3 w-3" /> Partner
-                          </p>
-                          <p className="font-semibold">{deliveryResult.lastMilePartner}</p>
-                        </div>
-                        <div className="rounded-xl bg-white/60 px-3 py-2">
-                          <p className="text-xs uppercase tracking-wider opacity-70 flex items-center gap-1">
-                            <RotateCcw className="h-3 w-3" /> Returns
-                          </p>
-                          <p className="font-semibold">{deliveryResult.returnEligible ? "Eligible" : "Not eligible"}</p>
-                        </div>
-                      </div>
                       <div className="flex flex-wrap gap-2 text-xs">
                         <span className={`rounded-full px-3 py-1 ${deliveryResult.codSupported ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-700"}`}>
                           {deliveryResult.codSupported ? "COD available" : "COD unavailable"}
@@ -1182,6 +1200,7 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
                   )}
                 </div>
 
+                {product.customizable && (
                 <Card className="rounded-[28px] border-border/50 bg-white shadow-sm">
                   <CardContent className="p-5 space-y-4">
                     <div className="flex items-center justify-between gap-3">
@@ -1224,6 +1243,7 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
                     </div>
                   </CardContent>
                 </Card>
+                )}
               </div>
             </div>
 

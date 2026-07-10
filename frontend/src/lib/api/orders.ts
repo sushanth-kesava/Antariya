@@ -54,16 +54,30 @@ export type Order = {
   total: number;
   status: string;
   createdAt: string;
+  paymentMethod?: "upi" | "cod";
+  paymentStatus?: "pending" | "paid" | "failed";
+  razorpayPaymentId?: string;
 };
 
-export async function createOrderOnBackend(token: string, items: OrderItemInput[]): Promise<Order> {
+export type PaymentVerification = {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+};
+
+export async function createOrderOnBackend(
+  token: string,
+  items: OrderItemInput[],
+  paymentMethod?: "upi" | "cod",
+  payment?: PaymentVerification
+): Promise<Order> {
   const response = await fetch(`${API_BASE_URL}/orders`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ items }),
+    body: JSON.stringify({ items, paymentMethod, ...(payment || {}) }),
   });
 
   const data = await response.json();

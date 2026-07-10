@@ -5,16 +5,12 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import Script from "next/script";
-import { Trash2, Plus, Minus, ArrowRight, ShoppingBag, ShieldCheck, Loader2 } from "lucide-react";
+import { Trash2, Plus, Minus, ArrowRight, ShoppingBag, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Navbar } from "@/components/navbar";
-import { useToast } from "@/hooks/use-toast";
-import { CartItem, clearCart, getCartItems, setCartItems } from "@/lib/cart";
-import { createOrderOnBackend } from "@/lib/api/orders";
-import { createRazorpayOrderOnBackend, verifyRazorpayPaymentOnBackend } from "@/lib/api/payments";
+import { CartItem, getCartItems, setCartItems } from "@/lib/cart";
 import {
   formatINR,
   INDIA_FREE_SHIPPING_THRESHOLD,
@@ -25,28 +21,7 @@ import {
 
 export default function CartPage() {
   const router = useRouter();
-  const { toast } = useToast();
   const [items, setItems] = useState<CartItem[]>([]);
-  const [placingOrder, setPlacingOrder] = useState(false);
-  const [razorpayReady, setRazorpayReady] = useState(false);
-
-  useEffect(() => {
-    if (typeof window !== "undefined" && typeof window.Razorpay === "function") {
-      setRazorpayReady(true);
-      return;
-    }
-    const interval = setInterval(() => {
-      if (typeof window !== "undefined" && typeof window.Razorpay === "function") {
-        setRazorpayReady(true);
-        clearInterval(interval);
-      }
-    }, 300);
-    return () => clearInterval(interval);
-  }, []);
-
-  const razorpayKeyId =
-    process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID?.trim() ||
-    (typeof window !== "undefined" ? window.__ANTARIYA_RUNTIME_CONFIG__?.razorpayKeyId?.trim() || "" : "");
 
   useEffect(() => {
     setItems(getCartItems());
@@ -77,120 +52,10 @@ export default function CartPage() {
   const tax = subtotal * INDIA_GST_RATE;
   const total = subtotal + shipping + tax;
 
-  const handleCheckout = async () => {
+  const handleCheckout = () => {
     const token = localStorage.getItem("app_auth_token");
-
-    if (!token) {
-      router.push("/login");
-      return;
-    }
-
-    if (!razorpayKeyId) {
-      toast({ title: "Configuration error", description: "Razorpay key is missing. Set NEXT_PUBLIC_RAZORPAY_KEY_ID in frontend env." });
-      return;
-    }
-
-    if (!razorpayReady || typeof window === "undefined" || typeof window.Razorpay !== "function") {
-      toast({ title: "Payment gateway loading", description: "Please wait a moment and try again." });
-      return;
-    }
-
-    const amountInPaise = Math.round(total * 100);
-
-    if (amountInPaise < 100) {
-      toast({ title: "Amount too low", description: "Minimum payment amount is ₹1.00" });
-      return;
-    }
-
-    const sessionRaw = localStorage.getItem("google_auth_user");
-    const session = sessionRaw ? JSON.parse(sessionRaw) : null;
-    const customerName = typeof session?.displayName === "string" ? session.displayName : "Customer";
-    const customerEmail = typeof session?.email === "string" ? session.email : "";
-
-    try {
-      setPlacingOrder(true);
-
-      const receipt = `antariya_${Date.now()}`;
-      const order = await createRazorpayOrderOnBackend(token, {
-        amount: amountInPaise,
-        currency: "INR",
-        receipt,
-      });
-
-      const orderItems = items.map((item) => ({
-        productId: item.productId,
-        quantity: item.quantity,
-        variantSku: item.variantSku || undefined,
-        customization: item.customization,
-      }));
-
-      const paymentObject = new window.Razorpay({
-        key: razorpayKeyId,
-        amount: order.amount,
-        currency: order.currency,
-        name: "Antariya",
-        description: "Secure checkout",
-        order_id: order.order_id,
-        prefill: {
-          name: customerName,
-          email: customerEmail,
-        },
-        notes: {
-          source: "cart_checkout",
-          items: String(items.length),
-        },
-        handler: async (response: {
-          razorpay_payment_id: string;
-          razorpay_order_id: string;
-          razorpay_signature: string;
-        }) => {
-          try {
-            await verifyRazorpayPaymentOnBackend(token, {
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_signature: response.razorpay_signature,
-            });
-
-            await createOrderOnBackend(token, orderItems);
-            clearCart();
-            setItems([]);
-            const params = new URLSearchParams({
-              status: "success",
-              paymentId: response.razorpay_payment_id,
-              orderId: response.razorpay_order_id,
-              amount: String(total),
-            });
-            router.push(`/order-status?${params.toString()}`);
-          } catch (error) {
-            console.error("Payment verification failed", error);
-            const reason = error instanceof Error ? error.message : "Payment verification failed. Please contact support.";
-            const params = new URLSearchParams({ status: "failed", reason });
-            router.push(`/order-status?${params.toString()}`);
-          } finally {
-            setPlacingOrder(false);
-          }
-        },
-        modal: {
-          ondismiss: () => {
-            setPlacingOrder(false);
-            router.push("/order-status?status=cancelled");
-          },
-        },
-      });
-
-      paymentObject.on("payment.failed", (event: { error?: { description?: string } }) => {
-        setPlacingOrder(false);
-        const reason = event?.error?.description || "Your payment could not be completed. Please try again.";
-        const params = new URLSearchParams({ status: "failed", reason });
-        router.push(`/order-status?${params.toString()}`);
-      });
-
-      paymentObject.open();
-    } catch (error) {
-      console.error("Checkout failed", error);
-      toast({ title: "Checkout failed", description: error instanceof Error ? error.message : "Failed to place order." });
-      setPlacingOrder(false);
-    }
+    if (!token) { router.push("/login"); return; }
+    router.push("/checkout");
   };
 
   if (items.length === 0) {
@@ -215,12 +80,6 @@ export default function CartPage() {
 
   return (
     <>
-      <Script
-        src="https://checkout.razorpay.com/v1/checkout.js"
-        strategy="afterInteractive"
-        onLoad={() => setRazorpayReady(true)}
-        onError={() => setRazorpayReady(false)}
-      />
       <Navbar />
       <div className="min-h-screen bg-gray-50/50 py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -355,27 +214,14 @@ export default function CartPage() {
                   className="w-full h-12 text-base rounded-full shadow-md hover:shadow-lg transition-shadow"
                   size="lg"
                   onClick={handleCheckout}
-                  disabled={placingOrder || !razorpayReady || !razorpayKeyId}
                 >
-                  {placingOrder ? (
-                    <>
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Processing Payment...
-                    </>
-                  ) : !razorpayKeyId ? (
-                    "Razorpay Not Configured"
-                  ) : !razorpayReady ? (
-                    "Loading Payment Gateway..."
-                  ) : (
-                    <>
-                      Proceed to Checkout
-                      <ArrowRight className="ml-2 h-5 w-5" />
-                    </>
-                  )}
+                  Proceed to Checkout
+                  <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
 
                 <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground mt-4">
                   <ShieldCheck className="h-4 w-4 text-green-500" />
-                  <span>Secure India checkout (UPI / NetBanking / Cards / COD)</span>
+                  <span>Secure India checkout · UPI / COD</span>
                 </div>
               </CardFooter>
             </Card>

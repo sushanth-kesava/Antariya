@@ -5,10 +5,11 @@ const User = require("../models/User");
 const Order = require("../models/Order");
 const AdminProfile = require("../models/AdminProfile");
 const StockAdjustment = require("../models/StockAdjustment");
+const inventoryService = require("../services/inventory.service");
 const multer = require("multer");
 const { hasCloudinaryCredentials, uploadProductImageBuffer } = require("../services/cloudinary.service");
 
-const MAX_PRODUCT_IMAGES = 6;
+const MAX_PRODUCT_IMAGES = 10;
 const MAX_PRODUCT_IMAGE_SIZE_BYTES = 50 * 1024 * 1024;
 // Curated Antariya storefront categories (order defines the marketplace bar order).
 const ANTARIYA_CATEGORIES = [
@@ -481,10 +482,6 @@ async function getProducts(req, res, next) {
       filter.color = color;
     }
 
-    if (gender) {
-      filter.gender = gender;
-    }
-
     if (neckType) {
       filter.neckType = neckType;
     }
@@ -501,11 +498,32 @@ async function getProducts(req, res, next) {
       filter.customizable = customizable === "true";
     }
 
+    // Gender can be stored in three places depending on how a product was
+    // created: the top-level `gender`, the multi-select `genders` array, or
+    // per-variant `gender`. Match any of them so category cards map products
+    // correctly regardless of which field was populated.
+    const andClauses = [];
+    if (gender) {
+      andClauses.push({
+        $or: [
+          { gender },
+          { genders: gender },
+          { "variants.gender": gender },
+        ],
+      });
+    }
+
     if (search) {
-      filter.$or = [
-        { name: { $regex: search, $options: "i" } },
-        { description: { $regex: search, $options: "i" } },
-      ];
+      andClauses.push({
+        $or: [
+          { name: { $regex: search, $options: "i" } },
+          { description: { $regex: search, $options: "i" } },
+        ],
+      });
+    }
+
+    if (andClauses.length > 0) {
+      filter.$and = andClauses;
     }
 
     const [products, total] = await Promise.all([
@@ -1277,35 +1295,54 @@ async function adjustStock(req, res, next) {
       }
     }
 
-    const applyDelta = (current) => {
-      const value = Number(current) || 0;
-      if (type === "set") return Math.max(0, numericQuantity);
-      if (type === "remove") return Math.max(0, value - Math.abs(numericQuantity));
-      return Math.max(0, value + Math.abs(numericQuantity)); // add
-    };
+    const hasVariants = Array.isArray(product.variants) && product.variants.length > 0;
 
-    let previousStock;
-    let newStock;
-
-    if (variantSku && Array.isArray(product.variants) && product.variants.length > 0) {
+    if (hasVariants && !variantSku) {
+      // Product has variants but no variantSku was provided. Adjusting the
+      // aggregate directly would desync it from the per-variant rows.
+      return res.status(400).json({
+        success: false,
+        message: "This product has variants. Please specify which variant (variantSku) to adjust.",
+      });
+    }
+    if (variantSku && hasVariants) {
       const variant = product.variants.find((entry) => entry.sku === variantSku);
       if (!variant) {
         return res.status(404).json({ success: false, message: "Variant not found" });
       }
-      previousStock = Number(variant.stock) || 0;
-      newStock = applyDelta(previousStock);
-      variant.stock = newStock;
-      // Roll product-level stock to the sum of variants.
-      product.stock = product.variants.reduce((sum, entry) => sum + (Number(entry.stock) || 0), 0);
-    } else {
-      previousStock = Number(product.stock) || 0;
-      newStock = applyDelta(previousStock);
-      product.stock = newStock;
     }
 
-    await product.save();
+    // Persist any ownership self-heal changes made above before mutating stock.
+    if (product.isModified()) {
+      await product.save();
+    }
 
-    const appliedDelta = newStock - previousStock;
+    // Delegate the actual stock mutation to the transactional inventory
+    // service: it updates the authoritative Inventory row (DEFAULT warehouse),
+    // writes an immutable ledger entry, refreshes the derived Product.stock
+    // projection, and emits a real-time update — all inside one ACID txn.
+    const result = await inventoryService.adminAdjust({
+      productId: product._id,
+      variantSku: variantSku || "",
+      type,
+      quantity: numericQuantity,
+      reason: String(reason || "").trim(),
+      actor: { userId: req.auth?.sub || "", email: req.auth?.email || "", role: req.auth?.role || "admin" },
+    });
+
+    const previousStock = result.before;
+    const newStock = result.after;
+    const appliedDelta = result.delta;
+
+    // Reload the product so the response reflects the refreshed projection.
+    const refreshed = await Product.findById(product._id);
+    if (refreshed) {
+      product.stock = refreshed.stock;
+      product.variants = refreshed.variants;
+    }
+
+    // Mirror the movement into the legacy StockAdjustment collection so any
+    // existing admin "stock history" UI keeps working unchanged.
     const log = await StockAdjustment.create({
       productId: product._id,
       productName: product.name,

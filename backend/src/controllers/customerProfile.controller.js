@@ -1,5 +1,6 @@
 const CustomerProfile = require("../models/CustomerProfile");
 const User = require("../models/User");
+const AdminProfile = require("../models/AdminProfile");
 
 // GET /api/customer/profile
 async function getCustomerProfile(req, res, next) {
@@ -10,16 +11,22 @@ async function getCustomerProfile(req, res, next) {
 
     // Auto-create profile if it doesn't exist yet (lazy init)
     if (!profile) {
-      const user = await User.findById(userId).lean();
-      if (!user) {
+      // Look up the identity in both collections: regular shoppers live in
+      // `User`, while admins and superadmins live in `AdminProfile`. Checking
+      // both means the profile panel works for every role.
+      const account =
+        (await User.findById(userId).lean()) ||
+        (await AdminProfile.findById(userId).lean());
+
+      if (!account) {
         return res.status(404).json({ success: false, message: "User not found." });
       }
 
       profile = await CustomerProfile.create({
-        userId: user._id,
-        email: user.email,
-        displayName: user.displayName || "",
-        photoURL: user.photoURL || null,
+        userId: account._id,
+        email: account.email,
+        displayName: account.displayName || "",
+        photoURL: account.photoURL || null,
       });
     }
 

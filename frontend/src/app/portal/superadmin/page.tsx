@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Navbar } from "@/components/navbar";
@@ -33,6 +33,7 @@ import {
   updateUserRoleOnBackend,
 } from "@/lib/api/superadmin";
 import { getApiBaseUrl } from "@/lib/api/base-url";
+import { useInventoryUpdates } from "@/hooks/use-inventory-updates";
 import { formatINR } from "@/lib/india";
 import { clearAuthSession, getPortalPathForRole, normalizeAppRole, persistAuthSession } from "@/lib/auth-session";
 
@@ -113,6 +114,22 @@ export default function SuperAdminPortalPage() {
 
     void loadSession();
   }, [router]);
+
+  // Live inventory: refresh the superadmin dashboard (which surfaces the
+  // low-stock product count) whenever the backend pushes an inventory change.
+  const dashboardRefreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useInventoryUpdates({
+    role: "superadmin",
+    onUpdate: () => {
+      if (!authToken) return;
+      if (dashboardRefreshTimer.current) clearTimeout(dashboardRefreshTimer.current);
+      dashboardRefreshTimer.current = setTimeout(() => {
+        getSuperAdminDashboardFromBackend(authToken)
+          .then((payload) => setDashboard(payload))
+          .catch((e) => console.error("Live dashboard refresh failed", e));
+      }, 800);
+    },
+  });
 
   const handleRoleUpdate = async () => {
     if (!authToken || updatingRole) {

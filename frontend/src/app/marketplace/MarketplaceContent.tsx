@@ -6,8 +6,9 @@ import { Product } from "@/app/lib/mock-data";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Filter, Search, ChevronDown, RefreshCw, Sparkles, Palette, ShoppingBag, X } from "lucide-react";
+import { Filter, Search, ChevronDown, RefreshCw, Sparkles, Palette, ShoppingBag, X, ArrowRight, LayoutGrid } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import {
@@ -19,6 +20,7 @@ import {
 } from "@/lib/api/products";
 import { getApiBaseUrl } from "@/lib/api/base-url";
 import { normalizeAppRole } from "@/lib/auth-session";
+import { GENDER_CATEGORIES } from "@/lib/categories";
 import { useAuth } from "@/context/AuthContext";
 
 type SortOption = "relevance" | "price_asc" | "price_desc" | "rating" | "newest";
@@ -80,6 +82,8 @@ export default function MarketplaceContent() {
 
   const [searchQuery, setSearchQuery] = useState(searchParams.get("search") || "");
   const [activeSearch, setActiveSearch] = useState(searchParams.get("search") || "");
+  const [activeGender, setActiveGender] = useState(searchParams.get("gender") || "");
+  const [genderCovers, setGenderCovers] = useState<Record<string, string>>({});
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -159,6 +163,43 @@ export default function MarketplaceContent() {
     };
   }, [role, roleResolved]);
 
+  // Keep the active gender in sync with the URL (e.g. when a category card is clicked).
+  useEffect(() => {
+    setActiveGender(searchParams.get("gender") || "");
+    setActiveSearch(searchParams.get("search") || "");
+  }, [searchParams]);
+
+  // Fetch a representative product image for each gender category card
+  // (and a general cover for the "All Products" card).
+  useEffect(() => {
+    if (!roleResolved || role === "superadmin") return;
+    let cancelled = false;
+
+    async function loadCovers() {
+      try {
+        const covers: Record<string, string> = {};
+        await Promise.all(
+          GENDER_CATEGORIES.map(async (cat) => {
+            const { products: sample } = await getProductsFromBackend({
+              gender: cat.value || undefined,
+              limit: 1,
+            });
+            const cover = sample.find((p) => p.image)?.image;
+            if (cover) covers[cat.value] = cover;
+          })
+        );
+        if (!cancelled) setGenderCovers(covers);
+      } catch (error) {
+        console.error("Failed to load category covers", error);
+      }
+    }
+
+    loadCovers();
+    return () => {
+      cancelled = true;
+    };
+  }, [role, roleResolved]);
+
   useEffect(() => {
     if (!roleResolved || role === "superadmin") {
       return;
@@ -171,6 +212,7 @@ export default function MarketplaceContent() {
       try {
         const { products: data, pagination } = await getProductsFromBackend({
           search: activeSearch || undefined,
+          gender: activeGender || undefined,
           page: 1,
           limit: ITEMS_PER_PAGE,
         });
@@ -196,7 +238,7 @@ export default function MarketplaceContent() {
     return () => {
       cancelled = true;
     };
-  }, [activeSearch, role, roleResolved]);
+  }, [activeSearch, activeGender, role, roleResolved]);
 
   useEffect(() => {
     if (role === "superadmin") {
@@ -208,6 +250,18 @@ export default function MarketplaceContent() {
 
   const heroCopy = ROLE_TITLES[role];
 
+  // Select / clear a gender category by updating the URL (keeps it shareable & back-button friendly).
+  const selectGender = (value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value && value !== activeGender) {
+      params.set("gender", value);
+    } else {
+      params.delete("gender");
+    }
+    const qs = params.toString();
+    router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  };
+
   const loadMore = async () => {
     if (currentPage >= totalPages || loadingMore) return;
 
@@ -216,6 +270,7 @@ export default function MarketplaceContent() {
       const nextPage = currentPage + 1;
       const { products: data } = await getProductsFromBackend({
         search: activeSearch || undefined,
+        gender: activeGender || undefined,
         page: nextPage,
         limit: ITEMS_PER_PAGE,
       });
@@ -274,34 +329,68 @@ export default function MarketplaceContent() {
 
       <main className="w-full max-w-[1760px] mx-auto px-3 sm:px-4 lg:px-6 py-12">
         <div className="flex flex-col gap-10">
-          <div className="relative rounded-[40px] overflow-hidden bg-primary text-white p-10 md:p-14 shadow-2xl">
-            <div className="absolute top-0 right-0 w-1/2 h-full opacity-10 pointer-events-none">
-              <Sparkles className="w-full h-full" />
-            </div>
-            <div className="relative z-10 max-w-2xl space-y-6">
-              <div className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-sm font-bold tracking-wide">
-                <Sparkles className="h-4 w-4 text-accent" /> {heroCopy.eyebrow}
+          {/* Global gender categories — the top-level "shop by audience" entry points. */}
+          {role !== "superadmin" && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold font-headline tracking-tight">Shop by Category</h2>
+                  <p className="text-sm text-muted-foreground font-medium">Pick who you&apos;re shopping for</p>
+                </div>
+                {activeGender && (
+                  <Button
+                    variant="ghost"
+                    className="rounded-full text-sm font-semibold text-primary hover:bg-primary/5"
+                    onClick={() => selectGender("")}
+                  >
+                    <X className="mr-1 h-4 w-4" /> Clear filter
+                  </Button>
+                )}
               </div>
-              <h1 className="text-4xl md:text-6xl font-black font-headline leading-tight tracking-tight">
-                {heroCopy.title}
-              </h1>
-              <p className="text-lg md:text-xl text-white/80 leading-relaxed font-medium">
-                {heroCopy.description}
-              </p>
-              <div className="flex flex-wrap items-center gap-4 pt-4">
-                <Button asChild size="lg" className="rounded-full h-14 px-8 bg-accent text-accent-foreground font-bold text-lg hover:scale-105 hover:bg-accent/90 transition-all shadow-xl shadow-accent/20">
-                  <Link href={heroCopy.ctaHref}>
-                    <Palette className="mr-2 h-5 w-5" /> {heroCopy.ctaLabel}
-                  </Link>
-                </Button>
-                <Button asChild variant="outline" size="lg" className="rounded-full h-14 px-8 bg-white/10 border-white/20 text-white font-bold text-lg hover:bg-white/20 transition-all">
-                  <Link href={role === "customer" ? "/customize" : role === "admin" ? "/portal/admin" : "/portal/superadmin"}>
-                    <ShoppingBag className="mr-2 h-5 w-5" /> {role === "customer" ? "Open Builder" : role === "admin" ? "Admin Console" : "Full Inventory"}
-                  </Link>
-                </Button>
+
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+                {GENDER_CATEGORIES.map((cat) => {
+                  const isActive = activeGender === cat.value;
+                  const cover = genderCovers[cat.value] || cat.fallbackImage;
+                  return (
+                    <button
+                      key={cat.value}
+                      type="button"
+                      onClick={() => selectGender(cat.value)}
+                      className={`group relative aspect-square w-full max-w-[260px] mx-auto overflow-hidden rounded-2xl border text-left transition-all hover:shadow-xl ${
+                        isActive ? "border-primary ring-2 ring-primary shadow-lg" : "border-border/50 hover:border-primary/40"
+                      }`}
+                    >
+                      {/* Product image background */}
+                      {cover ? (
+                        <Image
+                          src={cover}
+                          alt={cat.label}
+                          fill
+                          className="object-cover transition-transform duration-500 group-hover:scale-105"
+                          sizes="(max-width: 1024px) 50vw, 25vw"
+                        />
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-muted via-background to-muted text-primary">
+                          <LayoutGrid className="h-10 w-10 opacity-40" />
+                        </div>
+                      )}
+                      {/* Dark gradient so the label is always readable */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent" />
+                      {/* Label */}
+                      <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white">
+                        <h3 className="text-lg font-bold drop-shadow">{cat.label}</h3>
+                        <p className="text-xs text-white/85 drop-shadow">{cat.description}</p>
+                        <span className="mt-2 inline-flex items-center gap-1 text-sm font-semibold">
+                          Shop now <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
-          </div>
+          )}
 
           <div className="flex flex-col md:flex-row items-center justify-between gap-6 bg-card border border-border/50 p-6 rounded-3xl shadow-sm">
             <div className="space-y-1 shrink-0">
@@ -565,6 +654,35 @@ export default function MarketplaceContent() {
               </Button>
             </div>
           )}
+
+          <div className="relative rounded-[40px] overflow-hidden bg-primary text-white p-10 md:p-14 shadow-2xl">
+            <div className="absolute top-0 right-0 w-1/2 h-full opacity-10 pointer-events-none">
+              <Sparkles className="w-full h-full" />
+            </div>
+            <div className="relative z-10 max-w-2xl space-y-6">
+              <div className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-sm font-bold tracking-wide">
+                <Sparkles className="h-4 w-4 text-accent" /> {heroCopy.eyebrow}
+              </div>
+              <h1 className="text-4xl md:text-6xl font-black font-headline leading-tight tracking-tight">
+                {heroCopy.title}
+              </h1>
+              <p className="text-lg md:text-xl text-white/80 leading-relaxed font-medium">
+                {heroCopy.description}
+              </p>
+              <div className="flex flex-wrap items-center gap-4 pt-4">
+                <Button asChild size="lg" className="rounded-full h-14 px-8 bg-accent text-accent-foreground font-bold text-lg hover:scale-105 hover:bg-accent/90 transition-all shadow-xl shadow-accent/20">
+                  <Link href={heroCopy.ctaHref}>
+                    <Palette className="mr-2 h-5 w-5" /> {heroCopy.ctaLabel}
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" size="lg" className="rounded-full h-14 px-8 bg-white/10 border-white/20 text-white font-bold text-lg hover:bg-white/20 transition-all">
+                  <Link href={role === "customer" ? "/customize" : role === "admin" ? "/portal/admin" : "/portal/superadmin"}>
+                    <ShoppingBag className="mr-2 h-5 w-5" /> {role === "customer" ? "Open Builder" : role === "admin" ? "Admin Console" : "Full Inventory"}
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
       </main>
     </div>

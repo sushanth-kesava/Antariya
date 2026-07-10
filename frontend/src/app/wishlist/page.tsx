@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import Script from "next/script";
 import { Heart, Trash2, ShoppingCart, ArrowRight, ShieldCheck, Loader2, CheckSquare, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,8 +12,6 @@ import { Separator } from "@/components/ui/separator";
 import { Navbar } from "@/components/navbar";
 import { useToast } from "@/hooks/use-toast";
 import { getWishlistFromBackend, setWishlistItemOnBackend, type WishlistItem } from "@/lib/api/wishlist";
-import { createOrderOnBackend } from "@/lib/api/orders";
-import { createRazorpayOrderOnBackend, verifyRazorpayPaymentOnBackend } from "@/lib/api/payments";
 import { addProductToCart } from "@/lib/cart";
 import {
   formatINR,
@@ -34,27 +31,7 @@ export default function WishlistPage() {
   const [loadingItems, setLoadingItems] = useState(true);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [placingOrder, setPlacingOrder] = useState(false);
-  const [razorpayReady, setRazorpayReady] = useState(false);
-
-  const razorpayKeyId =
-    process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID?.trim() ||
-    (typeof window !== "undefined" ? window.__ANTARIYA_RUNTIME_CONFIG__?.razorpayKeyId?.trim() || "" : "");
-
-  // Poll for Razorpay SDK
-  useEffect(() => {
-    if (typeof window !== "undefined" && typeof window.Razorpay === "function") {
-      setRazorpayReady(true);
-      return;
-    }
-    const interval = setInterval(() => {
-      if (typeof window !== "undefined" && typeof window.Razorpay === "function") {
-        setRazorpayReady(true);
-        clearInterval(interval);
-      }
-    }, 300);
-    return () => clearInterval(interval);
-  }, []);
+  const [checkingOut, setCheckingOut] = useState(false);
 
   // Redirect unauthenticated users
   useEffect(() => {
@@ -104,7 +81,18 @@ export default function WishlistPage() {
     }
   };
 
+  const productNeedsVariant = (product: WishlistItem["product"]) =>
+    Array.isArray((product as any).variants) && (product as any).variants.length > 0;
+
   const handleAddToCart = (item: WishlistItem) => {
+    if (productNeedsVariant(item.product)) {
+      toast({
+        title: "Select an option",
+        description: "Please choose a variant on the product page before adding to cart.",
+      });
+      router.push(`/product/${item.product.id}`);
+      return;
+    }
     addProductToCart(item.product);
     toast({ title: "Added to cart", description: item.product.name });
   };
@@ -119,7 +107,7 @@ export default function WishlistPage() {
   const tax = subtotal * INDIA_GST_RATE;
   const total = subtotal + shipping + tax;
 
-  const handleCheckout = async () => {
+  const handleCheckout = () => {
     if (selectedItems.length === 0) {
       toast({ title: "No items selected", description: "Select at least one item to checkout." });
       return;
@@ -128,87 +116,29 @@ export default function WishlistPage() {
     const token = localStorage.getItem("app_auth_token");
     if (!token) { router.push("/login"); return; }
 
-    if (!razorpayKeyId) {
-      toast({ title: "Configuration error", description: "Razorpay key is missing." });
+    const itemsNeedingVariant = selectedItems.filter((i) => productNeedsVariant(i.product));
+    if (itemsNeedingVariant.length > 0) {
+      toast({
+        title: "Select options first",
+        description:
+          itemsNeedingVariant.length === 1
+            ? `"${itemsNeedingVariant[0].product.name}" needs a variant selected before checkout.`
+            : `${itemsNeedingVariant.length} items need a variant selected before checkout.`,
+        variant: "destructive",
+      });
+      router.push(`/product/${itemsNeedingVariant[0].product.id}`);
       return;
     }
 
-    if (!razorpayReady || typeof window.Razorpay !== "function") {
-      toast({ title: "Payment gateway loading", description: "Please wait a moment and try again." });
-      return;
-    }
-
-    const amountInPaise = Math.round(total * 100);
-    if (amountInPaise < 100) {
-      toast({ title: "Amount too low", description: "Minimum payment amount is ₹1.00" });
-      return;
-    }
-
-    const sessionRaw = localStorage.getItem("google_auth_user");
-    const session = sessionRaw ? JSON.parse(sessionRaw) : null;
-    const customerName = typeof session?.displayName === "string" ? session.displayName : "Customer";
-    const customerEmail = typeof session?.email === "string" ? session.email : "";
-
-    try {
-      setPlacingOrder(true);
-      const rzpOrder = await createRazorpayOrderOnBackend(token, {
-        amount: amountInPaise,
-        currency: "INR",
-        receipt: `wishlist_${Date.now()}`,
-      });
-
-      const orderItems = selectedItems.map((i) => ({ productId: i.productId, quantity: 1 }));
-
-      const paymentObject = new window.Razorpay({
-        key: razorpayKeyId,
-        amount: rzpOrder.amount,
-        currency: rzpOrder.currency,
-        name: "Antariya",
-        description: "Wishlist checkout",
-        order_id: rzpOrder.order_id,
-        prefill: { name: customerName, email: customerEmail },
-        notes: { source: "wishlist_checkout", items: String(selectedItems.length) },
-        handler: async (response: {
-          razorpay_payment_id: string;
-          razorpay_order_id: string;
-          razorpay_signature: string;
-        }) => {
-          try {
-            await verifyRazorpayPaymentOnBackend(token, response);
-            await createOrderOnBackend(token, orderItems);
-            const params = new URLSearchParams({
-              status: "success",
-              paymentId: response.razorpay_payment_id,
-              orderId: response.razorpay_order_id,
-              amount: String(total),
-            });
-            router.push(`/order-status?${params.toString()}`);
-          } catch (err) {
-            const reason = err instanceof Error ? err.message : "Payment verification failed. Please contact support.";
-            router.push(`/order-status?${new URLSearchParams({ status: "failed", reason }).toString()}`);
-          } finally {
-            setPlacingOrder(false);
-          }
-        },
-        modal: {
-          ondismiss: () => {
-            setPlacingOrder(false);
-            router.push("/order-status?status=cancelled");
-          },
-        },
-      });
-
-      paymentObject.on("payment.failed", (event: { error?: { description?: string } }) => {
-        setPlacingOrder(false);
-        const reason = event?.error?.description || "Your payment could not be completed. Please try again.";
-        router.push(`/order-status?${new URLSearchParams({ status: "failed", reason }).toString()}`);
-      });
-
-      paymentObject.open();
-    } catch (err) {
-      toast({ title: "Checkout failed", description: err instanceof Error ? err.message : "Failed to place order.", variant: "destructive" });
-      setPlacingOrder(false);
-    }
+    setCheckingOut(true);
+    // Add the selected wishlist items to the cart, then route through the
+    // shared /checkout workflow (same as the cart page).
+    selectedItems.forEach((i) => addProductToCart(i.product));
+    toast({
+      title: "Proceeding to checkout",
+      description: `${selectedItems.length} ${selectedItems.length === 1 ? "item" : "items"} added to your cart.`,
+    });
+    router.push("/checkout");
   };
 
   if (authLoading || loadingItems) {
@@ -244,12 +174,6 @@ export default function WishlistPage() {
 
   return (
     <>
-      <Script
-        src="https://checkout.razorpay.com/v1/checkout.js"
-        strategy="afterInteractive"
-        onLoad={() => setRazorpayReady(true)}
-        onError={() => setRazorpayReady(false)}
-      />
       <div className="min-h-screen bg-gray-50/50 flex flex-col">
         <Navbar />
         <div className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -409,16 +333,12 @@ export default function WishlistPage() {
                     className="w-full h-12 text-base rounded-full shadow-md hover:shadow-lg transition-shadow"
                     size="lg"
                     onClick={handleCheckout}
-                    disabled={placingOrder || selectedItems.length === 0 || !razorpayReady || !razorpayKeyId}
+                    disabled={checkingOut || selectedItems.length === 0}
                   >
-                    {placingOrder ? (
-                      <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Processing Payment...</>
-                    ) : !razorpayKeyId ? (
-                      "Razorpay Not Configured"
-                    ) : !razorpayReady ? (
-                      "Loading Payment Gateway..."
+                    {checkingOut ? (
+                      <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Proceeding...</>
                     ) : (
-                      <>Checkout Selected <ArrowRight className="ml-2 h-5 w-5" /></>
+                      <>Proceed to Checkout <ArrowRight className="ml-2 h-5 w-5" /></>
                     )}
                   </Button>
                   <Button variant="outline" className="w-full rounded-full" asChild>

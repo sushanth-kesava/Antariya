@@ -4,6 +4,27 @@ const env = require("../config/env");
 
 const MIN_RAZORPAY_AMOUNT_PAISE = 100;
 
+/**
+ * Pure server-side verification of a Razorpay payment signature.
+ * Returns true only when the HMAC-SHA256 of `${order_id}|${payment_id}`
+ * (keyed with the Razorpay secret) matches the signature Razorpay sent.
+ * Use this to bind payment verification to any server action (e.g. order
+ * creation) so an order can never be persisted without a real payment.
+ */
+function isValidRazorpaySignature({ razorpayOrderId, razorpayPaymentId, razorpaySignature }) {
+  if (!isRazorpayConfigured()) {
+    return false;
+  }
+  if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
+    return false;
+  }
+  const payload = `${razorpayOrderId}|${razorpayPaymentId}`;
+  const expectedSignature = crypto.createHmac("sha256", env.razorpayKeySecret).update(payload).digest("hex");
+  const expectedBuf = Buffer.from(expectedSignature, "utf8");
+  const actualBuf = Buffer.from(String(razorpaySignature), "utf8");
+  return expectedBuf.length === actualBuf.length && crypto.timingSafeEqual(expectedBuf, actualBuf);
+}
+
 function isRazorpayConfigured() {
   return Boolean(env.razorpayKeyId) && Boolean(env.razorpayKeySecret);
 }
@@ -90,10 +111,7 @@ function verifyPaymentSignature(req, res) {
     });
   }
 
-  const payload = `${razorpayOrderId}|${razorpayPaymentId}`;
-  const expectedSignature = crypto.createHmac("sha256", env.razorpayKeySecret).update(payload).digest("hex");
-
-  if (expectedSignature !== razorpaySignature) {
+  if (!isValidRazorpaySignature({ razorpayOrderId, razorpayPaymentId, razorpaySignature })) {
     return res.status(400).json({
       success: false,
       message: "Invalid payment signature",
@@ -109,4 +127,6 @@ function verifyPaymentSignature(req, res) {
 module.exports = {
   createRazorpayOrder,
   verifyPaymentSignature,
+  isValidRazorpaySignature,
+  isRazorpayConfigured,
 };

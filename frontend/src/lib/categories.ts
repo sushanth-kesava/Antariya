@@ -1,3 +1,4 @@
+
 // Single source of truth for Antariya's two-level T-shirt category system.
 //
 // Structure: CATEGORY (top-level section) -> SUB-CATEGORIES (items).
@@ -8,6 +9,52 @@
 //  - Admin "Add Product": category dropdown -> sub-category dropdown.
 //  - Customer marketplace: expandable category sidebar (category -> sub-cats).
 //  - Homepage "Shop by Category" bar (curated highlights).
+
+// ---------------------------------------------------------------------------
+// GLOBAL GENDER CATEGORIES (top-level "parent nodes" of the whole catalog).
+//
+// Every product carries a `gender` field ("Men" | "Women" | "Unisex").
+// These act as the highest-level entry points into the marketplace: a shopper
+// picks who they're shopping for, then sees only that audience's products.
+//
+// `value` MUST match the product `gender` field value used on the Add-Product
+// form (see PRODUCT_ATTRIBUTES.gender below).
+// ---------------------------------------------------------------------------
+export type GenderCategory = {
+  /** Display label for the card. */
+  label: string;
+  /** The `gender` field value to filter products by. */
+  value: string;
+  /** Short marketing tagline shown on the card. */
+  description: string;
+  /** Optional fallback image if no live product image is available for the card. */
+  fallbackImage?: string;
+};
+
+export const GENDER_CATEGORIES: GenderCategory[] = [
+  {
+    label: "Men's",
+    value: "Men",
+    description: "T-shirts & apparel for him",
+  },
+  {
+    label: "Women's",
+    value: "Women",
+    description: "T-shirts & apparel for her",
+  },
+  {
+    label: "Unisex",
+    value: "Unisex",
+    description: "Styles for everyone",
+  },
+  {
+    // "All Products" is not a gender — an empty value clears the gender filter
+    // and shows the entire catalogue.
+    label: "All Products",
+    value: "",
+    description: "Browse the entire collection",
+  },
+];
 
 export type CategoryDefinition = {
   /** Top-level category name (the section). */

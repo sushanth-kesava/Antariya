@@ -10,7 +10,8 @@
     "db:cleanup": "node scripts/cleanup-database.js",
     "db:import-products": "node scripts/import-products.js",
     "db:reassign-owners": "node scripts/reassign-product-owners.js",
-    "db:inspect-products": "node scripts/inspect-products.js"
+    "db:inspect-products": "node scripts/inspect-products.js",
+    "db:migrate-inventory": "node scripts/migrate-inventory.js"
   },
   "dependencies": {
     "axios": "^1.16.0",
@@ -21,12 +22,14 @@
     "express": "^4.21.2",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
+    "jspdf": "^2.5.2",
     "mongodb": "^6.0.0",
     "mongoose": "^8.15.1",
     "morgan": "^1.10.0",
     "multer": "^2.1.1",
     "nodemailer": "^8.0.4",
-    "razorpay": "^2.9.6"
+    "razorpay": "^2.9.6",
+    "socket.io": "^4.8.3"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"

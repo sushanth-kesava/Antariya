@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -18,10 +18,12 @@ import {
 import { type Product } from "@/app/lib/mock-data";
 import { getMyOrdersFromBackend } from "@/lib/api/orders";
 import { getWishlistFromBackend, WishlistItem } from "@/lib/api/wishlist";
+import { useInventoryUpdates } from "@/hooks/use-inventory-updates";
 import { getProductsFromBackend } from "@/lib/api/products";
 import { formatINR, formatIndianDate, normalizeCatalogPriceToINR } from "@/lib/india";
 import { clearAuthSession, getPortalPathForRole } from "@/lib/auth-session";
 import { getCustomerProfileFromBackend, type CustomerProfileData } from "@/lib/api/customerProfile";
+import { generateInvoicePdf } from "@/lib/invoice";
 import { useAuth } from "@/context/AuthContext";
 
 type RecommendationCard = {
@@ -89,6 +91,20 @@ function buildRecommendations(products: Product[], orders: any[], wishlist: Wish
   });
 }
 
+// Self-subscribing live stock badge for a single product (used in the
+// wishlist grid where we can't call a hook inside .map()).
+function LiveStockBadge({ productId, initialStock }: { productId: string; initialStock: number }) {
+  const updates = useInventoryUpdates({ productId });
+  const live = updates[""];
+  const stock = live && typeof live.available === "number" ? live.available : initialStock;
+  if (stock > 0) return null;
+  return (
+    <span className="inline-flex items-center rounded-full bg-red-500/90 text-white text-[10px] font-semibold px-2 py-0.5">
+      Out of stock
+    </span>
+  );
+}
+
 export default function CustomerDashboardClient() {
   const router = useRouter();
   const { user: authUser, loading: authLoading } = useAuth();
@@ -110,6 +126,24 @@ export default function CustomerDashboardClient() {
     if (typeof window !== "undefined") {
       window.dispatchEvent(new Event("antariya-open-profile"));
     }
+  };
+
+  // Build a branded invoice PDF for an order, filling in the customer's details.
+  const handleDownloadInvoice = (order: any) => {
+    const defaultAddress =
+      customerProfile?.addresses?.find((a) => a.isDefault) || customerProfile?.addresses?.[0];
+    const addressText = defaultAddress
+      ? [defaultAddress.line1, defaultAddress.line2, `${defaultAddress.city}, ${defaultAddress.state} ${defaultAddress.pincode}`]
+          .filter(Boolean)
+          .join(", ")
+      : null;
+
+    generateInvoicePdf(order, {
+      name: customerProfile?.displayName || authUser?.displayName || "Valued Customer",
+      email: customerProfile?.email || authUser?.email || order.userEmail,
+      phone: customerProfile?.phone,
+      address: addressText,
+    });
   };
 
   useEffect(() => {
@@ -348,8 +382,8 @@ export default function CustomerDashboardClient() {
                       {orders.map((order, i) => {
                         const isOpen = expandedOrderId === order.id;
                         return (
-                        <>
-                        <tr key={i} className="hover:bg-gray-50/50 transition-colors">
+                        <React.Fragment key={order.id ?? i}>
+                        <tr className="hover:bg-gray-50/50 transition-colors">
                           <td className="px-6 py-5 font-mono font-medium text-gray-900">{order.id}</td>
                           <td className="px-6 py-5 text-muted-foreground">{formatIndianDate(order.createdAt)}</td>
                           <td className="px-6 py-5">
@@ -358,6 +392,7 @@ export default function CustomerDashboardClient() {
                           <td className="px-6 py-5 font-medium">{order.items?.length || 0}</td>
                           <td className="px-6 py-5 font-bold text-gray-900">{formatINR(Number(order.total || 0))}</td>
                           <td className="px-6 py-5 text-right">
+                            <div className="inline-flex items-center gap-2">
                             <Button
                               variant="secondary"
                               size="sm"
@@ -366,6 +401,15 @@ export default function CustomerDashboardClient() {
                             >
                               Details <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isOpen ? "rotate-180" : ""}`} />
                             </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="rounded-full shadow-sm gap-1"
+                              onClick={() => handleDownloadInvoice(order)}
+                            >
+                              <Download className="h-3.5 w-3.5" /> Invoice
+                            </Button>
+                            </div>
                           </td>
                         </tr>
                         {isOpen && (
@@ -374,7 +418,12 @@ export default function CustomerDashboardClient() {
                               <div className="space-y-3">
                                 <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Items in this order</p>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                  {(order.items || []).map((item: any, idx: number) => (
+                                  {(order.items || []).map((item: any, idx: number) => {
+                                    const sku = item.variant?.sku || item.variantSku || "";
+                                    const variantAttrs = item.variant
+                                      ? [item.variant.size, item.variant.color, item.variant.gender].filter(Boolean).join(" · ")
+                                      : "";
+                                    return (
                                     <div key={idx} className="flex items-center gap-3 rounded-xl border border-gray-100 bg-white p-3">
                                       {item.image ? (
                                         // eslint-disable-next-line @next/next/no-img-element
@@ -384,16 +433,20 @@ export default function CustomerDashboardClient() {
                                       )}
                                       <div className="min-w-0 flex-1">
                                         <p className="text-sm font-semibold truncate">{item.name}</p>
-                                        {item.variant && (item.variant.size || item.variant.color) ? (
-                                          <p className="text-xs text-muted-foreground truncate">
-                                            {[item.variant.size, item.variant.color, item.variant.gender].filter(Boolean).join(" · ")}
-                                          </p>
-                                        ) : null}
+                                        <p className="text-xs text-muted-foreground truncate">
+                                          <span className="font-medium text-gray-600">Model:</span> {item.name}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground truncate">
+                                          <span className="font-medium text-gray-600">SKU:</span>{" "}
+                                          <span className="font-mono">{sku || "—"}</span>
+                                          {variantAttrs ? <span> · {variantAttrs}</span> : null}
+                                        </p>
                                         <p className="text-xs text-muted-foreground">Qty {item.quantity} · {formatINR(Number(item.price || 0))}</p>
                                       </div>
                                       <Link href={`/product/${item.productId}`} className="text-xs font-semibold text-primary hover:underline shrink-0">View</Link>
                                     </div>
-                                  ))}
+                                    );
+                                  })}
                                 </div>
                                 <div className="flex flex-wrap gap-4 pt-2 text-sm">
                                   <span className="text-muted-foreground">Subtotal: <span className="font-semibold text-foreground">{formatINR(Number(order.subtotal || 0))}</span></span>
@@ -405,7 +458,7 @@ export default function CustomerDashboardClient() {
                             </td>
                           </tr>
                         )}
-                        </>
+                        </React.Fragment>
                         );
                       })}
                     </tbody>
@@ -497,7 +550,10 @@ export default function CustomerDashboardClient() {
                       </div>
                       <CardContent className="p-4 space-y-2">
                         <div className="flex items-center justify-between gap-2">
-                          <Badge variant="secondary" className="rounded-full">{item.product.category}</Badge>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary" className="rounded-full">{item.product.category}</Badge>
+                            <LiveStockBadge productId={item.product.id} initialStock={Number(item.product.stock ?? 0)} />
+                          </div>
                           <span className="text-xs font-semibold text-muted-foreground">{formatINR(normalizeCatalogPriceToINR(Number(item.product.price || 0)))}</span>
                         </div>
                         <h3 className="font-semibold text-lg line-clamp-1">{item.product.name}</h3>

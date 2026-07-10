@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/navbar";
@@ -27,6 +27,7 @@ import {
   ClipboardCheck,
   Heart,
   X,
+  Pencil,
 } from "lucide-react";
 import {
   createProductOnBackend,
@@ -53,6 +54,8 @@ import {
   getAdminDashboardFromBackend,
   updateAdminOrderStatusOnBackend,
 } from "@/lib/api/orders";
+import { useInventoryUpdates } from "@/hooks/use-inventory-updates";
+import { useInventoryAlerts } from "@/hooks/use-inventory-alerts";
 import { getApiBaseUrl } from "@/lib/api/base-url";
 import { formatINR, formatIndianDate, formatIndianDateTime, normalizeCatalogPriceToINR } from "@/lib/india";
 import { PRODUCT_ATTRIBUTES } from "@/lib/categories";
@@ -63,6 +66,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -105,6 +109,13 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
   });
   const [adjusting, setAdjusting] = useState(false);
   const [adjustMessage, setAdjustMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  // Quick stock-only editor (per catalog row). Kept separate from the full
+  // adjust form above so the row action stays focused on updating stock.
+  const [stockEditProduct, setStockEditProduct] = useState<any | null>(null);
+  const [stockEditVariantSku, setStockEditVariantSku] = useState<string>("");
+  const [stockEditValue, setStockEditValue] = useState<string>("");
+  const [stockEditSaving, setStockEditSaving] = useState(false);
+  const [stockEditError, setStockEditError] = useState<string | null>(null);
   const [loadingDashboard, setLoadingDashboard] = useState(false);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
   const [orderStatusFilter, setOrderStatusFilter] = useState<"all" | "Processing" | "Shipped" | "Delivered" | "Cancelled">("all");
@@ -150,6 +161,24 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
     stock: string;
   };
   const [variants, setVariants] = useState<VariantRow[]>([]);
+
+  // --- Real-time inventory (staff) --------------------------------------
+  // Live low-stock + verification alerts pushed to the admin role room.
+  const { lowStock: liveLowStock, alert: liveAlert } = useInventoryAlerts("admin");
+  // Any inventory:update refreshes the inventory report so the dashboard
+  // figures (available/low/out) stay current without a manual reload. We
+  // debounce via a ref timer to coalesce bursts.
+  const inventoryRefreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useInventoryUpdates({
+    role: "admin",
+    onUpdate: () => {
+      if (!authToken) return;
+      if (inventoryRefreshTimer.current) clearTimeout(inventoryRefreshTimer.current);
+      inventoryRefreshTimer.current = setTimeout(() => {
+        void loadInventory();
+      }, 800);
+    },
+  });
 
   const selectedImagePreviews = useMemo(
     () => selectedImageFiles.map((file) => ({ file, previewUrl: URL.createObjectURL(file) })),
@@ -359,6 +388,12 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
       setAdjustMessage({ type: "error", text: "Enter a valid quantity." });
       return;
     }
+    const selectedProduct = catalog.find((p) => p.id === adjustForm.productId);
+    const productHasVariants = Boolean(selectedProduct?.variants && selectedProduct.variants.length > 0);
+    if (productHasVariants && !adjustForm.variantSku) {
+      setAdjustMessage({ type: "error", text: "This product has variants. Please select which variant to adjust." });
+      return;
+    }
     try {
       setAdjusting(true);
       const { product } = await adjustStockOnBackend(authToken, adjustForm.productId, {
@@ -385,6 +420,67 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
       }
     } finally {
       setAdjusting(false);
+    }
+  };
+
+  const openStockEditor = (product: any) => {
+    const hasVariants = Array.isArray(product?.variants) && product.variants.length > 0;
+    const firstSku = hasVariants ? (product.variants[0]?.sku || "") : "";
+    const initialStock = hasVariants
+      ? Number(product.variants[0]?.stock ?? 0)
+      : Number(product.stock ?? 0);
+    setStockEditProduct(product);
+    setStockEditVariantSku(firstSku);
+    setStockEditValue(String(initialStock));
+    setStockEditError(null);
+  };
+
+  const closeStockEditor = () => {
+    setStockEditProduct(null);
+    setStockEditVariantSku("");
+    setStockEditValue("");
+    setStockEditError(null);
+  };
+
+  // When switching the selected variant, reflect that variant's current stock.
+  const handleStockEditVariantChange = (sku: string) => {
+    setStockEditVariantSku(sku);
+    const variant = stockEditProduct?.variants?.find((v: any) => v.sku === sku);
+    if (variant) setStockEditValue(String(Number(variant.stock ?? 0)));
+  };
+
+  const handleStockEditSave = async () => {
+    if (!authToken || !stockEditProduct) return;
+    const newStock = parseInt(stockEditValue, 10);
+    if (!Number.isFinite(newStock) || newStock < 0) {
+      setStockEditError("Enter a valid stock quantity (0 or more).");
+      return;
+    }
+    const hasVariants = Array.isArray(stockEditProduct.variants) && stockEditProduct.variants.length > 0;
+    if (hasVariants && !stockEditVariantSku) {
+      setStockEditError("Select which variant to update.");
+      return;
+    }
+    try {
+      setStockEditSaving(true);
+      setStockEditError(null);
+      // "set" writes the exact new stock level via the transactional service.
+      const { product } = await adjustStockOnBackend(authToken, stockEditProduct.id, {
+        type: "set",
+        quantity: newStock,
+        variantSku: hasVariants ? stockEditVariantSku : undefined,
+        reason: "Manual stock edit (catalog)",
+      });
+      setCatalog((current) => current.map((item) => (item.id === product.id ? product : item)));
+      setAdjustMessage({ type: "success", text: "Stock updated successfully." });
+      void loadCatalog();
+      void loadStockHistory();
+      void loadInventory();
+      closeStockEditor();
+    } catch (err) {
+      setStockEditError(err instanceof Error ? err.message : "Failed to update stock.");
+    } finally {
+      setStockEditSaving(false);
     }
   };
 
@@ -553,16 +649,16 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
           deduped.push(file);
         }
 
-        if (deduped.length >= 6) {
+        if (deduped.length >= 10) {
           break;
         }
       }
 
-      if (current.length + nextFiles.length > 6) {
-        setError("You can upload up to 6 images only.");
+      if (current.length + nextFiles.length > 10) {
+        setError("You can upload up to 10 images only.");
       }
 
-      return deduped.slice(0, 6);
+      return deduped.slice(0, 10);
     });
   };
 
@@ -820,6 +916,24 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
   return (
     <div className="min-h-screen bg-gray-50/50 flex flex-col font-sans">
       <Navbar />
+      {(liveLowStock || liveAlert) && (
+        <div className="w-full max-w-[1760px] mx-auto px-3 sm:px-4 lg:px-6 pt-4 space-y-2">
+          {liveLowStock && liveLowStock.count > 0 && (
+            <div className="rounded-xl border border-amber-300 bg-amber-50 text-amber-900 px-4 py-3 text-sm flex items-center justify-between gap-3">
+              <span>
+                <strong>{liveLowStock.count}</strong> item{liveLowStock.count === 1 ? "" : "s"} at or below reorder point
+                {liveLowStock.alerts?.[0] ? ` — e.g. ${liveLowStock.alerts[0].productName}${liveLowStock.alerts[0].variantSku ? ` (${liveLowStock.alerts[0].variantSku})` : ""} · ${liveLowStock.alerts[0].available} left` : ""}
+              </span>
+              <Button type="button" variant="secondary" size="sm" className="h-8 rounded-lg" onClick={() => loadInventory()}>Review</Button>
+            </div>
+          )}
+          {liveAlert && liveAlert.issueCount > 0 && (
+            <div className="rounded-xl border border-red-300 bg-red-50 text-red-900 px-4 py-3 text-sm">
+              <strong>Inventory verification:</strong> {liveAlert.issueCount} issue{liveAlert.issueCount === 1 ? "" : "s"} detected ({liveAlert.kind}). Check the ledger for details.
+            </div>
+          )}
+        </div>
+      )}
       
       <div className="flex-1 flex flex-col lg:flex-row w-full max-w-[1760px] mx-auto px-3 sm:px-4 lg:px-6 py-8 gap-8">
         
@@ -1021,10 +1135,20 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
                         className="w-full h-10 rounded-xl border border-border bg-background px-2 text-sm outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
                         disabled={!adjustForm.productId}
                       >
-                        <option value="">Whole product</option>
-                        {(catalog.find((p) => p.id === adjustForm.productId)?.variants || []).map((v) => (
-                          <option key={v.sku} value={v.sku}>{v.sku || [v.size, v.color].filter(Boolean).join(" ")}</option>
-                        ))}
+                        {(() => {
+                          const sel = catalog.find((p) => p.id === adjustForm.productId);
+                          const hasVar = Boolean(sel?.variants && sel.variants.length > 0);
+                          return (
+                            <>
+                              <option value="" disabled={hasVar}>
+                                {hasVar ? "Select a variant…" : "Whole product"}
+                              </option>
+                              {(sel?.variants || []).map((v) => (
+                                <option key={v.sku} value={v.sku}>{v.sku || [v.size, v.color].filter(Boolean).join(" ")}</option>
+                              ))}
+                            </>
+                          );
+                        })()}
                       </select>
                     </div>
                     <div>
@@ -1353,7 +1477,7 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
                         </div>
                         <div>
                           <p className="text-sm font-semibold">Drag and drop images here</p>
-                          <p className="text-xs text-muted-foreground">or click to browse. Up to 6 images. If cloud upload is unavailable, the backend will handle the images another way.</p>
+                          <p className="text-xs text-muted-foreground">or click to browse. Up to 10 images. If cloud upload is unavailable, the backend will handle the images another way.</p>
                         </div>
                       </div>
 
@@ -1536,7 +1660,11 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
                         <p className="text-sm text-gray-500">{formatINR(normalizeCatalogPriceToINR(Number(product.price || 0)))} • {product.category} • In stock: {product.stock}</p>
                       </div>
                     </div>
-                    <div>
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => openStockEditor(product)} className="gap-1.5 text-gray-600 hover:text-primary hover:bg-primary/5 rounded-lg">
+                        <Pencil className="h-4 w-4" />
+                        Edit stock
+                      </Button>
                       <Button variant="ghost" size="icon" onClick={() => handleDelete(product.id)} className="text-red-500 hover:text-red-600 hover:bg-red-50">
                         <Trash2 className="h-5 w-5" />
                       </Button>
@@ -1549,6 +1677,63 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
                 </div>
               )}
             </div>
+
+            <Dialog open={Boolean(stockEditProduct)} onOpenChange={(open) => { if (!open) closeStockEditor(); }}>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Update stock</DialogTitle>
+                  <DialogDescription>
+                    {stockEditProduct?.name ? `Set the available stock for “${stockEditProduct.name}”.` : "Set the available stock for this product."}
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4 py-2">
+                  {Array.isArray(stockEditProduct?.variants) && stockEditProduct.variants.length > 0 && (
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium text-gray-700">Variant</label>
+                      <select
+                        value={stockEditVariantSku}
+                        onChange={(e) => handleStockEditVariantChange(e.target.value)}
+                        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      >
+                        {stockEditProduct.variants.map((v: any) => {
+                          const label = [v.size, v.color, v.gender, v.neckType, v.pattern].filter(Boolean).join(" / ") || v.sku;
+                          return (
+                            <option key={v.sku} value={v.sku}>
+                              {label} (current: {Number(v.stock ?? 0)})
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+                  )}
+
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-gray-700">New stock quantity</label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={stockEditValue}
+                      onChange={(e) => setStockEditValue(e.target.value)}
+                      placeholder="e.g. 25"
+                      autoFocus
+                    />
+                    <p className="text-xs text-muted-foreground">This sets the exact available stock. Every change is recorded in the inventory ledger.</p>
+                  </div>
+
+                  {stockEditError && (
+                    <p className="text-sm text-red-600">{stockEditError}</p>
+                  )}
+                </div>
+
+                <DialogFooter>
+                  <Button variant="ghost" onClick={closeStockEditor} disabled={stockEditSaving}>Cancel</Button>
+                  <Button onClick={() => void handleStockEditSave()} disabled={stockEditSaving} className="gap-2">
+                    {stockEditSaving ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving...</> : "Save stock"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
           ) : null}
 

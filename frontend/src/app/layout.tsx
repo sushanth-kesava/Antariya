@@ -1,6 +1,7 @@
 
 import type {Metadata} from 'next';
 import { Inter, Literata } from 'next/font/google';
+import Script from 'next/script';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { BRAND_ICON_URL, BRAND_LOGO_URL } from '@/lib/brand';
@@ -56,7 +57,7 @@ export default function RootLayout({
         <link rel="icon" href={BRAND_ICON_URL} />
         <link rel="shortcut icon" href={BRAND_ICON_URL} />
         <link rel="apple-touch-icon" href={BRAND_ICON_URL} />
-        <script src="/runtime-config.js" defer></script>
+        <Script src="/runtime-config.js" strategy="beforeInteractive" />
       </head>
       <body className={`${inter.variable} ${literata.variable} font-body antialiased selection:bg-primary selection:text-white`}>
         <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "YOUR_GOOGLE_CLIENT_ID"}>
