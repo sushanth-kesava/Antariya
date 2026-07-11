@@ -8,6 +8,16 @@ const userSchema = new mongoose.Schema(
     displayName: { type: String, required: true, trim: true },
     photoURL: { type: String, default: null },
     role: { type: String, enum: ["customer", "admin"], default: "customer" },
+    // ERP RBAC: stable role key resolved against the Role catalog. Defaults
+    // are derived from `role` for legacy records. Superadmin is still gated by
+    // the email allowlist in config/env.js, but a matching roleKey is set too.
+    roleKey: { type: String, default: null, index: true, lowercase: true, trim: true },
+    // Per-user permission overrides layered on top of the role's permissions.
+    // effective = (role.permissions ∪ customPermissions) − deniedPermissions
+    customPermissions: { type: [String], default: [] },
+    deniedPermissions: { type: [String], default: [] },
+    // Soft activation flag for portal staff (mirrors AdminProfile.active).
+    active: { type: Boolean, default: true },
     authProvider: { type: String, enum: ["google", "credentials"], default: "google" },
     passwordHash: { type: String, default: null },
     oauth: {

@@ -39,6 +39,7 @@ export type CustomerProfileData = {
   totalSpend: number;
   lastOrderAt: string | null;
   profileComplete: boolean;
+  lastProfileEditAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -52,42 +53,92 @@ export async function getCustomerProfileFromBackend(token: string): Promise<Cust
   return data.profile as CustomerProfileData;
 }
 
+export type UpdateProfileResult =
+  | { success: true; profile: CustomerProfileData }
+  | { success: false; message: string; code?: string; daysRemaining?: number };
+
 export async function updateCustomerProfileOnBackend(
   token: string,
-  updates: Partial<Pick<CustomerProfileData, "displayName" | "phone" | "gender" | "dateOfBirth" | "preferences">>
-): Promise<CustomerProfileData> {
+  updates: Partial<Pick<CustomerProfileData, "displayName" | "gender" | "dateOfBirth" | "preferences">>
+): Promise<UpdateProfileResult> {
   const res = await fetch(`${API_BASE_URL}/customer/profile`, {
     method: "PUT",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify(updates),
   });
   const data = await res.json();
-  if (!res.ok || !data.success) throw new Error(data.message || "Failed to update profile");
-  return data.profile as CustomerProfileData;
+  if (!res.ok || !data.success) {
+    return { success: false, message: data.message || "Failed to update profile", code: data.code, daysRemaining: data.daysRemaining };
+  }
+  return { success: true, profile: data.profile as CustomerProfileData };
 }
 
-export async function addAddressOnBackend(
-  token: string,
-  address: Omit<CustomerAddress, "_id">
-): Promise<CustomerAddress[]> {
+export type AddressInput = {
+  addressType: "Home" | "Office" | "Other";
+  line1: string;
+  line2?: string;
+  landmark?: string;
+  city: string;
+  state: string;
+  country?: string;
+  pincode: string;
+  alternatePhone?: string;
+  deliveryInstructions?: string;
+  isDefault?: boolean;
+};
+
+export type AddressResult =
+  | { success: true; addresses: CustomerAddress[] }
+  | { success: false; message: string; code?: string };
+
+export async function addAddressOnBackend(token: string, address: AddressInput): Promise<AddressResult> {
   const res = await fetch(`${API_BASE_URL}/customer/profile/address`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify(address),
   });
   const data = await res.json();
-  if (!res.ok || !data.success) throw new Error(data.message || "Failed to add address");
-  return data.addresses as CustomerAddress[];
+  if (!res.ok || !data.success) {
+    return { success: false, message: data.message || "Failed to add address", code: data.code };
+  }
+  return { success: true, addresses: data.addresses as CustomerAddress[] };
 }
 
-export async function removeAddressOnBackend(token: string, addressId: string): Promise<CustomerAddress[]> {
+export async function updateAddressOnBackend(token: string, addressId: string, address: AddressInput): Promise<AddressResult> {
+  const res = await fetch(`${API_BASE_URL}/customer/profile/address/${addressId}`, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(address),
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    return { success: false, message: data.message || "Failed to update address", code: data.code };
+  }
+  return { success: true, addresses: data.addresses as CustomerAddress[] };
+}
+
+export async function setDefaultAddressOnBackend(token: string, addressId: string): Promise<AddressResult> {
+  const res = await fetch(`${API_BASE_URL}/customer/profile/address/${addressId}/default`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    return { success: false, message: data.message || "Failed to set default address" };
+  }
+  return { success: true, addresses: data.addresses as CustomerAddress[] };
+}
+
+export async function removeAddressOnBackend(token: string, addressId: string): Promise<AddressResult> {
   const res = await fetch(`${API_BASE_URL}/customer/profile/address/${addressId}`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${token}` },
   });
   const data = await res.json();
-  if (!res.ok || !data.success) throw new Error(data.message || "Failed to remove address");
-  return data.addresses as CustomerAddress[];
+  if (!res.ok || !data.success) {
+    return { success: false, message: data.message || "Failed to remove address" };
+  }
+  return { success: true, addresses: data.addresses as CustomerAddress[] };
 }
 
 
@@ -132,4 +183,49 @@ export async function completeProfileOnBackend(
     return { success: false, message: data.message || "Failed to complete profile", errors: data.errors };
   }
   return { success: true, profile: data.profile as CustomerProfileData };
+}
+
+
+export type AdminBusinessDetails = {
+  fullName?: string | null;
+  email?: string | null;
+  phoneNumber?: string | null;
+  businessName?: string | null;
+  businessType?: string | null;
+  businessAddress?: string | null;
+  website?: string | null;
+  panNumber?: string | null;
+  aadharNumber?: string | null;
+  gstNumber?: string | null;
+  notes?: string | null;
+  status?: string;
+  submittedAt?: string;
+  reviewedAt?: string | null;
+};
+
+export async function getBusinessDetailsFromBackend(token: string): Promise<AdminBusinessDetails | null> {
+  const res = await fetch(`${API_BASE_URL}/customer/profile/business`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) return null;
+  return (data.business as AdminBusinessDetails) || null;
+}
+
+
+export async function updateBusinessDetailsOnBackend(
+  token: string,
+  updates: Partial<Pick<AdminBusinessDetails,
+    "businessName" | "businessType" | "businessAddress" | "website" | "panNumber" | "aadharNumber" | "gstNumber" | "notes">>
+): Promise<{ success: boolean; message?: string; business?: AdminBusinessDetails }> {
+  const res = await fetch(`${API_BASE_URL}/customer/profile/business`, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(updates),
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    return { success: false, message: data.message || "Failed to update business details" };
+  }
+  return { success: true, message: data.message, business: data.business as AdminBusinessDetails };
 }

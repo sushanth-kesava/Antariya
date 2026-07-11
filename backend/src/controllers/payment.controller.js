@@ -124,9 +124,40 @@ function verifyPaymentSignature(req, res) {
   });
 }
 
+/**
+ * Issue a refund against a captured Razorpay payment. Amount is optional —
+ * when omitted, Razorpay refunds the full captured amount. `amountPaise` must
+ * be an integer number of paise when provided (partial refund).
+ * Returns the Razorpay refund object. Throws if Razorpay isn't configured.
+ */
+async function refundRazorpayPayment({ paymentId, amountPaise, notes } = {}) {
+  if (!isRazorpayConfigured()) {
+    const err = new Error("Razorpay is not configured");
+    err.statusCode = 500;
+    throw err;
+  }
+  if (!paymentId) {
+    const err = new Error("A Razorpay payment id is required to refund");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const client = getRazorpayClient();
+  const payload = {};
+  if (Number.isFinite(Number(amountPaise)) && Number(amountPaise) > 0) {
+    payload.amount = Math.round(Number(amountPaise));
+  }
+  if (notes && typeof notes === "object") {
+    payload.notes = notes;
+  }
+
+  return client.payments.refund(paymentId, payload);
+}
+
 module.exports = {
   createRazorpayOrder,
   verifyPaymentSignature,
   isValidRazorpaySignature,
   isRazorpayConfigured,
+  refundRazorpayPayment,
 };

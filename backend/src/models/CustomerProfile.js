@@ -58,6 +58,10 @@ const customerProfileSchema = new mongoose.Schema(
     totalSpend: { type: Number, default: 0 },
     lastOrderAt: { type: Date, default: null },
     profileComplete: { type: Boolean, default: false },
+    // Timestamp of the last edit to core identity details (name/gender/DOB).
+    // Used to enforce a 15-day cooldown between such edits. Null = never edited
+    // via the profile page, so the first edit is always allowed.
+    lastProfileEditAt: { type: Date, default: null },
   },
   {
     timestamps: true,

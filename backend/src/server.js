@@ -10,6 +10,7 @@ const productRoutes = require("./routes/product.routes");
 const orderRoutes = require("./routes/order.routes");
 const superAdminRoutes = require("./routes/superadmin.routes");
 const deliveryRoutes = require("./routes/delivery.routes");
+const erpRoutes = require("./routes/erp.routes");
 const wishlistRoutes = require("./routes/wishlist.routes");
 const waitlistRoutes = require("./routes/waitlist.routes");
 const statsRoutes = require("./routes/stats.routes");
@@ -19,6 +20,8 @@ const inventoryRoutes = require("./routes/inventory.routes");
 const { notFound, errorHandler } = require("./middleware/error.middleware");
 const { attachRealtime } = require("./services/realtime.service");
 const { startInventoryJobs } = require("./services/inventory.jobs");
+const { ensureDefaultRoles } = require("./services/rbac.service");
+const { ensureDefaultRateLimits } = require("./services/ratelimit.service");
 const { ensureDefaultWarehouse } = require("./services/inventory.service");
 const http = require("http");
 
@@ -72,6 +75,7 @@ app.use("/api/products", productRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/superadmin", superAdminRoutes);
 app.use("/api/delivery", deliveryRoutes);
+app.use("/api/erp", erpRoutes);
 app.use("/api/wishlist", wishlistRoutes);
 app.use("/api/waitlist", waitlistRoutes);
 app.use("/api/stats", statsRoutes);
@@ -88,6 +92,13 @@ async function startServer() {
     // Guarantee the DEFAULT warehouse exists before serving traffic, so the
     // inventory system never needs a manual migration to function.
     await ensureDefaultWarehouse();
+
+    // Seed the default RBAC roles (superadmin, admin, hr_manager, etc.) so the
+    // ERP permission engine is functional on first boot with no manual setup.
+    await ensureDefaultRoles();
+
+    // Seed the default rate-limit rules so Governance → Rate Limits is live.
+    await ensureDefaultRateLimits();
 
     const httpServer = http.createServer(app);
 

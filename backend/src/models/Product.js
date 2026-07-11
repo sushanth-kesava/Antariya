@@ -44,6 +44,9 @@ const productSchema = new mongoose.Schema(
     fileDownloadLink: { type: String, default: null },
     rating: { type: Number, min: 0, max: 5, default: 0 },
     customizable: { type: Boolean, default: false },
+    // Storefront visibility. Defaults true so all existing products stay
+    // visible; toggled from the ERP Catalog module (catalog.publish).
+    published: { type: Boolean, default: true, index: true },
   },
   {
     timestamps: true,

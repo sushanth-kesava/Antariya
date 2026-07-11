@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Loader2, User as UserIcon, Pencil, Check, Mail, Phone, Calendar, Award, ShoppingBag } from "lucide-react";
+import { X, Loader2, User as UserIcon, Pencil, Check, Mail, Phone, Calendar, Award, ShoppingBag, MapPin, MessageCircle, Home, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -39,6 +39,7 @@ export function ProfileSidebar({ open, onClose, onSaved }: ProfileSidebarProps) 
     dateOfBirth: "",
     newsletter: true,
     smsAlerts: false,
+    whatsappOptIn: false,
   });
 
   useEffect(() => {
@@ -63,6 +64,7 @@ export function ProfileSidebar({ open, onClose, onSaved }: ProfileSidebarProps) 
           dateOfBirth: data.dateOfBirth ? data.dateOfBirth.slice(0, 10) : "",
           newsletter: data.preferences?.newsletter ?? true,
           smsAlerts: data.preferences?.smsAlerts ?? false,
+          whatsappOptIn: data.preferences?.whatsappOptIn ?? false,
         });
       })
       .catch((err) => {
@@ -93,21 +95,25 @@ export function ProfileSidebar({ open, onClose, onSaved }: ProfileSidebarProps) 
     setError(null);
     setMessage(null);
     try {
-      const updated = await updateCustomerProfileOnBackend(token, {
+      const result = await updateCustomerProfileOnBackend(token, {
         displayName: form.displayName,
-        phone: form.phone,
         gender: form.gender || null,
         dateOfBirth: form.dateOfBirth || null,
         preferences: {
           categories: profile?.preferences?.categories || [],
           newsletter: form.newsletter,
           smsAlerts: form.smsAlerts,
+          whatsappOptIn: form.whatsappOptIn,
         },
       });
-      setProfile(updated);
+      if (!result.success) {
+        setError(result.message);
+        return;
+      }
+      setProfile(result.profile);
       setEditing(false);
       setMessage("Profile updated.");
-      onSaved?.(updated);
+      onSaved?.(result.profile);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update profile.");
     } finally {
@@ -124,6 +130,7 @@ export function ProfileSidebar({ open, onClose, onSaved }: ProfileSidebarProps) 
         dateOfBirth: profile.dateOfBirth ? profile.dateOfBirth.slice(0, 10) : "",
         newsletter: profile.preferences?.newsletter ?? true,
         smsAlerts: profile.preferences?.smsAlerts ?? false,
+        whatsappOptIn: profile.preferences?.whatsappOptIn ?? false,
       });
     }
     setEditing(false);
@@ -302,7 +309,54 @@ export function ProfileSidebar({ open, onClose, onSaved }: ProfileSidebarProps) 
                       className="h-4 w-4 accent-primary disabled:opacity-60"
                     />
                   </label>
+                  <label className="flex items-center justify-between rounded-xl border border-border bg-muted/40 px-3 py-2">
+                    <span className="text-sm flex items-center gap-1.5"><MessageCircle className="h-3.5 w-3.5" /> WhatsApp updates</span>
+                    <input
+                      type="checkbox"
+                      checked={form.whatsappOptIn}
+                      disabled={!editing}
+                      onChange={(e) => setForm((c) => ({ ...c, whatsappOptIn: e.target.checked }))}
+                      className="h-4 w-4 accent-primary disabled:opacity-60"
+                    />
+                  </label>
                 </div>
+              </div>
+
+              {/* Saved Shipping Addresses (read-only snapshot from onboarding) */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-bold flex items-center gap-1.5"><MapPin className="h-4 w-4 text-primary" /> Shipping Address</h3>
+                {profile.addresses && profile.addresses.length > 0 ? (
+                  profile.addresses.map((addr) => (
+                    <div key={addr._id} className="rounded-xl border border-border bg-muted/40 p-4 space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold rounded-full bg-primary/10 text-primary px-2 py-0.5">
+                          {addr.addressType === "Office" ? <Building2 className="h-3 w-3" /> : <Home className="h-3 w-3" />}
+                          {addr.addressType || addr.label || "Home"}
+                        </span>
+                        {addr.isDefault ? (
+                          <span className="text-[10px] uppercase tracking-wide font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">Default</span>
+                        ) : null}
+                      </div>
+                      <p className="text-sm font-medium leading-relaxed">
+                        {[addr.line1, addr.line2, addr.landmark].filter(Boolean).join(", ")}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {[addr.city, addr.state, addr.pincode].filter(Boolean).join(", ")}
+                        {addr.country ? `, ${addr.country}` : ""}
+                      </p>
+                      {addr.alternatePhone ? (
+                        <p className="text-xs text-muted-foreground flex items-center gap-1"><Phone className="h-3 w-3" /> Alt: {addr.alternatePhone}</p>
+                      ) : null}
+                      {addr.deliveryInstructions ? (
+                        <p className="text-xs text-muted-foreground italic">&ldquo;{addr.deliveryInstructions}&rdquo;</p>
+                      ) : null}
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground rounded-xl border border-dashed border-border p-4 text-center">
+                    No shipping address saved yet.
+                  </p>
+                )}
               </div>
 
               {error ? <p className="text-sm text-red-600">{error}</p> : null}

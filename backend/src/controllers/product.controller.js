@@ -140,6 +140,7 @@ function normalizeProduct(doc) {
     fileDownloadLink: doc.fileDownloadLink,
     rating: doc.rating,
     customizable: doc.customizable,
+    published: doc.published !== false,
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
   };
@@ -465,6 +466,13 @@ async function getProducts(req, res, next) {
     const skip = (pageNum - 1) * limitNum;
 
     const filter = {};
+
+    // Storefront only shows published products. Staff tooling that needs to
+    // see unpublished items can pass ?includeUnpublished=true. Legacy products
+    // without the field ($ne: false) remain visible.
+    if (req.query.includeUnpublished !== "true") {
+      filter.published = { $ne: false };
+    }
 
     if (category) {
       filter.category = category;

@@ -174,11 +174,14 @@ export function Navbar() {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild className="rounded-xl p-3 cursor-pointer">
+                    <Link href="/account">My Profile</Link>
+                  </DropdownMenuItem>
                   <DropdownMenuItem
                     className="rounded-xl p-3 cursor-pointer"
                     onSelect={(e) => { e.preventDefault(); setProfileOpen(true); }}
                   >
-                    My Profile
+                    Quick View
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild className="rounded-xl p-3 cursor-pointer">
                     <Link href={portalHref}>My Portal</Link>
