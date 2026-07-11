@@ -33,7 +33,7 @@ export function Hero({ metrics, featuredProduct }: HeroProps) {
               <span>India's Largest Embroidery Marketplace</span>
             </div>
             
-            <h1 className="text-5xl lg:text-7xl font-bold tracking-tight text-foreground leading-[1.1]">
+            <h1 className="text-4xl sm:text-5xl lg:text-7xl font-bold tracking-tight text-foreground leading-[1.1]">
               Every Stitch Tells a <span className="text-primary italic font-headline">Story</span>
             </h1>
             
@@ -54,7 +54,7 @@ export function Hero({ metrics, featuredProduct }: HeroProps) {
               </Button>
             </div>
 
-            <div className="flex items-center gap-8 pt-8">
+            <div className="flex flex-wrap items-center gap-x-8 gap-y-4 pt-8">
               <div className="space-y-1">
                 <p className="text-2xl font-bold">{formatMetric(metrics.products)}</p>
                 <p className="text-sm text-muted-foreground">Products</p>

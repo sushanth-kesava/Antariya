@@ -11,14 +11,7 @@ services:
         sync: false
       - key: JWT_SECRET
         sync: false
+      # Frontend is hosted on Hostinger (static export). These origins are
+      # allowed through CORS so the Hostinger site can call this backend.
       - key: FRONTEND_URL
-        value: https://antariya.onrender.com
-  - type: static_site
-    name: antariya-frontend
-    rootDir: frontend
-    buildCommand: npm ci && npm run build
-    staticPublishPath: out
-    autoDeploy: true
-    envVars:
-      - key: NEXT_PUBLIC_API_BASE_URL
-        value: https://api.antariyaofficial.com/api
+        value: https://antariyaofficial.com,https://www.antariyaofficial.com

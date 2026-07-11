@@ -3,11 +3,18 @@ const mongoose = require("mongoose");
 const addressSchema = new mongoose.Schema(
   {
     label: { type: String, default: "Home" },
+    // "Home" | "Office" | "Other" — the delivery address type.
+    addressType: { type: String, enum: ["Home", "Office", "Other"], default: "Home" },
     line1: { type: String, default: "" },
     line2: { type: String, default: "" },
+    landmark: { type: String, default: "" },
     city: { type: String, default: "" },
     state: { type: String, default: "" },
+    country: { type: String, default: "India" },
     pincode: { type: String, default: "" },
+    // Optional per-address delivery preferences / contact.
+    alternatePhone: { type: String, default: "" },
+    deliveryInstructions: { type: String, default: "" },
     isDefault: { type: Boolean, default: false },
   },
   { _id: true }
@@ -40,6 +47,7 @@ const customerProfileSchema = new mongoose.Schema(
       categories: { type: [String], default: [] },
       newsletter: { type: Boolean, default: true },
       smsAlerts: { type: Boolean, default: false },
+      whatsappOptIn: { type: Boolean, default: false },
     },
     membershipTier: {
       type: String,

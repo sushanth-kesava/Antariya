@@ -120,4 +120,132 @@ async function removeAddress(req, res, next) {
   }
 }
 
-module.exports = { getCustomerProfile, updateCustomerProfile, addAddress, removeAddress };
+// POST /api/customer/profile/complete
+// One-shot onboarding submission: personal info + default shipping address +
+// delivery preferences + notification opt-ins. Validates server-side, creates
+// the first default address, and lets the pre-save hook set profileComplete.
+const INDIAN_PHONE_RE = /^[6-9]\d{9}$/;
+const PINCODE_RE = /^\d{6}$/;
+
+function normalizePhone(value) {
+  // Accept formats like +91 98765 43210, 09876543210, 9876543210 -> 10 digits.
+  const digits = String(value || "").replace(/\D/g, "");
+  if (digits.length === 12 && digits.startsWith("91")) return digits.slice(2);
+  if (digits.length === 11 && digits.startsWith("0")) return digits.slice(1);
+  return digits;
+}
+
+async function completeProfile(req, res, next) {
+  try {
+    const userId = req.auth?.sub;
+    const {
+      fullName,
+      email,
+      phone,
+      dateOfBirth,
+      gender,
+      address = {},
+      useSamePhone,
+      alternatePhone,
+      addressType,
+      deliveryInstructions,
+      whatsappOptIn,
+      promotionalEmails,
+    } = req.body || {};
+
+    // --- Validation -------------------------------------------------------
+    const errors = {};
+    const trimmedName = String(fullName || "").trim();
+    if (!trimmedName) errors.fullName = "Full name is required.";
+
+    const normalizedPhone = normalizePhone(phone);
+    if (!normalizedPhone) errors.phone = "Mobile number is required.";
+    else if (!INDIAN_PHONE_RE.test(normalizedPhone)) errors.phone = "Enter a valid 10-digit Indian mobile number.";
+
+    const line1 = String(address.line1 || "").trim();
+    if (!line1) errors["address.line1"] = "Address line 1 is required.";
+
+    const state = String(address.state || "").trim();
+    if (!state) errors["address.state"] = "State is required.";
+
+    const city = String(address.city || "").trim();
+    if (!city) errors["address.city"] = "City is required.";
+
+    const country = String(address.country || "India").trim() || "India";
+
+    const pincode = String(address.pincode || "").trim();
+    if (!pincode) errors["address.pincode"] = "PIN code is required.";
+    else if (!PINCODE_RE.test(pincode)) errors["address.pincode"] = "PIN code must be exactly 6 digits.";
+
+    let altPhone = "";
+    if (!useSamePhone && alternatePhone) {
+      altPhone = normalizePhone(alternatePhone);
+      if (altPhone && !INDIAN_PHONE_RE.test(altPhone)) {
+        errors.alternatePhone = "Enter a valid 10-digit Indian mobile number.";
+      }
+    }
+
+    const normalizedType = ["Home", "Office", "Other"].includes(addressType) ? addressType : "Home";
+    const normalizedGender = ["male", "female", "other"].includes(gender) ? gender : null;
+
+    if (Object.keys(errors).length > 0) {
+      return res.status(400).json({ success: false, message: "Please correct the highlighted fields.", errors });
+    }
+
+    // --- Load or lazily create the profile --------------------------------
+    let profile = await CustomerProfile.findOne({ userId });
+    if (!profile) {
+      const account =
+        (await User.findById(userId).lean()) ||
+        (await AdminProfile.findById(userId).lean());
+      if (!account) {
+        return res.status(404).json({ success: false, message: "User not found." });
+      }
+      profile = await CustomerProfile.create({
+        userId: account._id,
+        email: account.email,
+        displayName: account.displayName || "",
+        photoURL: account.photoURL || null,
+      });
+    }
+
+    // --- Apply personal info ---------------------------------------------
+    profile.displayName = trimmedName;
+    profile.phone = normalizedPhone;
+    if (dateOfBirth) profile.dateOfBirth = new Date(dateOfBirth);
+    profile.gender = normalizedGender;
+    // Email is verified at the account level; allow an editable override.
+    if (email && String(email).trim()) profile.email = String(email).trim().toLowerCase();
+
+    // --- Preferences ------------------------------------------------------
+    profile.preferences.whatsappOptIn = Boolean(whatsappOptIn);
+    profile.preferences.newsletter = Boolean(promotionalEmails);
+
+    // --- Default shipping address ----------------------------------------
+    // Mark all existing addresses non-default, then push this as the default.
+    profile.addresses.forEach((addr) => { addr.isDefault = false; });
+    profile.addresses.push({
+      label: normalizedType,
+      addressType: normalizedType,
+      line1,
+      line2: String(address.line2 || "").trim(),
+      landmark: String(address.landmark || "").trim(),
+      city,
+      state,
+      country,
+      pincode,
+      alternatePhone: useSamePhone ? "" : altPhone,
+      deliveryInstructions: String(deliveryInstructions || "").trim(),
+      isDefault: true,
+    });
+
+    // profileComplete is auto-set by the pre-save hook (name + phone + address).
+    await profile.save();
+
+    return res.status(200).json({ success: true, message: "Profile completed successfully!", profile });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+module.exports = { getCustomerProfile, updateCustomerProfile, addAddress, removeAddress, completeProfile };

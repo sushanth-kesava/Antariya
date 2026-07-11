@@ -26,6 +26,8 @@ import {
   signupWithCredentialsOnBackend,
 } from "@/lib/api/auth";
 import { getApiBaseUrl } from "@/lib/api/base-url";
+import { useAuth } from "@/context/AuthContext";
+import { getCustomerProfileFromBackend } from "@/lib/api/customerProfile";
 
 type AuthMode = "login" | "signup";
 
@@ -63,8 +65,13 @@ export default function CommonAuthPage({ mode }: { mode: AuthMode }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
+  const { setUser } = useAuth();
   const API_BASE_URL = getApiBaseUrl();
   const [loading, setLoading] = useState(false);
+  // Brief "signing you in" overlay shown after a successful auth, so the
+  // transition to the portal feels smooth (no hard refresh needed).
+  const [redirecting, setRedirecting] = useState(false);
+  const [welcomeName, setWelcomeName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -129,6 +136,7 @@ export default function CommonAuthPage({ mode }: { mode: AuthMode }) {
           typeof data.token === "string" && data.token.trim().length > 0 ? data.token : token;
 
         persistAuthSession(refreshedToken, normalizedUser);
+        setUser(normalizedUser);
         router.replace(nextPath || getPortalPathForRole(normalizedUser.role));
       } catch {
         clearAuthSession();
@@ -142,9 +150,34 @@ export default function CommonAuthPage({ mode }: { mode: AuthMode }) {
     };
   }, [forceSwitch, nextPath, router]);
 
-  const finishAuth = (token: string, user: AuthSessionUser) => {
+  const finishAuth = async (token: string, user: AuthSessionUser) => {
     persistAuthSession(token, user);
-    router.replace(getPortalPathForRole(user.role));
+    // Update the shared auth context synchronously so the navbar and every
+    // consumer reflect the logged-in state instantly — no hard refresh.
+    setUser(user);
+    setWelcomeName(user.displayName || user.email || "");
+    setRedirecting(true);
+
+    // Decide the destination. Customers whose profile isn't complete are sent
+    // to the onboarding page first; a requested `next` is preserved so they
+    // return to it after completing. Admins/superadmins skip onboarding.
+    let destination = nextPath || getPortalPathForRole(user.role);
+    if (user.role === "customer") {
+      try {
+        const profile = await getCustomerProfileFromBackend(token);
+        if (profile && !profile.profileComplete) {
+          const suffix = nextPath ? `?next=${encodeURIComponent(nextPath)}` : "";
+          destination = `/complete-profile${suffix}`;
+        }
+      } catch {
+        /* if the check fails, fall through to the normal destination */
+      }
+    }
+
+    // Small delay lets the welcome animation play before navigating.
+    window.setTimeout(() => {
+      router.replace(destination);
+    }, 900);
   };
 
   const googleAuth = useGoogleLogin({
@@ -173,7 +206,7 @@ export default function CommonAuthPage({ mode }: { mode: AuthMode }) {
           throw new Error("Authentication response was incomplete.");
         }
 
-        finishAuth(result.token, result.user);
+        await finishAuth(result.token, result.user);
       } catch (error) {
         toast({
           title: "Authentication failed",
@@ -273,7 +306,7 @@ export default function CommonAuthPage({ mode }: { mode: AuthMode }) {
         throw new Error("Authentication response was incomplete.");
       }
 
-      finishAuth(result.token, result.user);
+      await finishAuth(result.token, result.user);
     } catch (error) {
       toast({
         title: isSignup ? "Signup failed" : "Login failed",
@@ -287,6 +320,27 @@ export default function CommonAuthPage({ mode }: { mode: AuthMode }) {
 
   return (
     <div className="min-h-screen bg-gray-50/50 flex flex-col font-sans">
+      {redirecting ? (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/95 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-5 animate-fade-in text-center px-6">
+            <div className="relative h-16 w-16">
+              <div className="absolute inset-0 rounded-full border-4 border-primary/20" />
+              <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-primary animate-spin" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <svg className="h-7 w-7 text-primary animate-scale-in" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xl font-bold font-headline tracking-tight text-foreground">
+                {welcomeName ? `Welcome, ${welcomeName.split(" ")[0]}!` : "You're signed in!"}
+              </p>
+              <p className="text-sm text-muted-foreground">Taking you to your portal...</p>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <Navbar />
       <div className="flex-1 flex items-center justify-center px-4 py-10">
         <div className="w-full max-w-xl bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-100">

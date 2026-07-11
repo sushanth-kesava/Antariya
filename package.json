@@ -3,7 +3,10 @@
   "version": "1.0.0",
   "description": "Antariya - E-commerce platform with customization",
   "private": true,
-  "workspaces": ["frontend", "backend"],
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
   "scripts": {
     "dev": "concurrently \"npm --prefix frontend run dev\" \"npm --prefix backend run dev\"",
     "build": "npm --prefix frontend run build && npm --prefix backend run build 2>/dev/null || true",
