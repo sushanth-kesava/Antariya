@@ -309,9 +309,76 @@ async function sendOrderInvoiceEmail({ to, displayName, order, buyer }) {
   return sendMail({ to, ...message, attachments });
 }
 
+/**
+ * Wrap arbitrary body HTML in the branded Antariya email shell (header with
+ * brand name + footer). Used for campaigns and templated emails so every
+ * message looks consistent. `bodyHtml` is inserted as-is (already trusted /
+ * sanitized by the composer). An optional unsubscribe URL renders a footer link.
+ */
+function wrapBrandedEmail({ title, bodyHtml, unsubscribeUrl }) {
+  const appName = env.appName || "Antariya";
+  const safeAppName = escapeHtml(appName);
+  const safeTitle = escapeHtml(title || appName);
+  const websiteUrl = env.frontendUrl || "https://antariyaofficial.com";
+  const safeWebsiteUrl = escapeHtml(websiteUrl);
+  const unsubscribeBlock = unsubscribeUrl
+    ? `<p style="margin:12px 0 0;font-size:12px;line-height:1.6;color:#9ca3af;">Don't want these emails? <a href="${escapeHtml(
+        unsubscribeUrl
+      )}" style="color:#0f766e;">Unsubscribe</a>.</p>`
+    : "";
+
+  return `
+  <!DOCTYPE html>
+  <html>
+    <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>${safeTitle}</title></head>
+    <body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:24px 0;">
+        <tr><td align="center">
+          <table role="presentation" width="640" cellpadding="0" cellspacing="0" style="width:640px;max-width:94%;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb;">
+            <tr><td style="background:linear-gradient(135deg,#0f766e,#0ea5a4);padding:26px 28px;">
+              <h1 style="margin:0;font-size:26px;line-height:1.2;color:#ffffff;">${safeAppName}</h1>
+            </td></tr>
+            <tr><td style="padding:28px;">${bodyHtml}</td></tr>
+            <tr><td style="padding:18px 28px 30px;border-top:1px solid #f3f4f6;">
+              <p style="margin:0;font-size:13px;line-height:1.6;color:#6b7280;">Visit us at <a href="${safeWebsiteUrl}" style="color:#0f766e;">${safeWebsiteUrl}</a></p>
+              ${unsubscribeBlock}
+              <p style="margin:12px 0 0;font-size:12px;line-height:1.6;color:#a8a29e;">© ${new Date().getFullYear()} ${safeAppName}. All rights reserved.</p>
+            </td></tr>
+          </table>
+        </td></tr>
+      </table>
+    </body>
+  </html>`;
+}
+
+/** Substitute {{key}} placeholders in a string with values from `vars`. */
+function renderPlaceholders(template, vars = {}) {
+  return String(template || "").replace(/\{\{\s*(\w+)\s*\}\}/g, (match, key) =>
+    Object.prototype.hasOwnProperty.call(vars, key) ? String(vars[key] ?? "") : match
+  );
+}
+
+/**
+ * Send a branded email built from a raw subject + body HTML (already the inner
+ * content — it gets wrapped in the branded shell). Used by campaigns.
+ */
+async function sendBrandedEmail({ to, subject, bodyHtml, unsubscribeUrl, vars }) {
+  const renderedSubject = renderPlaceholders(subject, vars);
+  const renderedBody = renderPlaceholders(bodyHtml, vars);
+  const html = wrapBrandedEmail({ title: renderedSubject, bodyHtml: renderedBody, unsubscribeUrl });
+  // Plain-text fallback: strip tags from the rendered body.
+  const text = renderedBody.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  return sendMail({ to, subject: renderedSubject, html, text });
+}
+
 module.exports = {
   sendWelcomeEmail,
   sendWaitlistConfirmationEmail,
   sendOrderInvoiceEmail,
+  sendMail,
+  sendBrandedEmail,
+  wrapBrandedEmail,
+  renderPlaceholders,
+  escapeHtml,
   hasMailConfig,
 };

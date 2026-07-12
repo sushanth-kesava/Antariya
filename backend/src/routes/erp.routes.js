@@ -24,6 +24,19 @@ const {
   transferStock,
 } = require("../controllers/erpOps.controller");
 const {
+  listTemplates,
+  createTemplate,
+  updateTemplate,
+  deleteTemplate,
+  listCampaigns,
+  getAudienceCounts,
+  sendCampaign,
+  listSubscribers,
+  removeSubscriber,
+  exportSubscribers,
+  listEmailLogs,
+} = require("../controllers/erpComms.controller");
+const {
   requireAuth,
   loadActor,
   requirePermission,
@@ -71,5 +84,22 @@ router.patch("/products/:productId/publish", requirePermission("catalog.publish"
 router.get("/warehouses", requirePermission("inventory.view"), listWarehouses);
 router.post("/warehouses", requirePermission("inventory.warehouse.manage"), createWarehouse);
 router.post("/inventory/transfer", requirePermission("inventory.transfer"), transferStock);
+
+// ── Communications / Email ──────────────────────────────────────────────
+// Templates
+router.get("/comms/templates", requirePermission("comms.templates.view"), listTemplates);
+router.post("/comms/templates", requirePermission("comms.templates.manage"), createTemplate);
+router.patch("/comms/templates/:templateId", requirePermission("comms.templates.manage"), updateTemplate);
+router.delete("/comms/templates/:templateId", requirePermission("comms.templates.manage"), deleteTemplate);
+// Campaigns
+router.get("/comms/audiences", requirePermission("comms.campaigns.view"), getAudienceCounts);
+router.get("/comms/campaigns", requirePermission("comms.campaigns.view"), listCampaigns);
+router.post("/comms/campaigns", requirePermission("comms.campaigns.send"), sendCampaign);
+// Subscribers
+router.get("/comms/subscribers", requirePermission("comms.subscribers.view"), listSubscribers);
+router.get("/comms/subscribers/export", requirePermission("comms.subscribers.view"), exportSubscribers);
+router.delete("/comms/subscribers/:subscriberId", requirePermission("comms.subscribers.manage"), removeSubscriber);
+// Email logs
+router.get("/comms/logs", requirePermission("comms.logs.view"), listEmailLogs);
 
 module.exports = router;

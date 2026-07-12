@@ -423,3 +423,187 @@ export async function transferErpStock(
   });
   await parse<{ success: boolean }>(response, "Failed to transfer stock");
 }
+
+
+/* ────────────────────────── Communications / Email ────────────────────────── */
+
+export type ErpEmailTemplate = {
+  id: string;
+  key: string;
+  name: string;
+  subject: string;
+  html: string;
+  description: string;
+  placeholders: string[];
+  system: boolean;
+  updatedAt?: string;
+};
+
+export type ErpEmailCampaign = {
+  id: string;
+  name: string;
+  subject: string;
+  audience: string;
+  recipientCount: number;
+  status: string;
+  sentCount: number;
+  failedCount: number;
+  skippedCount: number;
+  createdBy: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+};
+
+export type ErpAudienceCounts = {
+  audiences: { all_customers: number; newsletter: number; waitlist: number; admins: number };
+  mailConfigured: boolean;
+};
+
+export type ErpSubscriber = {
+  id: string;
+  email: string;
+  name: string;
+  source: string;
+  status: string;
+  createdAt: string;
+};
+
+export type ErpSubscriberPage = {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  subscribed: number;
+  subscribers: ErpSubscriber[];
+};
+
+export type ErpEmailLogEntry = {
+  id: string;
+  to: string;
+  subject: string;
+  type: string;
+  status: "sent" | "failed" | "skipped";
+  attempts: number;
+  error: string | null;
+  createdAt: string;
+};
+
+export type ErpEmailLogPage = {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  failed: number;
+  logs: ErpEmailLogEntry[];
+};
+
+/* Templates */
+export async function listEmailTemplates(token: string): Promise<ErpEmailTemplate[]> {
+  const r = await fetch(`${API_BASE_URL}/erp/comms/templates`, { headers: authHeaders(token) });
+  const d = await parse<{ templates: ErpEmailTemplate[] }>(r, "Failed to load templates");
+  return d.templates;
+}
+
+export async function createEmailTemplate(
+  token: string,
+  payload: { name: string; subject: string; html: string; description?: string; key?: string }
+): Promise<ErpEmailTemplate> {
+  const r = await fetch(`${API_BASE_URL}/erp/comms/templates`, {
+    method: "POST",
+    headers: authHeaders(token, true),
+    body: JSON.stringify(payload),
+  });
+  const d = await parse<{ template: ErpEmailTemplate }>(r, "Failed to create template");
+  return d.template;
+}
+
+export async function updateEmailTemplate(
+  token: string,
+  templateId: string,
+  payload: Partial<{ name: string; subject: string; html: string; description: string }>
+): Promise<ErpEmailTemplate> {
+  const r = await fetch(`${API_BASE_URL}/erp/comms/templates/${templateId}`, {
+    method: "PATCH",
+    headers: authHeaders(token, true),
+    body: JSON.stringify(payload),
+  });
+  const d = await parse<{ template: ErpEmailTemplate }>(r, "Failed to update template");
+  return d.template;
+}
+
+export async function deleteEmailTemplate(token: string, templateId: string): Promise<void> {
+  const r = await fetch(`${API_BASE_URL}/erp/comms/templates/${templateId}`, {
+    method: "DELETE",
+    headers: authHeaders(token),
+  });
+  await parse<{ success: boolean }>(r, "Failed to delete template");
+}
+
+/* Campaigns */
+export async function getAudienceCounts(token: string): Promise<ErpAudienceCounts> {
+  const r = await fetch(`${API_BASE_URL}/erp/comms/audiences`, { headers: authHeaders(token) });
+  return parse<ErpAudienceCounts>(r, "Failed to load audiences");
+}
+
+export async function listEmailCampaigns(token: string): Promise<ErpEmailCampaign[]> {
+  const r = await fetch(`${API_BASE_URL}/erp/comms/campaigns`, { headers: authHeaders(token) });
+  const d = await parse<{ campaigns: ErpEmailCampaign[] }>(r, "Failed to load campaigns");
+  return d.campaigns;
+}
+
+export async function sendEmailCampaign(
+  token: string,
+  payload: { name: string; subject: string; html: string; audience: string; customList?: string[] }
+): Promise<ErpEmailCampaign> {
+  const r = await fetch(`${API_BASE_URL}/erp/comms/campaigns`, {
+    method: "POST",
+    headers: authHeaders(token, true),
+    body: JSON.stringify(payload),
+  });
+  const d = await parse<{ campaign: ErpEmailCampaign }>(r, "Failed to send campaign");
+  return d.campaign;
+}
+
+/* Subscribers */
+export async function listSubscribers(
+  token: string,
+  params: { page?: number; limit?: number; status?: string; search?: string } = {}
+): Promise<ErpSubscriberPage> {
+  const q = new URLSearchParams();
+  if (params.page) q.set("page", String(params.page));
+  if (params.limit) q.set("limit", String(params.limit));
+  if (params.status) q.set("status", params.status);
+  if (params.search) q.set("search", params.search);
+  const qs = q.toString();
+  const r = await fetch(`${API_BASE_URL}/erp/comms/subscribers${qs ? `?${qs}` : ""}`, {
+    headers: authHeaders(token),
+  });
+  return parse<ErpSubscriberPage>(r, "Failed to load subscribers");
+}
+
+export async function removeSubscriber(token: string, subscriberId: string): Promise<void> {
+  const r = await fetch(`${API_BASE_URL}/erp/comms/subscribers/${subscriberId}`, {
+    method: "DELETE",
+    headers: authHeaders(token),
+  });
+  await parse<{ success: boolean }>(r, "Failed to remove subscriber");
+}
+
+/* Email logs */
+export async function listEmailLogs(
+  token: string,
+  params: { page?: number; limit?: number; status?: string; type?: string; to?: string } = {}
+): Promise<ErpEmailLogPage> {
+  const q = new URLSearchParams();
+  if (params.page) q.set("page", String(params.page));
+  if (params.limit) q.set("limit", String(params.limit));
+  if (params.status) q.set("status", params.status);
+  if (params.type) q.set("type", params.type);
+  if (params.to) q.set("to", params.to);
+  const qs = q.toString();
+  const r = await fetch(`${API_BASE_URL}/erp/comms/logs${qs ? `?${qs}` : ""}`, {
+    headers: authHeaders(token),
+  });
+  return parse<ErpEmailLogPage>(r, "Failed to load email logs");
+}

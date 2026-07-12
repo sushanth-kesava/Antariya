@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BRAND_LOGO_URL } from "@/lib/brand";
+import { NewsletterSignup } from "@/components/newsletter-signup";
 
 type FooterVariant = "public" | "customer" | "admin" | "superadmin";
 
@@ -116,6 +117,11 @@ export function Footer({ variant = "public" }: FooterProps) {
               <p className="inline-flex items-center rounded-full border border-border bg-background/60 px-4 py-2 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur">
                 {copy.note}
               </p>
+            )}
+            {variant === "public" && (
+              <div className="max-w-sm pt-2">
+                <NewsletterSignup source="footer" />
+              </div>
             )}
           </div>
 

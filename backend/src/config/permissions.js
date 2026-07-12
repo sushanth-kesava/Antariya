@@ -27,6 +27,7 @@ const MODULES = {
   INVENTORY: "inventory",
   CATALOG: "catalog",
   FINANCE: "finance",
+  COMMS: "comms",
   GOVERNANCE: "governance",
 };
 
@@ -36,6 +37,7 @@ const MODULE_META = {
   [MODULES.INVENTORY]: { label: "Inventory & Warehouses", icon: "Package" },
   [MODULES.CATALOG]: { label: "Catalog / Products", icon: "Tags" },
   [MODULES.FINANCE]: { label: "Finance & Reports", icon: "Wallet" },
+  [MODULES.COMMS]: { label: "Communications / Email", icon: "Mail" },
   [MODULES.GOVERNANCE]: { label: "Governance / Audit / Settings", icon: "ShieldCheck" },
 };
 
@@ -75,6 +77,15 @@ const PERMISSIONS = [
   { key: "finance.view", module: MODULES.FINANCE, label: "View financials", description: "See revenue, payouts, and financial summaries." },
   { key: "finance.reports.export", module: MODULES.FINANCE, label: "Export reports", description: "Download financial and operational reports." },
   { key: "finance.refunds.approve", module: MODULES.FINANCE, label: "Approve refunds", description: "Sign off on refund requests raised by staff." },
+
+  // ── Communications / Email ─────────────────────────────────────────────
+  { key: "comms.templates.view", module: MODULES.COMMS, label: "View email templates", description: "See the catalog of email templates and their content." },
+  { key: "comms.templates.manage", module: MODULES.COMMS, label: "Create / edit email templates", description: "Author and edit reusable email templates." },
+  { key: "comms.campaigns.view", module: MODULES.COMMS, label: "View campaigns", description: "See email campaigns / broadcasts and their status." },
+  { key: "comms.campaigns.send", module: MODULES.COMMS, label: "Send campaigns / broadcasts", description: "Compose and send broadcast emails to customers or segments." },
+  { key: "comms.subscribers.view", module: MODULES.COMMS, label: "View subscribers", description: "See newsletter subscribers and waitlist contacts." },
+  { key: "comms.subscribers.manage", module: MODULES.COMMS, label: "Manage subscribers", description: "Add, remove, or export newsletter subscribers." },
+  { key: "comms.logs.view", module: MODULES.COMMS, label: "View email logs", description: "See the log of every email sent, failed, or skipped." },
 
   // ── Governance / Audit / Settings ──────────────────────────────────────
   { key: "governance.roles.view", module: MODULES.GOVERNANCE, label: "View roles", description: "See all roles and their permission sets." },
@@ -118,6 +129,8 @@ const DEFAULT_ROLES = [
       "inventory.view", "inventory.adjust", "inventory.transfer",
       "catalog.view", "catalog.create", "catalog.edit", "catalog.publish", "catalog.reviews.moderate",
       "finance.view",
+      "comms.templates.view", "comms.campaigns.view", "comms.campaigns.send",
+      "comms.subscribers.view", "comms.logs.view",
       "governance.audit.view", "governance.errors.view", "governance.ratelimit.view",
     ],
     system: true,
@@ -168,6 +181,20 @@ const DEFAULT_ROLES = [
       "catalog.view", "catalog.create", "catalog.edit", "catalog.publish", "catalog.delete",
       "catalog.reviews.moderate",
       "inventory.view",
+    ],
+    system: true,
+    locked: false,
+  },
+  {
+    key: "marketing_manager",
+    name: "Marketing Manager",
+    description: "Owns email marketing — templates, campaigns, subscribers, and logs.",
+    permissions: [
+      "comms.templates.view", "comms.templates.manage",
+      "comms.campaigns.view", "comms.campaigns.send",
+      "comms.subscribers.view", "comms.subscribers.manage",
+      "comms.logs.view",
+      "catalog.view",
     ],
     system: true,
     locked: false,

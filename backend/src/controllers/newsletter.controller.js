@@ -1,0 +1,72 @@
+const crypto = require("crypto");
+const NewsletterSubscriber = require("../models/NewsletterSubscriber");
+
+function normalizeEmail(v) {
+  return String(v || "").trim().toLowerCase();
+}
+
+/**
+ * POST /newsletter/subscribe  (public)
+ * Body: { email, name?, source? }
+ * Idempotent: re-subscribing an existing email just re-activates it.
+ */
+async function subscribe(req, res, next) {
+  try {
+    const email = normalizeEmail(req.body.email);
+    if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
+      return res.status(400).json({ success: false, message: "A valid email is required." });
+    }
+
+    const name = String(req.body.name || "").trim().slice(0, 120);
+    const source = String(req.body.source || "website").trim().slice(0, 80);
+    const token = crypto.randomBytes(16).toString("hex");
+
+    const sub = await NewsletterSubscriber.findOneAndUpdate(
+      { email },
+      {
+        $set: { status: "subscribed", unsubscribedAt: null },
+        $setOnInsert: { email, name, source, unsubscribeToken: token },
+      },
+      { new: true, upsert: true }
+    );
+
+    return res.status(201).json({
+      success: true,
+      message: "You're subscribed! Watch your inbox for updates.",
+      subscriber: { email: sub.email, status: sub.status },
+    });
+  } catch (error) {
+    if (error?.code === 11000) {
+      return res.status(200).json({ success: true, message: "You're already subscribed." });
+    }
+    return next(error);
+  }
+}
+
+/**
+ * GET/POST /newsletter/unsubscribe  (public)
+ * Query/body: { email } (and optional token). One-click unsubscribe.
+ */
+async function unsubscribe(req, res, next) {
+  try {
+    const email = normalizeEmail(req.body.email || req.query.email);
+    if (!email) {
+      return res.status(400).json({ success: false, message: "Email is required." });
+    }
+
+    const sub = await NewsletterSubscriber.findOne({ email });
+    if (!sub) {
+      return res.status(200).json({ success: true, message: "You are not subscribed." });
+    }
+
+    sub.status = "unsubscribed";
+    sub.unsubscribedAt = new Date();
+    await sub.save();
+
+    return res.status(200).json({ success: true, message: "You've been unsubscribed." });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+module.exports = { subscribe, unsubscribe };
