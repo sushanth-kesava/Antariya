@@ -37,6 +37,8 @@ const frontendOrigins = String(process.env.FRONTEND_URL || "")
 const defaultFrontendOrigins = [
   "https://antariyaofficial.com",
   "https://antariya.onrender.com",
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
   "http://localhost:9002",
   "http://127.0.0.1:9002",
 ];
