@@ -1189,9 +1189,6 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
                         </div>
                       </div>
                       <div className="flex flex-wrap gap-2 text-xs">
-                        <span className={`rounded-full px-3 py-1 ${deliveryResult.codSupported ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-700"}`}>
-                          {deliveryResult.codSupported ? "COD available" : "COD unavailable"}
-                        </span>
                         <span className={`rounded-full px-3 py-1 ${deliveryResult.prepaidSupported ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-700"}`}>
                           {deliveryResult.prepaidSupported ? "Prepaid available" : "Prepaid unavailable"}
                         </span>

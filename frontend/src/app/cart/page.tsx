@@ -221,7 +221,7 @@ export default function CartPage() {
 
                 <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground mt-4">
                   <ShieldCheck className="h-4 w-4 text-green-500" />
-                  <span>Secure India checkout · UPI / COD</span>
+                  <span>Secure India checkout · UPI / Cards / NetBanking</span>
                 </div>
               </CardFooter>
             </Card>

@@ -29,17 +29,14 @@ function OrderStatusContent() {
   const amountRaw = searchParams.get("amount");
   const amount = amountRaw && Number.isFinite(Number(amountRaw)) ? Number(amountRaw) : null;
   const reason = searchParams.get("reason") || "";
-  const isCod = (searchParams.get("paymentMethod") || "").toLowerCase() === "cod";
 
   const config = {
     success: {
       icon: CheckCircle2,
       iconClass: "text-green-600",
       ringClass: "bg-green-100",
-      title: isCod ? "Order Confirmed" : "Payment Successful",
-      message: isCod
-        ? "Thank you for your order! Your order is confirmed and will be shipped soon. Please keep the exact amount ready to pay on delivery."
-        : "Thank you for your order! Your payment has been received and your order is confirmed.",
+      title: "Payment Successful",
+      message: "Thank you for your order! Your payment has been received and your order is confirmed.",
     },
     failed: {
       icon: XCircle,
