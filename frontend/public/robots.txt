@@ -1,59 +1,28 @@
-# Antariya E-commerce Robots Configuration
-# Updated: 12 July 2026
+# Robots.txt for Antariya E-commerce
 
+# Allow all bots
 User-agent: *
 Allow: /
-Allow: /marketplace
-Allow: /shop
-Allow: /customize
-Allow: /product/
-Allow: /legal/policies
 
-# Disallow private/functional pages from indexing
-Disallow: /login
-Disallow: /signup
-Disallow: /cart
-Disallow: /checkout
-Disallow: /order-status
-Disallow: /account
-Disallow: /wishlist
-Disallow: /complete-profile
+# Disallow admin/private areas
 Disallow: /portal/
 Disallow: /admin-login
 Disallow: /superadmin-login
 
-# Disallow API routes
-Disallow: /api/
-
-# Disallow temporary/technical directories
-Disallow: /_next/
-Disallow: /node_modules/
-Disallow: /.git/
-
-# Crawl delay (requests per second)
-Crawl-delay: 1
-
-# Sitemap location
+# Sitemaps
 Sitemap: https://antariyaofficial.com/sitemap.xml
 
-# Specific crawlers
+# Crawl Delay (optional - set reasonable value)
+Crawl-delay: 1
+
+# Specific bot rules (optional)
 User-agent: Googlebot
 Allow: /
-Crawl-delay: 0.5
+Disallow: /portal/
 
 User-agent: Bingbot
 Allow: /
-Crawl-delay: 1
+Disallow: /portal/
 
-User-agent: Baiduspider
-Disallow: /
-
-# Block bad bots
-User-agent: MJ12bot
-Disallow: /
-
-User-agent: AhrefsBot
-Disallow: /
-
-User-agent: SemrushBot
+User-agent: BadBot
 Disallow: /
