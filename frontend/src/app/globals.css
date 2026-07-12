@@ -78,6 +78,7 @@
   html {
     font-size: 100%;
     /* Prevent any stray wide element from causing horizontal scroll on mobile. */
+    -webkit-font-smoothing: antialiased;
     overflow-x: hidden;
   }
   body {
@@ -86,7 +87,17 @@
     background-size: 40px 40px;
     /* Avoid horizontal overflow on small screens. */
     max-width: 100%;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
     overflow-x: hidden;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  
+  /* Mobile-first responsive typography */
+  @media (max-width: 640px) {
+    html { font-size: 14px; }
   }
   /* The 0.9 zoom tightens the desktop layout (which looks good there), but on
      phones it shrinks/mis-scales content and breaks the fit. Apply it only on
