@@ -29,14 +29,14 @@ type AuthResponse = {
 
 type CredentialsSignupPayload = {
   email: string;
-  password=[REDACTED_PASSWORD]
+  password: string;
   displayName?: string;
   role?: AppRole;
 };
 
 type CredentialsLoginPayload = {
   email: string;
-  password=[REDACTED_PASSWORD]
+  password: string;
   role?: AppRole;
 };
 
