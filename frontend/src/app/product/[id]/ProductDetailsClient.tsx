@@ -31,7 +31,7 @@ import Image from "next/image";
 import { useRef, useState, useEffect, useMemo } from "react";
 import { Product } from "@/app/lib/mock-data";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import {
   addProductReviewOnBackend,
   getProductByIdFromBackend,
@@ -218,6 +218,21 @@ type ProductDetailsClientProps = {
 
 export default function ProductDetailsClient({ id }: ProductDetailsClientProps) {
   const router = useRouter();
+  const pathname = usePathname();
+
+  // Static export: the page is pre-built once as a shell (product/placeholder/index.html)
+  // and served for any /product/<id>/ URL via .htaccess rewrite.
+  // Extract the real product ID from the current browser URL at runtime.
+  const productId = (() => {
+    if (id && id !== "placeholder") return id;
+    // pathname is e.g. "/product/6a53e9f8e8f38cf1f43c3d56"
+    const parts = pathname.split("/").filter(Boolean);
+    const idx = parts.indexOf("product");
+    return (idx !== -1 && parts[idx + 1] && parts[idx + 1] !== "placeholder")
+      ? parts[idx + 1]
+      : "";
+  })();
+
   const { toast } = useToast();
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const reviewImageInputRef = useRef<HTMLInputElement | null>(null);
@@ -226,12 +241,13 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!productId) return; // wait until URL is parsed
     const loadProduct = async () => {
       setLoading(true);
       setError(null);
 
       try {
-        const data = await getProductByIdFromBackend(id);
+        const data = await getProductByIdFromBackend(productId);
         setProduct(data);
       } catch (err) {
         setError(getErrorMessage(err, "Failed to load product"));
@@ -241,12 +257,12 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
     };
 
     void loadProduct();
-  }, [id]);
+  }, [productId]);
 
   // Live inventory: patch stock in place whenever the backend pushes an update
   // for this product (order placed elsewhere, admin adjustment, restock, etc.).
   useInventoryUpdates({
-    productId: id,
+    productId: productId,
     onUpdate: (update) => {
       setProduct((prev) => {
         if (!prev) return prev;
@@ -426,7 +442,7 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
       setReviewsLoading(true);
 
       try {
-        const reviewData = await getProductReviewsFromBackend(id);
+        const reviewData = await getProductReviewsFromBackend(productId);
         setReviews(reviewData.reviews);
         setReviewSummary(reviewData.summary);
       } catch (reviewError) {
@@ -437,7 +453,7 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
     };
 
     void loadReviews();
-  }, [id]);
+  }, [productId]);
 
   useEffect(() => {
     const loadReviewEligibility = async () => {
@@ -449,7 +465,7 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
       }
 
       try {
-        const eligibility = await getReviewEligibilityFromBackend(token, id);
+        const eligibility = await getReviewEligibilityFromBackend(token, productId);
         setReviewEligibility(eligibility);
       } catch (eligibilityError) {
         console.error("Failed to load review eligibility", eligibilityError);
@@ -457,7 +473,7 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
     };
 
     void loadReviewEligibility();
-  }, [id]);
+  }, [productId]);
 
   useEffect(() => {
     const loadWishlistState = async () => {

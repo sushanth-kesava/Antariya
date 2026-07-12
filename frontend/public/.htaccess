@@ -1,0 +1,32 @@
+Options -MultiViews
+RewriteEngine On
+
+# Serve static files and directories directly
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Rewrite /product/<any-id>/ to the pre-built product shell
+# This allows any product page to work without a rebuild
+RewriteRule ^product/([^/]+)/?$ /product/placeholder/index.html [L]
+RewriteRule ^product/([^/]+)/index\.html$ /product/placeholder/index.html [L]
+
+# For all other routes: serve Next.js static export pages
+# Append /index.html for clean URLs
+RewriteCond %{REQUEST_URI} !\.html$
+RewriteCond %{REQUEST_URI} !\.js$
+RewriteCond %{REQUEST_URI} !\.css$
+RewriteCond %{REQUEST_URI} !\.png$
+RewriteCond %{REQUEST_URI} !\.jpg$
+RewriteCond %{REQUEST_URI} !\.jpeg$
+RewriteCond %{REQUEST_URI} !\.gif$
+RewriteCond %{REQUEST_URI} !\.svg$
+RewriteCond %{REQUEST_URI} !\.ico$
+RewriteCond %{REQUEST_URI} !\.webp$
+RewriteCond %{REQUEST_URI} !\.woff$
+RewriteCond %{REQUEST_URI} !\.woff2$
+RewriteCond %{REQUEST_URI} !\.ttf$
+RewriteCond %{REQUEST_URI} !\.xml$
+RewriteCond %{REQUEST_URI} !\.txt$
+RewriteCond %{REQUEST_URI} !\.json$
+RewriteRule ^(.*)/?$ /$1/index.html [L]
