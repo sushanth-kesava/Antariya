@@ -5,7 +5,7 @@
 
   <!-- Homepage -->
   <url>
-    <loc>https://antariya.com/</loc>
+    <loc>https://antariyaofficial.com/</loc>
     <lastmod>2026-07-12</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
@@ -13,28 +13,28 @@
 
   <!-- Primary Pages -->
   <url>
-    <loc>https://antariya.com/marketplace</loc>
+    <loc>https://antariyaofficial.com/marketplace</loc>
     <lastmod>2026-07-12</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
 
   <url>
-    <loc>https://antariya.com/shop</loc>
+    <loc>https://antariyaofficial.com/shop</loc>
     <lastmod>2026-07-12</lastmod>
     <changefreq>hourly</changefreq>
     <priority>0.9</priority>
   </url>
 
   <url>
-    <loc>https://antariya.com/shop/hoodies</loc>
+    <loc>https://antariyaofficial.com/shop/hoodies</loc>
     <lastmod>2026-07-12</lastmod>
     <changefreq>hourly</changefreq>
     <priority>0.8</priority>
   </url>
 
   <url>
-    <loc>https://antariya.com/customize</loc>
+    <loc>https://antariyaofficial.com/customize</loc>
     <lastmod>2026-07-12</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -42,7 +42,7 @@
 
   <!-- Legal -->
   <url>
-    <loc>https://antariya.com/legal/policies</loc>
+    <loc>https://antariyaofficial.com/legal/policies</loc>
     <lastmod>2026-07-12</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
@@ -50,14 +50,14 @@
 
   <!-- Authentication (noindex recommended via robots.txt) -->
   <url>
-    <loc>https://antariya.com/login</loc>
+    <loc>https://antariyaofficial.com/login</loc>
     <lastmod>2026-07-12</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
   </url>
 
   <url>
-    <loc>https://antariya.com/signup</loc>
+    <loc>https://antariyaofficial.com/signup</loc>
     <lastmod>2026-07-12</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
@@ -65,42 +65,42 @@
 
   <!-- Functional Pages (noindex recommended via robots.txt) -->
   <url>
-    <loc>https://antariya.com/cart</loc>
+    <loc>https://antariyaofficial.com/cart</loc>
     <lastmod>2026-07-12</lastmod>
     <changefreq>never</changefreq>
     <priority>0.1</priority>
   </url>
 
   <url>
-    <loc>https://antariya.com/checkout</loc>
+    <loc>https://antariyaofficial.com/checkout</loc>
     <lastmod>2026-07-12</lastmod>
     <changefreq>never</changefreq>
     <priority>0.1</priority>
   </url>
 
   <url>
-    <loc>https://antariya.com/order-status</loc>
+    <loc>https://antariyaofficial.com/order-status</loc>
     <lastmod>2026-07-12</lastmod>
     <changefreq>never</changefreq>
     <priority>0.1</priority>
   </url>
 
   <url>
-    <loc>https://antariya.com/account</loc>
+    <loc>https://antariyaofficial.com/account</loc>
     <lastmod>2026-07-12</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.2</priority>
   </url>
 
   <url>
-    <loc>https://antariya.com/wishlist</loc>
+    <loc>https://antariyaofficial.com/wishlist</loc>
     <lastmod>2026-07-12</lastmod>
     <changefreq>never</changefreq>
     <priority>0.1</priority>
   </url>
 
   <url>
-    <loc>https://antariya.com/complete-profile</loc>
+    <loc>https://antariyaofficial.com/complete-profile</loc>
     <lastmod>2026-07-12</lastmod>
     <changefreq>never</changefreq>
     <priority>0.1</priority>
@@ -108,56 +108,56 @@
 
   <!-- Admin Portal (noindex recommended) -->
   <url>
-    <loc>https://antariya.com/portal/admin</loc>
+    <loc>https://antariyaofficial.com/portal/admin</loc>
     <lastmod>2026-07-12</lastmod>
     <changefreq>never</changefreq>
     <priority>0.0</priority>
   </url>
 
   <url>
-    <loc>https://antariya.com/portal/admin/my-company-catalog</loc>
+    <loc>https://antariyaofficial.com/portal/admin/my-company-catalog</loc>
     <lastmod>2026-07-12</lastmod>
     <changefreq>never</changefreq>
     <priority>0.0</priority>
   </url>
 
   <url>
-    <loc>https://antariya.com/portal/admin/add-new-product</loc>
+    <loc>https://antariyaofficial.com/portal/admin/add-new-product</loc>
     <lastmod>2026-07-12</lastmod>
     <changefreq>never</changefreq>
     <priority>0.0</priority>
   </url>
 
   <url>
-    <loc>https://antariya.com/portal/admin/operations-overview</loc>
+    <loc>https://antariyaofficial.com/portal/admin/operations-overview</loc>
     <lastmod>2026-07-12</lastmod>
     <changefreq>never</changefreq>
     <priority>0.0</priority>
   </url>
 
   <url>
-    <loc>https://antariya.com/portal/admin/review-moderation</loc>
+    <loc>https://antariyaofficial.com/portal/admin/review-moderation</loc>
     <lastmod>2026-07-12</lastmod>
     <changefreq>never</changefreq>
     <priority>0.0</priority>
   </url>
 
   <url>
-    <loc>https://antariya.com/portal/admin/moderation-activity</loc>
+    <loc>https://antariyaofficial.com/portal/admin/moderation-activity</loc>
     <lastmod>2026-07-12</lastmod>
     <changefreq>never</changefreq>
     <priority>0.0</priority>
   </url>
 
   <url>
-    <loc>https://antariya.com/portal/customer</loc>
+    <loc>https://antariyaofficial.com/portal/customer</loc>
     <lastmod>2026-07-12</lastmod>
     <changefreq>never</changefreq>
     <priority>0.0</priority>
   </url>
 
   <url>
-    <loc>https://antariya.com/portal/superadmin</loc>
+    <loc>https://antariyaofficial.com/portal/superadmin</loc>
     <lastmod>2026-07-12</lastmod>
     <changefreq>never</changefreq>
     <priority>0.0</priority>
@@ -165,21 +165,21 @@
 
   <!-- Authentication Pages (noindex recommended) -->
   <url>
-    <loc>https://antariya.com/admin-login</loc>
+    <loc>https://antariyaofficial.com/admin-login</loc>
     <lastmod>2026-07-12</lastmod>
     <changefreq>never</changefreq>
     <priority>0.0</priority>
   </url>
 
   <url>
-    <loc>https://antariya.com/admin-login/apply</loc>
+    <loc>https://antariyaofficial.com/admin-login/apply</loc>
     <lastmod>2026-07-12</lastmod>
     <changefreq>never</changefreq>
     <priority>0.0</priority>
   </url>
 
   <url>
-    <loc>https://antariya.com/superadmin-login</loc>
+    <loc>https://antariyaofficial.com/superadmin-login</loc>
     <lastmod>2026-07-12</lastmod>
     <changefreq>never</changefreq>
     <priority>0.0</priority>

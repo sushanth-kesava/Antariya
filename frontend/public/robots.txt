@@ -34,7 +34,7 @@ Disallow: /.git/
 Crawl-delay: 1
 
 # Sitemap location
-Sitemap: https://antariya.com/sitemap.xml
+Sitemap: https://antariyaofficial.com/sitemap.xml
 
 # Specific crawlers
 User-agent: Googlebot
