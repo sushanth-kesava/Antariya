@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Script from "next/script";
-import { ArrowLeft, Loader2, ShieldCheck, Smartphone } from "lucide-react";
+import { ArrowLeft, Loader2, ShieldCheck, Smartphone, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -19,18 +19,65 @@ import {
   INDIA_STANDARD_SHIPPING,
   normalizeCatalogPriceToINR,
 } from "@/lib/india";
+import { checkStockAvailability, StockCheckResult } from "@/lib/api/stock";
 
 export default function CheckoutPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [placingOrder, setPlacingOrder] = useState(false);
   const [razorpayReady, setRazorpayReady] = useState(false);
+  const [stockStatus, setStockStatus] = useState<Map<string, StockCheckResult>>(new Map());
+  const [checkingStock, setCheckingStock] = useState(true);
+  const [stockError, setStockError] = useState<string | null>(null);
 
   const items = useMemo(() => getCartItems(), []);
 
   useEffect(() => {
     if (items.length === 0) router.replace("/cart");
   }, [items, router]);
+
+  // Check stock before allowing payment
+  useEffect(() => {
+    if (items.length > 0) {
+      checkStockStatus();
+    }
+  }, [items]);
+
+  const checkStockStatus = async () => {
+    try {
+      setCheckingStock(true);
+      setStockError(null);
+
+      const token = localStorage.getItem("app_auth_token");
+      if (!token) {
+        router.push("/login");
+        return;
+      }
+
+      const checkItems = items.map(item => ({
+        productId: item.productId,
+        variantSku: item.variantSku,
+        quantity: item.quantity,
+      }));
+
+      const result = await checkStockAvailability(token, checkItems);
+      
+      const statusMap = new Map<string, StockCheckResult>();
+      result.items.forEach(item => {
+        const key = `${item.productId}:${item.variantSku || ""}`;
+        statusMap.set(key, item);
+      });
+      
+      setStockStatus(statusMap);
+      if (!result.allAvailable) {
+        setStockError("Stock availability changed. Please return to your cart and update quantities.");
+      }
+    } catch (error) {
+      console.warn("Stock check failed:", error);
+    } finally {
+      setCheckingStock(false);
+    }
+  };
 
   useEffect(() => {
     if (typeof window !== "undefined" && typeof window.Razorpay === "function") {
@@ -195,11 +242,58 @@ export default function CheckoutPage() {
           </div>
 
           {/* Order Summary */}
+          {stockError && (
+            <div className="mb-6 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-6 py-4 text-sm text-red-700">
+              <AlertCircle className="h-5 w-5 mt-0.5 shrink-0" />
+              <div>
+                <p className="font-semibold">Stock availability changed</p>
+                <p className="text-xs mt-1">{stockError}</p>
+              </div>
+            </div>
+          )}
+
+          {checkingStock && (
+            <div className="mb-6 flex items-center justify-center gap-2 text-sm text-muted-foreground rounded-2xl border border-gray-200 bg-gray-50 px-6 py-4">
+              <div className="h-4 w-4 animate-spin border-2 border-primary border-t-transparent rounded-full" />
+              Verifying stock availability…
+            </div>
+          )}
+
           <Card className="rounded-2xl shadow-sm border-gray-100">
             <CardHeader className="bg-gray-50/50 border-b border-gray-100 pb-4 rounded-t-2xl">
               <CardTitle className="text-lg">Order Summary</CardTitle>
             </CardHeader>
             <CardContent className="pt-5 space-y-3">
+              <div className="space-y-2 mb-4 pb-4 border-b border-gray-100">
+                {items.map((item) => {
+                  const key = `${item.productId}:${item.variantSku || ""}`;
+                  const status = stockStatus.get(key);
+                  return (
+                    <div key={item.lineId} className="flex justify-between text-xs">
+                      <div className="flex-1">
+                        <p className="font-medium text-gray-900">{item.name}</p>
+                        {item.variant && (item.variant.size || item.variant.color) && (
+                          <p className="text-muted-foreground text-[11px] mt-0.5">
+                            {[item.variant.size, item.variant.color, item.variant.gender].filter(Boolean).join(" • ")}
+                          </p>
+                        )}
+                        <p className="text-muted-foreground mt-0.5">
+                          {item.quantity}× {formatINR(normalizeCatalogPriceToINR(item.price))}
+                          {status && (
+                            <span className={`ml-2 font-medium ${status.isAvailable ? "text-green-600" : "text-red-600"}`}>
+                              ({status.available} available)
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                      <p className="font-medium text-gray-900 text-right ml-4">
+                        {formatINR(normalizeCatalogPriceToINR(item.price) * item.quantity)}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+
               <div className="flex justify-between text-gray-600 text-sm">
                 <span>Subtotal ({items.length} {items.length === 1 ? "item" : "items"})</span>
                 <span className="font-medium text-gray-900">{formatINR(subtotal)}</span>
@@ -226,7 +320,7 @@ export default function CheckoutPage() {
                 className="w-full h-12 text-base rounded-full shadow-md hover:shadow-lg transition-shadow"
                 size="lg"
                 onClick={handleUPI}
-                disabled={placingOrder || !razorpayReady || !razorpayKeyId}
+                disabled={placingOrder || !razorpayReady || !razorpayKeyId || checkingStock || stockError !== null}
               >
                 {placingOrder ? (
                   <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Processing...</>

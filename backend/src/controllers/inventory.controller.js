@@ -198,6 +198,82 @@ async function transferStock(req, res, next) {
   }
 }
 
+// --- Stock availability check for cart items (customer-facing) ----
+// POST /inventory/check-stock
+// body: { items: [{ productId, variantSku?, quantity }, ...] }
+// Returns item-level stock availability (for cart validation before checkout)
+async function checkStockAvailability(req, res, next) {
+  try {
+    const { items } = req.body;
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "items array is required",
+      });
+    }
+
+    const productIds = [...new Set(items.map((i) => i.productId))];
+    const products = await Product.find({ _id: { $in: productIds } });
+    const productMap = new Map(products.map((p) => [p._id.toString(), p]));
+
+    const results = [];
+    let allAvailable = true;
+
+    for (const item of items) {
+      const productId = String(item.productId);
+      const product = productMap.get(productId);
+      const variantSku = item.variantSku ? String(item.variantSku).trim() : "";
+      const quantity = Number(item.quantity) || 0;
+
+      if (!product) {
+        allAvailable = false;
+        results.push({
+          productId,
+          variantSku,
+          quantity,
+          available: 0,
+          isAvailable: false,
+          productName: "Unknown product",
+        });
+        continue;
+      }
+
+      // Check variant-level stock if variant SKU is specified
+      let available = 0;
+      if (variantSku && product.variants && product.variants.length > 0) {
+        const matchedVariant = product.variants.find((v) => v.sku === variantSku);
+        available = matchedVariant ? Number(matchedVariant.stock || 0) : 0;
+      } else {
+        // Fall back to product-level stock
+        available = Number(product.stock || 0);
+      }
+
+      const isAvailable = available >= quantity;
+      if (!isAvailable) {
+        allAvailable = false;
+      }
+
+      results.push({
+        productId,
+        variantSku,
+        quantity,
+        available,
+        isAvailable,
+        productName: product.name,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      items: results,
+      allAvailable,
+    });
+  } catch (err) {
+    return next(err);
+  }
+}
+
 // --- Verification on demand ------------------------------------------------
 async function runVerification(req, res, next) {
   try {
@@ -217,4 +293,5 @@ module.exports = {
   processReturn,
   transferStock,
   runVerification,
+  checkStockAvailability,
 };

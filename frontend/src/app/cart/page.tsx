@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Trash2, Plus, Minus, ArrowRight, ShoppingBag, ShieldCheck } from "lucide-react";
+import { Trash2, Plus, Minus, ArrowRight, ShoppingBag, ShieldCheck, AlertCircle, CheckCircle2, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -18,13 +18,56 @@ import {
   INDIA_STANDARD_SHIPPING,
   normalizeCatalogPriceToINR,
 } from "@/lib/india";
+import { checkStockAvailability, StockCheckResult } from "@/lib/api/stock";
 
 export default function CartPage() {
   const router = useRouter();
   const [items, setItems] = useState<CartItem[]>([]);
+  const [stockStatus, setStockStatus] = useState<Map<string, StockCheckResult>>(new Map());
+  const [checkingStock, setCheckingStock] = useState(false);
+  const [stockError, setStockError] = useState<string | null>(null);
+
+  const checkStockStatus = async (cartItems: CartItem[]) => {
+    try {
+      setCheckingStock(true);
+      setStockError(null);
+      
+      const token = localStorage.getItem("app_auth_token");
+      if (!token) return;
+
+      const checkItems = cartItems.map(item => ({
+        productId: item.productId,
+        variantSku: item.variantSku,
+        quantity: item.quantity,
+      }));
+      const result = await checkStockAvailability(token, checkItems);
+      
+      const statusMap = new Map<string, StockCheckResult>();
+      result.items.forEach(item => {
+        const key = `${item.productId}:${item.variantSku || ""}`;
+        statusMap.set(key, item);
+      });
+      
+      setStockStatus(statusMap);
+      if (!result.allAvailable) {
+        setStockError("Some items have insufficient stock");
+      }
+    } catch (error) {
+      // Silently handle stock check failures — let checkout attempt if stock check is unavailable
+      console.warn("Stock check failed:", error);
+    } finally {
+      setCheckingStock(false);
+    }
+  };
 
   useEffect(() => {
-    setItems(getCartItems());
+    const cartItems = getCartItems();
+    setItems(cartItems);
+    
+    // Check stock availability for all items
+    if (cartItems.length > 0) {
+      checkStockStatus(cartItems);
+    }
   }, []);
 
   const persist = (nextItems: CartItem[]) => {
@@ -55,6 +98,15 @@ export default function CartPage() {
   const handleCheckout = () => {
     const token = localStorage.getItem("app_auth_token");
     if (!token) { router.push("/login"); return; }
+    
+    // Check that all items have sufficient stock
+    const hasStockIssues = items.some(item => {
+      const key = `${item.productId}:${item.variantSku || ""}`;
+      const status = stockStatus.get(key);
+      return status && !status.isAvailable;
+    });
+    
+    if (hasStockIssues) return;
     router.push("/checkout");
   };
 
@@ -102,6 +154,36 @@ export default function CartPage() {
               <div className="divide-y divide-gray-100">
                 {items.map((item) => (
                   <div key={item.lineId} className="p-6 transition-colors hover:bg-gray-50/50">
+                    {/* Stock status badge */}
+                    {(() => {
+                      const key = `${item.productId}:${item.variantSku || ""}`;
+                      const status = stockStatus.get(key);
+                      if (!status) return null;
+                      
+                      if (!status.isAvailable) {
+                        return (
+                          <div className="mb-3 flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+                            <AlertCircle className="h-3.5 w-3.5" />
+                            Out of stock ({status.available} available)
+                          </div>
+                        );
+                      } else if (status.available < 5) {
+                        return (
+                          <div className="mb-3 flex items-center gap-2 rounded-md border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs font-medium text-yellow-700">
+                            <Clock className="h-3.5 w-3.5" />
+                            Limited stock: only {status.available} left
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <div className="mb-3 flex items-center gap-2 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs font-medium text-green-700">
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            {status.available} in stock
+                          </div>
+                        );
+                      }
+                    })()}
+                    
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
                       <div className="md:col-span-6 flex items-start gap-4">
                         <div className="relative w-24 h-24 rounded-xl overflow-hidden bg-gray-100 shrink-0 border border-gray-100">
@@ -109,6 +191,11 @@ export default function CartPage() {
                         </div>
                         <div className="flex flex-col gap-1">
                           <h3 className="font-semibold text-gray-900 line-clamp-2">{item.name}</h3>
+                          {item.variant && (item.variant.size || item.variant.color) && (
+                            <p className="text-xs text-muted-foreground">
+                              {[item.variant.size, item.variant.color, item.variant.gender].filter(Boolean).join(" • ")}
+                            </p>
+                          )}
                           <p className="text-sm text-muted-foreground">{item.category}</p>
                           {item.customization && (
                             <div className="mt-1 space-y-1 text-xs text-muted-foreground">
@@ -151,14 +238,22 @@ export default function CartPage() {
                             <Minus className="h-4 w-4" />
                           </Button>
                           <span className="w-10 text-center text-sm font-medium">{item.quantity}</span>
-                          <Button
+                          {(() => {
+                            const key = `${item.productId}:${item.variantSku || ""}`;
+                            const status = stockStatus.get(key);
+                            const canIncrease = !status || status.available > item.quantity;
+                            return (
+                            <Button
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 rounded-full text-muted-foreground hover:text-gray-900"
                             onClick={() => updateQuantity(item.lineId, item.quantity + 1)}
+                            disabled={!canIncrease}
                           >
                             <Plus className="h-4 w-4" />
                           </Button>
+                            );
+                          })()}
                         </div>
                       </div>
 
@@ -210,10 +305,26 @@ export default function CartPage() {
                 </div>
               </CardContent>
               <CardFooter className="flex-col gap-4 pb-8">
+                {stockError && (
+                  <div className="w-full flex items-start gap-3 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="font-medium">Stock unavailable</p>
+                      <p className="text-xs mt-1">Some items in your cart are out of stock or quantities have changed. Please update quantities and try again.</p>
+                    </div>
+                  </div>
+                )}
+                {checkingStock && (
+                  <div className="w-full flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                    <div className="h-4 w-4 animate-spin border-2 border-primary border-t-transparent rounded-full" />
+                    Checking stock availability…
+                  </div>
+                )}
                 <Button
                   className="w-full h-12 text-base rounded-full shadow-md hover:shadow-lg transition-shadow"
                   size="lg"
                   onClick={handleCheckout}
+                  disabled={checkingStock || stockError !== null}
                 >
                   Proceed to Checkout
                   <ArrowRight className="ml-2 h-5 w-5" />
