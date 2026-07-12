@@ -14,6 +14,11 @@ const {
 
 const INDIA_FREE_SHIPPING_THRESHOLD = 1499;
 const INDIA_STANDARD_SHIPPING = 99;
+// COD anti-fraud: the minimum amount a Cash-on-Delivery customer must prepay
+// online to confirm the order. When a delivery charge applies, that charge is
+// collected instead (it's >= this fee); when shipping is free, this flat fee
+// is charged as a deposit toward the order total (NOT an extra charge).
+const COD_CONFIRMATION_FEE = Number(process.env.COD_CONFIRMATION_FEE || 149);
 // GST set to 0 — business is not GST-registered (no GSTIN).
 const INDIA_GST_RATE = 0;
 const LEGACY_USD_TO_INR_RATE = 83;
@@ -62,6 +67,9 @@ function normalizeOrder(order) {
     paymentMethod: order.paymentMethod,
     paymentStatus: order.paymentStatus,
     razorpayPaymentId: order.razorpayPaymentId || "",
+    deliveryPrepaid: Boolean(order.deliveryPrepaid),
+    amountPrepaid: Number(order.amountPrepaid || 0),
+    amountDueOnDelivery: Number(order.amountDueOnDelivery || 0),
     createdAt: order.createdAt,
   };
 }
@@ -156,6 +164,7 @@ async function createOrder(req, res, next) {
     const razorpayPaymentId = String(req.body?.razorpay_payment_id || "").trim();
     const razorpaySignature = String(req.body?.razorpay_signature || "").trim();
     let paymentStatus = "pending";
+    let deliveryFeeVerified = false;
 
     if (paymentMethod === "upi") {
       if (!isRazorpayConfigured()) {
@@ -177,6 +186,34 @@ async function createOrder(req, res, next) {
         });
       }
       paymentStatus = "paid";
+    }
+
+    // COD anti-fraud gate: when a delivery charge applies, the customer must
+    // prepay that charge online (Razorpay) to confirm the order is genuine.
+    // We re-verify the signature server-side, exactly like a UPI payment, but
+    // the order still ships as Cash-on-Delivery for the product amount.
+    // A COD order with zero delivery charge (e.g. free-shipping threshold met)
+    // needs no prepayment.
+    if (paymentMethod === "cod" && razorpayPaymentId) {
+      if (!isRazorpayConfigured()) {
+        return res.status(500).json({
+          success: false,
+          message: "Online payments are not configured",
+        });
+      }
+      if (!razorpayOrderId || !razorpaySignature) {
+        return res.status(400).json({
+          success: false,
+          message: "Delivery-fee payment verification details are required for COD",
+        });
+      }
+      if (!isValidRazorpaySignature({ razorpayOrderId, razorpayPaymentId, razorpaySignature })) {
+        return res.status(400).json({
+          success: false,
+          message: "Delivery-fee payment could not be verified. Order was not created.",
+        });
+      }
+      deliveryFeeVerified = true;
     }
     // --------------------------------------------------------------------
 
@@ -306,6 +343,33 @@ async function createOrder(req, res, next) {
     const tax = subtotal * INDIA_GST_RATE;
     const total = subtotal + shipping + tax;
 
+    // COD anti-fraud enforcement: EVERY Cash-on-Delivery order must be
+    // confirmed by an online prepayment (verified above). The required amount
+    // is the delivery charge when one applies, otherwise a flat confirmation
+    // fee (charged as a deposit toward the order total on free-shipping
+    // orders, so the customer never pays more than `total`).
+    const codRequiredPrepay =
+      paymentMethod === "cod"
+        ? shipping > 0
+          ? shipping
+          : Math.min(COD_CONFIRMATION_FEE, total)
+        : 0;
+
+    if (paymentMethod === "cod" && codRequiredPrepay > 0 && !deliveryFeeVerified) {
+      return res.status(400).json({
+        success: false,
+        message: `Cash-on-Delivery orders require an online confirmation payment of ${codRequiredPrepay} first. Your order was not placed.`,
+        code: "COD_DELIVERY_PREPAY_REQUIRED",
+      });
+    }
+
+    // Split the payment for COD: the confirmation amount (delivery charge or
+    // flat fee) is prepaid online as a deposit; the remainder of the order
+    // total is collected as cash on delivery.
+    const isCodPrepaid = paymentMethod === "cod" && deliveryFeeVerified && codRequiredPrepay > 0;
+    const amountPrepaid = isCodPrepaid ? codRequiredPrepay : paymentMethod === "upi" ? total : 0;
+    const amountDueOnDelivery = paymentMethod === "cod" ? Math.max(0, total - amountPrepaid) : 0;
+
     // Persist the order first (status Processing), then atomically reserve
     // stock via the inventory service. Reservation is the ONLY thing that
     // touches physical stock, inside an ACID transaction with row guards that
@@ -323,8 +387,11 @@ async function createOrder(req, res, next) {
       status: "Processing",
       paymentMethod,
       paymentStatus,
-      razorpayOrderId: paymentMethod === "upi" ? razorpayOrderId : "",
-      razorpayPaymentId: paymentMethod === "upi" ? razorpayPaymentId : "",
+      deliveryPrepaid: isCodPrepaid,
+      amountPrepaid,
+      amountDueOnDelivery,
+      razorpayOrderId: paymentMethod === "upi" || isCodPrepaid ? razorpayOrderId : "",
+      razorpayPaymentId: paymentMethod === "upi" || isCodPrepaid ? razorpayPaymentId : "",
     });
 
     // Unpaid online (UPI) orders get a hold the expiry sweeper releases if

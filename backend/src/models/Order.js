@@ -52,6 +52,15 @@ const orderSchema = new mongoose.Schema(
     paymentStatus: { type: String, enum: ["pending", "paid", "failed"], required: true, default: "pending" },
     razorpayOrderId: { type: String, default: "", trim: true },
     razorpayPaymentId: { type: String, default: "", trim: true, index: true },
+    // COD anti-fraud: the delivery charge is collected online up-front even for
+    // Cash-on-Delivery orders, so only genuine buyers confirm. The product
+    // amount is still paid in cash on delivery.
+    //   deliveryPrepaid       — delivery fee was paid online (COD confirmation)
+    //   amountPrepaid         — how much was charged online (the delivery fee)
+    //   amountDueOnDelivery   — cash to collect from the customer on delivery
+    deliveryPrepaid: { type: Boolean, default: false },
+    amountPrepaid: { type: Number, default: 0, min: 0 },
+    amountDueOnDelivery: { type: Number, default: 0, min: 0 },
     // Idempotency key binding this order to its inventory reservation, so
     // reserve/commit/release stay exactly-once across retries.
     reservationKey: { type: String, default: "", trim: true, index: true },

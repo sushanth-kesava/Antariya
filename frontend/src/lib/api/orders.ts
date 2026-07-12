@@ -57,6 +57,9 @@ export type Order = {
   paymentMethod?: "upi" | "cod";
   paymentStatus?: "pending" | "paid" | "failed";
   razorpayPaymentId?: string;
+  deliveryPrepaid?: boolean;
+  amountPrepaid?: number;
+  amountDueOnDelivery?: number;
 };
 
 export type PaymentVerification = {
