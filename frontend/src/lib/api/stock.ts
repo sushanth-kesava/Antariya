@@ -34,7 +34,6 @@ export async function checkStockAvailability(
 ): Promise<StockCheckResponse> {
   const response = await fetch(`${API_BASE_URL}/inventory/check-stock`, {
     credentials: "include",
-    credentials: "include",
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -55,7 +54,7 @@ export async function checkStockAvailability(
  * Get detailed stock info for a single product, including all variants.
  */
 export async function getProductStockDetails(productId: string) {
-  const response = await fetch(`${API_BASE_URL}/inventory/product/${productId}/stock`);
+  const response = await fetch(`${API_BASE_URL}/inventory/product/${productId}/stock`, { credentials: "include" });
 
   if (!response.ok) {
     throw new Error("Failed to fetch product stock details");

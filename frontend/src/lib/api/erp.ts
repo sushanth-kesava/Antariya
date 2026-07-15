@@ -140,7 +140,7 @@ async function parse<T>(response: Response, fallback: string): Promise<T> {
 }
 
 export async function getPermissionCatalog(token: string): Promise<ErpPermissionCatalog> {
-  const response = await fetch(`${API_BASE_URL}/erp/permissions`, { headers: authHeaders(token) });
+  const response = await fetch(`${API_BASE_URL}/erp/permissions`, { credentials: "include", headers: authHeaders(token) });
   const data = await parse<{ wildcard: string; modules: ErpModule[]; permissions: ErpPermission[] }>(
     response,
     "Failed to load permission catalog"
@@ -149,13 +149,13 @@ export async function getPermissionCatalog(token: string): Promise<ErpPermission
 }
 
 export async function getMyAccess(token: string): Promise<ErpActor> {
-  const response = await fetch(`${API_BASE_URL}/erp/me`, { headers: authHeaders(token) });
+  const response = await fetch(`${API_BASE_URL}/erp/me`, { credentials: "include", headers: authHeaders(token) });
   const data = await parse<{ actor: ErpActor }>(response, "Failed to load your access profile");
   return data.actor;
 }
 
 export async function listRoles(token: string): Promise<ErpRole[]> {
-  const response = await fetch(`${API_BASE_URL}/erp/roles`, { headers: authHeaders(token) });
+  const response = await fetch(`${API_BASE_URL}/erp/roles`, { credentials: "include", headers: authHeaders(token) });
   const data = await parse<{ roles: ErpRole[] }>(response, "Failed to load roles");
   return data.roles;
 }
@@ -165,7 +165,6 @@ export async function createRole(
   payload: { key: string; name: string; description?: string; permissions?: string[] }
 ): Promise<ErpRole> {
   const response = await fetch(`${API_BASE_URL}/erp/roles`, {
-    credentials: "include",
     credentials: "include",
     method: "POST",
     headers: authHeaders(token, true),
@@ -182,7 +181,6 @@ export async function updateRole(
 ): Promise<ErpRole> {
   const response = await fetch(`${API_BASE_URL}/erp/roles/${roleId}`, {
     credentials: "include",
-    credentials: "include",
     method: "PATCH",
     headers: authHeaders(token, true),
     body: JSON.stringify(payload),
@@ -193,7 +191,6 @@ export async function updateRole(
 
 export async function deleteRole(token: string, roleId: string): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/erp/roles/${roleId}`, {
-    credentials: "include",
     credentials: "include",
     method: "DELETE",
     headers: authHeaders(token),
@@ -211,7 +208,6 @@ export async function updateUserPermissions(
   }
 ): Promise<ErpUserAccessUpdate> {
   const response = await fetch(`${API_BASE_URL}/erp/users/permissions`, {
-    credentials: "include",
     credentials: "include",
     method: "PATCH",
     headers: authHeaders(token, true),
@@ -235,7 +231,6 @@ export async function listAuditLog(
   const qs = query.toString();
   const response = await fetch(`${API_BASE_URL}/erp/audit${qs ? `?${qs}` : ""}`, {
     credentials: "include",
-    credentials: "include",
     headers: authHeaders(token),
   });
   return parse<ErpAuditPage>(response, "Failed to load audit log");
@@ -255,7 +250,6 @@ export async function listErrorLogs(
   const qs = query.toString();
   const response = await fetch(`${API_BASE_URL}/erp/errors${qs ? `?${qs}` : ""}`, {
     credentials: "include",
-    credentials: "include",
     headers: authHeaders(token),
   });
   return parse<ErpErrorPage>(response, "Failed to load error logs");
@@ -263,7 +257,6 @@ export async function listErrorLogs(
 
 export async function updateErrorLog(token: string, errorId: string, resolved: boolean): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/erp/errors/${errorId}`, {
-    credentials: "include",
     credentials: "include",
     method: "PATCH",
     headers: authHeaders(token, true),
@@ -275,7 +268,6 @@ export async function updateErrorLog(token: string, errorId: string, resolved: b
 export async function purgeErrorLogs(token: string, scope: "resolved" | "all" = "resolved"): Promise<number> {
   const response = await fetch(`${API_BASE_URL}/erp/errors?scope=${scope}`, {
     credentials: "include",
-    credentials: "include",
     method: "DELETE",
     headers: authHeaders(token),
   });
@@ -286,7 +278,7 @@ export async function purgeErrorLogs(token: string, scope: "resolved" | "all" = 
 export async function listRateLimits(
   token: string
 ): Promise<{ rules: ErpRateLimitRule[]; activity: ErpRateLimitActivity }> {
-  const response = await fetch(`${API_BASE_URL}/erp/rate-limits`, { headers: authHeaders(token) });
+  const response = await fetch(`${API_BASE_URL}/erp/rate-limits`, { credentials: "include", headers: authHeaders(token) });
   const data = await parse<{ rules: ErpRateLimitRule[]; activity: ErpRateLimitActivity }>(
     response,
     "Failed to load rate limits"
@@ -300,7 +292,6 @@ export async function updateRateLimit(
   payload: { windowMs?: number; max?: number; enabled?: boolean }
 ): Promise<ErpRateLimitRule> {
   const response = await fetch(`${API_BASE_URL}/erp/rate-limits/${ruleId}`, {
-    credentials: "include",
     credentials: "include",
     method: "PATCH",
     headers: authHeaders(token, true),
@@ -318,7 +309,6 @@ export async function refundOrderOnErp(
   payload: { amount?: number; reason?: string } = {}
 ): Promise<{ refund: { id: string; status: string; amount: number } | null }> {
   const response = await fetch(`${API_BASE_URL}/erp/orders/${orderId}/refund`, {
-    credentials: "include",
     credentials: "include",
     method: "POST",
     headers: authHeaders(token, true),
@@ -361,7 +351,6 @@ export async function listErpProducts(
   const qs = query.toString();
   const response = await fetch(`${API_BASE_URL}/erp/products${qs ? `?${qs}` : ""}`, {
     credentials: "include",
-    credentials: "include",
     headers: authHeaders(token),
   });
   return parse<ErpProductPage>(response, "Failed to load products");
@@ -373,7 +362,6 @@ export async function updateErpProduct(
   payload: Record<string, unknown>
 ): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/erp/products/${productId}`, {
-    credentials: "include",
     credentials: "include",
     method: "PATCH",
     headers: authHeaders(token, true),
@@ -388,7 +376,6 @@ export async function setErpProductPublished(
   published: boolean
 ): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/erp/products/${productId}/publish`, {
-    credentials: "include",
     credentials: "include",
     method: "PATCH",
     headers: authHeaders(token, true),
@@ -410,7 +397,7 @@ export type ErpWarehouse = {
 };
 
 export async function listErpWarehouses(token: string): Promise<ErpWarehouse[]> {
-  const response = await fetch(`${API_BASE_URL}/erp/warehouses`, { headers: authHeaders(token) });
+  const response = await fetch(`${API_BASE_URL}/erp/warehouses`, { credentials: "include", headers: authHeaders(token) });
   const data = await parse<{ warehouses: ErpWarehouse[] }>(response, "Failed to load warehouses");
   return data.warehouses;
 }
@@ -420,7 +407,6 @@ export async function createErpWarehouse(
   payload: { code: string; name: string; city?: string; state?: string; pincode?: string; priority?: number }
 ): Promise<{ id: string; code: string; name: string }> {
   const response = await fetch(`${API_BASE_URL}/erp/warehouses`, {
-    credentials: "include",
     credentials: "include",
     method: "POST",
     headers: authHeaders(token, true),
@@ -445,7 +431,6 @@ export async function transferErpStock(
   }
 ): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/erp/inventory/transfer`, {
-    credentials: "include",
     credentials: "include",
     method: "POST",
     headers: authHeaders(token, true),
@@ -530,7 +515,7 @@ export type ErpEmailLogPage = {
 
 /* Templates */
 export async function listEmailTemplates(token: string): Promise<ErpEmailTemplate[]> {
-  const r = await fetch(`${API_BASE_URL}/erp/comms/templates`, { headers: authHeaders(token) });
+  const r = await fetch(`${API_BASE_URL}/erp/comms/templates`, { credentials: "include", headers: authHeaders(token) });
   const d = await parse<{ templates: ErpEmailTemplate[] }>(r, "Failed to load templates");
   return d.templates;
 }
@@ -540,7 +525,6 @@ export async function createEmailTemplate(
   payload: { name: string; subject: string; html: string; description?: string; key?: string }
 ): Promise<ErpEmailTemplate> {
   const r = await fetch(`${API_BASE_URL}/erp/comms/templates`, {
-    credentials: "include",
     credentials: "include",
     method: "POST",
     headers: authHeaders(token, true),
@@ -557,7 +541,6 @@ export async function updateEmailTemplate(
 ): Promise<ErpEmailTemplate> {
   const r = await fetch(`${API_BASE_URL}/erp/comms/templates/${templateId}`, {
     credentials: "include",
-    credentials: "include",
     method: "PATCH",
     headers: authHeaders(token, true),
     body: JSON.stringify(payload),
@@ -569,7 +552,6 @@ export async function updateEmailTemplate(
 export async function deleteEmailTemplate(token: string, templateId: string): Promise<void> {
   const r = await fetch(`${API_BASE_URL}/erp/comms/templates/${templateId}`, {
     credentials: "include",
-    credentials: "include",
     method: "DELETE",
     headers: authHeaders(token),
   });
@@ -578,12 +560,12 @@ export async function deleteEmailTemplate(token: string, templateId: string): Pr
 
 /* Campaigns */
 export async function getAudienceCounts(token: string): Promise<ErpAudienceCounts> {
-  const r = await fetch(`${API_BASE_URL}/erp/comms/audiences`, { headers: authHeaders(token) });
+  const r = await fetch(`${API_BASE_URL}/erp/comms/audiences`, { credentials: "include", headers: authHeaders(token) });
   return parse<ErpAudienceCounts>(r, "Failed to load audiences");
 }
 
 export async function listEmailCampaigns(token: string): Promise<ErpEmailCampaign[]> {
-  const r = await fetch(`${API_BASE_URL}/erp/comms/campaigns`, { headers: authHeaders(token) });
+  const r = await fetch(`${API_BASE_URL}/erp/comms/campaigns`, { credentials: "include", headers: authHeaders(token) });
   const d = await parse<{ campaigns: ErpEmailCampaign[] }>(r, "Failed to load campaigns");
   return d.campaigns;
 }
@@ -593,7 +575,6 @@ export async function sendEmailCampaign(
   payload: { name: string; subject: string; html: string; audience: string; customList?: string[] }
 ): Promise<ErpEmailCampaign> {
   const r = await fetch(`${API_BASE_URL}/erp/comms/campaigns`, {
-    credentials: "include",
     credentials: "include",
     method: "POST",
     headers: authHeaders(token, true),
@@ -616,7 +597,6 @@ export async function listSubscribers(
   const qs = q.toString();
   const r = await fetch(`${API_BASE_URL}/erp/comms/subscribers${qs ? `?${qs}` : ""}`, {
     credentials: "include",
-    credentials: "include",
     headers: authHeaders(token),
   });
   return parse<ErpSubscriberPage>(r, "Failed to load subscribers");
@@ -624,7 +604,6 @@ export async function listSubscribers(
 
 export async function removeSubscriber(token: string, subscriberId: string): Promise<void> {
   const r = await fetch(`${API_BASE_URL}/erp/comms/subscribers/${subscriberId}`, {
-    credentials: "include",
     credentials: "include",
     method: "DELETE",
     headers: authHeaders(token),
@@ -645,7 +624,6 @@ export async function listEmailLogs(
   if (params.to) q.set("to", params.to);
   const qs = q.toString();
   const r = await fetch(`${API_BASE_URL}/erp/comms/logs${qs ? `?${qs}` : ""}`, {
-    credentials: "include",
     credentials: "include",
     headers: authHeaders(token),
   });
