@@ -20,6 +20,7 @@ const statsRoutes = require("./routes/stats.routes");
 const paymentRoutes = require("./routes/payment.routes");
 const customerProfileRoutes = require("./routes/customerProfile.routes");
 const inventoryRoutes = require("./routes/inventory.routes");
+const couponRoutes = require("./routes/coupon.routes");
 const { notFound, errorHandler } = require("./middleware/error.middleware");
 const { attachRealtime } = require("./services/realtime.service");
 const { extractCookieToken } = require("./middleware/cookie-auth.middleware");
@@ -97,6 +98,7 @@ app.use("/api/stats", statsRoutes);
 app.use("/api", paymentRoutes);
 app.use("/api/customer", customerProfileRoutes);
 app.use("/api/inventory", inventoryRoutes);
+app.use("/api/coupons", couponRoutes);
 app.use(notFound);
 app.use(errorHandler);
 

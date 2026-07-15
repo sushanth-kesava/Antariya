@@ -1,10 +1,13 @@
 import type { NextConfig } from "next";
 
+const isProduction = process.env.NODE_ENV === "production";
+
 const nextConfig: NextConfig = {
-  output: "export",
+  // Only use static export for production builds (Hostinger).
+  // In dev mode, skip it so dynamic routes like /product/[id] work normally.
+  ...(isProduction ? { output: "export" } : {}),
   trailingSlash: true,
   typescript: {
-    // TypeScript errors must be fixed before deploying
     ignoreBuildErrors: false,
   },
   images: {

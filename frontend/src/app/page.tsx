@@ -3,6 +3,7 @@
 
 import { Navbar } from "@/components/navbar";
 import { Hero } from "@/components/hero";
+import { HeroCouponBanner } from "@/components/HeroCouponBanner";
 import { Footer } from "@/components/footer";
 import { ProductCard } from "@/components/product-card";
 import { Product } from "@/app/lib/mock-data";
@@ -34,7 +35,7 @@ export default function Home() {
       try {
         const [catalogResponse, statsResponse, layoutResponse] = await Promise.all([
           getProductsFromBackend({ limit: 500 }),
-          fetch(`${API_BASE_URL}/stats/home`).then(async (response) => {
+          fetch(`${API_BASE_URL}/stats/home`, { credentials: "include" }).then(async (response) => {
             const data = await response.json();
 
             if (!response.ok || !data?.success) {
@@ -43,7 +44,7 @@ export default function Home() {
 
             return data.stats as HeroMetrics;
           }),
-          fetch(`${API_BASE_URL}/products/marketplace?role=customer`).then(async (response) => {
+          fetch(`${API_BASE_URL}/products/marketplace?role=customer`, { credentials: "include" }).then(async (response) => {
             const data = await response.json();
 
             if (!response.ok || !data?.success) {
@@ -86,7 +87,8 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="flex flex-col min-h-screen">
+      <HeroCouponBanner />
       <Navbar />
       
       <main className="flex-grow">

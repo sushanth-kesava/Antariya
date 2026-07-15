@@ -24,7 +24,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    fetch(`${getApiBaseUrl()}/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
+    fetch(`${getApiBaseUrl()}/auth/me`, { credentials: "include", headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
       .then((data) => {
         if (data?.success && data?.user) {

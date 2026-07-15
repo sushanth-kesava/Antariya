@@ -108,6 +108,7 @@ export default function CommonAuthPage({ mode }: { mode: AuthMode }) {
 
       try {
         const response = await fetch(`${API_BASE_URL}/auth/me`, {
+          credentials: "include",
           headers: {
             Authorization: `Bearer ${token}`,
           },

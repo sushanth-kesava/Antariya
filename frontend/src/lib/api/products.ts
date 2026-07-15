@@ -156,7 +156,7 @@ export async function getProductsFromBackend(filters?: {
     limit: filters?.limit ? String(filters.limit) : undefined,
   });
 
-  const response = await fetch(`${API_BASE_URL}/products${query ? `?${query}` : ""}`);
+  const response = await fetch(`${API_BASE_URL}/products${query ? `?${query}` : ""}`, { credentials: "include" });
   const data = await response.json();
 
   if (!response.ok || !data?.success) {
@@ -170,7 +170,7 @@ export async function getProductsFromBackend(filters?: {
 }
 
 export async function getMarketplaceLayoutFromBackend(role: MarketplaceRole): Promise<MarketplaceLayoutResponse> {
-  const response = await fetch(`${API_BASE_URL}/products/marketplace?role=${encodeURIComponent(role)}`);
+  const response = await fetch(`${API_BASE_URL}/products/marketplace?role=${encodeURIComponent(role)}`, { credentials: "include" });
   const data = await response.json();
 
   if (!response.ok || !data?.success) {
@@ -181,7 +181,7 @@ export async function getMarketplaceLayoutFromBackend(role: MarketplaceRole): Pr
 }
 
 export async function getProductByIdFromBackend(id: string): Promise<Product | null> {
-  const response = await fetch(`${API_BASE_URL}/products/${id}`);
+  const response = await fetch(`${API_BASE_URL}/products/${id}`, { credentials: "include" });
 
   if (response.status === 404) {
     return null;
@@ -200,7 +200,7 @@ export async function getProductReviewsFromBackend(productId: string): Promise<{
   reviews: ProductReview[];
   summary: ProductReviewSummary;
 }> {
-  const response = await fetch(`${API_BASE_URL}/products/${productId}/reviews`);
+  const response = await fetch(`${API_BASE_URL}/products/${productId}/reviews`, { credentials: "include" });
   const data = await response.json();
 
   if (!response.ok || !data?.success) {
@@ -313,6 +313,7 @@ export async function getReviewModerationActivityFromBackend(
   limit = 25
 ): Promise<ModerationActivityItem[]> {
   const response = await fetch(`${API_BASE_URL}/products/admin/reviews/activity?limit=${Math.min(Math.max(limit, 1), 200)}`, {
+    credentials: "include",
     headers: {
       Authorization: `Bearer ${token}`,
     },

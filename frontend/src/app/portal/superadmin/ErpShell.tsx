@@ -11,6 +11,7 @@ import {
   Wallet,
   ShieldCheck,
   Mail,
+  Ticket,
   ScrollText,
   KeyRound,
   LogOut,
@@ -29,6 +30,7 @@ import { InventoryModule } from "./modules/InventoryModule";
 import { CatalogModule } from "./modules/CatalogModule";
 import { FinanceModule } from "./modules/FinanceModule";
 import { CommsModule } from "./modules/CommsModule";
+import { CouponsModule } from "./modules/CouponsModule";
 
 type ErpUser = {
   id: string | null;
@@ -54,6 +56,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: "catalog", label: "Catalog / Products", icon: Tags, anyOf: ["catalog.view"] },
   { key: "finance", label: "Finance & Reports", icon: Wallet, anyOf: ["finance.view"] },
   { key: "comms", label: "Communications", icon: Mail, anyOf: ["comms.campaigns.view", "comms.templates.view", "comms.subscribers.view", "comms.logs.view"] },
+  { key: "coupons", label: "Coupons & Offers", icon: Ticket },
   { key: "governance", label: "Governance", icon: ShieldCheck, anyOf: ["governance.roles.view", "governance.audit.view", "governance.settings.manage"] },
 ];
 
@@ -98,6 +101,8 @@ export function ErpShell({
         return <FinanceModule token={token} has={has} />;
       case "comms":
         return <CommsModule token={token} has={has} />;
+      case "coupons":
+        return <CouponsModule token={token} has={has} />;
       default:
         return <DashboardModule token={token} actor={actor} onNavigate={setActive} />;
     }
