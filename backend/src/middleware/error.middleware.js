@@ -2,9 +2,12 @@ const { recordError } = require("../services/errorlog.service");
 const env = require("../config/env");
 
 function notFound(req, res, next) {
+  // Truncate reflected URL to prevent abuse (reflected XSS in JSON isn't
+  // exploitable in modern browsers, but defense-in-depth doesn't hurt).
+  const safePath = String(req.originalUrl || "").slice(0, 200);
   res.status(404).json({
     success: false,
-    message: `Route not found: ${req.method} ${req.originalUrl}`,
+    message: `Route not found: ${req.method} ${safePath}`,
   });
 }
 

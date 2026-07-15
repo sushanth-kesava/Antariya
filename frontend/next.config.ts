@@ -4,7 +4,8 @@ const nextConfig: NextConfig = {
   output: "export",
   trailingSlash: true,
   typescript: {
-    ignoreBuildErrors: true,
+    // TypeScript errors must be fixed before deploying
+    ignoreBuildErrors: false,
   },
   images: {
     unoptimized: true,

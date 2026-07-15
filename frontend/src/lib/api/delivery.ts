@@ -19,7 +19,9 @@ export type DeliveryAvailability = {
 };
 
 export async function checkDeliveryByPincode(pincode: string): Promise<DeliveryAvailability> {
-  const response = await fetch(`${API_BASE_URL}/delivery/check?pincode=${encodeURIComponent(pincode)}`);
+  const response = await fetch(`${API_BASE_URL}/delivery/check?pincode=${encodeURIComponent(pincode)}`, {
+    credentials: "include",
+  });
   const data = (await response.json()) as DeliveryAvailability;
 
   if (!response.ok) {

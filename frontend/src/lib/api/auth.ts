@@ -48,6 +48,7 @@ export async function loginWithGoogleOnBackend(payload: GoogleAuthPayload): Prom
   try {
     response = await fetch(`${API_BASE_URL}/auth/google`, {
       method: "POST",
+      credentials: "include",
       headers: {
         "Content-Type": "application/json",
       },
@@ -80,6 +81,7 @@ async function postAuthRequest(path: string, payload: Record<string, unknown>): 
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
       method: "POST",
+      credentials: "include",
       headers: {
         "Content-Type": "application/json",
       },

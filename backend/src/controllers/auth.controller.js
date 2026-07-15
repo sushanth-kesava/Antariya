@@ -7,6 +7,7 @@ const AccessRequest = require("../models/AccessRequest");
 const CustomerProfile = require("../models/CustomerProfile");
 const env = require("../config/env");
 const { sendWelcomeEmail } = require("../services/mail.service");
+const { setAuthCookie } = require("../middleware/cookie-auth.middleware");
 
 function normalizeDisplayName(email, displayName) {
   const normalizedName = String(displayName || "").trim();
@@ -28,8 +29,13 @@ function issueJwtToken(authDocument, inferredRole) {
   return jwt.sign(jwtPayload, env.jwtSecret, jwtOptions);
 }
 
-function issueAuthResponse(authDocument, inferredRole) {
+function issueAuthResponse(authDocument, inferredRole, res) {
   const appToken = issueJwtToken(authDocument, inferredRole);
+
+  // Set HttpOnly cookie if response object is provided
+  if (res) {
+    setAuthCookie(res, appToken);
+  }
 
   return {
     success: true,
@@ -371,7 +377,7 @@ async function loginWithGoogle(req, res, next) {
       });
     }
 
-    return res.status(200).json(issueAuthResponse(authDocument, inferredRole));
+    return res.status(200).json(issueAuthResponse(authDocument, inferredRole, res));
   } catch (error) {
     if (error.response?.status === 401 || error.response?.status === 403) {
       return res.status(401).json({
@@ -480,7 +486,7 @@ async function signupWithCredentials(req, res, next) {
       console.error("Welcome email failed:", mailError.message || mailError);
     });
 
-    return res.status(201).json(issueAuthResponse(savedUser, savedUser.role || "customer"));
+    return res.status(201).json(issueAuthResponse(savedUser, savedUser.role || "customer", res));
   } catch (error) {
     if (error?.code === 11000) {
       return res.status(409).json({
@@ -579,7 +585,7 @@ async function loginWithCredentials(req, res, next) {
     };
     await user.save();
 
-    return res.status(200).json(issueAuthResponse(user, user.role || "customer"));
+    return res.status(200).json(issueAuthResponse(user, user.role || "customer", res));
   } catch (error) {
     return next(error);
   }

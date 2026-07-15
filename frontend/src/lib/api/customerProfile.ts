@@ -46,6 +46,7 @@ export type CustomerProfileData = {
 
 export async function getCustomerProfileFromBackend(token: string): Promise<CustomerProfileData> {
   const res = await fetch(`${API_BASE_URL}/customer/profile`, {
+    credentials: "include",
     headers: { Authorization: `Bearer ${token}` },
   });
   const data = await res.json();
@@ -62,6 +63,7 @@ export async function updateCustomerProfileOnBackend(
   updates: Partial<Pick<CustomerProfileData, "displayName" | "gender" | "dateOfBirth" | "preferences">>
 ): Promise<UpdateProfileResult> {
   const res = await fetch(`${API_BASE_URL}/customer/profile`, {
+    credentials: "include",
     method: "PUT",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify(updates),
@@ -93,6 +95,7 @@ export type AddressResult =
 
 export async function addAddressOnBackend(token: string, address: AddressInput): Promise<AddressResult> {
   const res = await fetch(`${API_BASE_URL}/customer/profile/address`, {
+    credentials: "include",
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify(address),
@@ -106,6 +109,7 @@ export async function addAddressOnBackend(token: string, address: AddressInput):
 
 export async function updateAddressOnBackend(token: string, addressId: string, address: AddressInput): Promise<AddressResult> {
   const res = await fetch(`${API_BASE_URL}/customer/profile/address/${addressId}`, {
+    credentials: "include",
     method: "PUT",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify(address),
@@ -119,6 +123,7 @@ export async function updateAddressOnBackend(token: string, addressId: string, a
 
 export async function setDefaultAddressOnBackend(token: string, addressId: string): Promise<AddressResult> {
   const res = await fetch(`${API_BASE_URL}/customer/profile/address/${addressId}/default`, {
+    credentials: "include",
     method: "PATCH",
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -131,6 +136,7 @@ export async function setDefaultAddressOnBackend(token: string, addressId: strin
 
 export async function removeAddressOnBackend(token: string, addressId: string): Promise<AddressResult> {
   const res = await fetch(`${API_BASE_URL}/customer/profile/address/${addressId}`, {
+    credentials: "include",
     method: "DELETE",
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -174,6 +180,7 @@ export async function completeProfileOnBackend(
   payload: CompleteProfilePayload
 ): Promise<CompleteProfileResult> {
   const res = await fetch(`${API_BASE_URL}/customer/profile/complete`, {
+    credentials: "include",
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -205,6 +212,7 @@ export type AdminBusinessDetails = {
 
 export async function getBusinessDetailsFromBackend(token: string): Promise<AdminBusinessDetails | null> {
   const res = await fetch(`${API_BASE_URL}/customer/profile/business`, {
+    credentials: "include",
     headers: { Authorization: `Bearer ${token}` },
   });
   const data = await res.json();
@@ -219,6 +227,7 @@ export async function updateBusinessDetailsOnBackend(
     "businessName" | "businessType" | "businessAddress" | "website" | "panNumber" | "aadharNumber" | "gstNumber" | "notes">>
 ): Promise<{ success: boolean; message?: string; business?: AdminBusinessDetails }> {
   const res = await fetch(`${API_BASE_URL}/customer/profile/business`, {
+    credentials: "include",
     method: "PUT",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify(updates),

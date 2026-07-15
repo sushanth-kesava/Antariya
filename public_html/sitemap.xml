@@ -1,44 +1,65 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <!-- Main pages -->
   <url>
     <loc>https://antariyaofficial.com/</loc>
-    <lastmod>2026-04-20</lastmod>
+    <lastmod>2026-07-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://antariyaofficial.com/story.html</loc>
-    <lastmod>2026-04-20</lastmod>
+    <loc>https://antariyaofficial.com/story</loc>
+    <lastmod>2026-07-14</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://antariyaofficial.com/contact.html</loc>
-    <lastmod>2026-04-20</lastmod>
+    <loc>https://antariyaofficial.com/contact</loc>
+    <lastmod>2026-07-14</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
+  <!-- Product pages -->
   <url>
-    <loc>https://antariyaofficial.com/legal/privacy.html</loc>
-    <lastmod>2026-04-20</lastmod>
+    <loc>https://antariyaofficial.com/products</loc>
+    <lastmod>2026-07-14</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://antariyaofficial.com/cart</loc>
+    <lastmod>2026-07-14</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://antariyaofficial.com/wishlist</loc>
+    <lastmod>2026-07-14</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <!-- Legal pages -->
+  <url>
+    <loc>https://antariyaofficial.com/legal/privacy</loc>
+    <lastmod>2026-07-14</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://antariyaofficial.com/legal/terms.html</loc>
-    <lastmod>2026-04-20</lastmod>
+    <loc>https://antariyaofficial.com/legal/terms</loc>
+    <lastmod>2026-07-14</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://antariyaofficial.com/legal/shipping.html</loc>
-    <lastmod>2026-04-20</lastmod>
+    <loc>https://antariyaofficial.com/legal/shipping</loc>
+    <lastmod>2026-07-14</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://antariyaofficial.com/legal/returns.html</loc>
-    <lastmod>2026-04-20</lastmod>
+    <loc>https://antariyaofficial.com/legal/returns</loc>
+    <lastmod>2026-07-14</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.4</priority>
   </url>

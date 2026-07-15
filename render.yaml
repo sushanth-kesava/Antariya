@@ -6,12 +6,40 @@ services:
     buildCommand: npm install
     startCommand: npm start
     autoDeploy: true
+    healthCheckPath: /api/health
     envVars:
+      # ─── Required ───────────────────────────────────────────────────────
       - key: MONGODB_URI
         sync: false
       - key: JWT_SECRET
         sync: false
-      # Frontend is hosted on Hostinger (static export). These origins are
-      # allowed through CORS so the Hostinger site can call this backend.
+      - key: SUPERADMIN_ALLOWED_EMAILS
+        sync: false
+      # ─── CORS: Frontend origins that can call this backend ───────────────
       - key: FRONTEND_URL
-        value: https://antariyaofficial.com,https://www.antariyaofficial.com
+        value: https://antariyaofficial.com,https://www.antariyaofficial.com,https://api.antariyaofficial.com
+      - key: NODE_ENV
+        value: production
+      # ─── Optional: Payments ─────────────────────────────────────────────
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      # ─── Optional: Email ────────────────────────────────────────────────
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: MAIL_FROM_EMAIL
+        sync: false
+      # ─── Optional: Cloudinary ───────────────────────────────────────────
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false

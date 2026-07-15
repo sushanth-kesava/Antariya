@@ -25,6 +25,7 @@ export async function createRazorpayOrderOnBackend(
   payload: CreateRazorpayOrderInput
 ): Promise<CreateRazorpayOrderResponse> {
   const response = await fetch(`${API_BASE_URL}/create-order`, {
+    credentials: "include",
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -48,6 +49,7 @@ export async function createRazorpayOrderOnBackend(
 
 export async function verifyRazorpayPaymentOnBackend(token: string, payload: VerifyPaymentPayload): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/verify-payment`, {
+    credentials: "include",
     method: "POST",
     headers: {
       "Content-Type": "application/json",

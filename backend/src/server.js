@@ -1,7 +1,9 @@
 const express = require("express");
 const cors = require("cors");
+const mongoose = require("mongoose");
 const helmet = require("helmet");
 const morgan = require("morgan");
+const cookieParser = require("cookie-parser");
 
 const env = require("./config/env");
 const { connectDb } = require("./config/db");
@@ -20,6 +22,7 @@ const customerProfileRoutes = require("./routes/customerProfile.routes");
 const inventoryRoutes = require("./routes/inventory.routes");
 const { notFound, errorHandler } = require("./middleware/error.middleware");
 const { attachRealtime } = require("./services/realtime.service");
+const { extractCookieToken } = require("./middleware/cookie-auth.middleware");
 const { startInventoryJobs } = require("./services/inventory.jobs");
 const { ensureDefaultRoles } = require("./services/rbac.service");
 const { ensureDefaultRateLimits } = require("./services/ratelimit.service");
@@ -49,7 +52,9 @@ app.use(
     credentials: true,
   })
 );
-app.use(express.json({ limit: "25mb" }));
+app.use(express.json({ limit: "2mb" }));
+app.use(cookieParser());
+app.use(extractCookieToken);
 app.use(morgan("tiny"));
 
 app.get("/", (req, res) => {
@@ -64,10 +69,18 @@ app.get("/", (req, res) => {
 });
 
 app.get("/api/health", (req, res) => {
-  res.status(200).json({
+  const mongoState = mongoose.connection.readyState;
+  // 0 = disconnected, 1 = connected, 2 = connecting, 3 = disconnecting
+  const dbHealthy = mongoState === 1;
+  const statusCode = dbHealthy ? 200 : 503;
+
+  res.status(statusCode).json({
     success: true,
     message: "Backend is running",
     timestamp: new Date().toISOString(),
+    database: dbHealthy ? "connected" : "disconnected",
+    uptime: Math.floor(process.uptime()),
+    memory: Math.round(process.memoryUsage().rss / (1024 * 1024)) + "MB",
   });
 });
 

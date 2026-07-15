@@ -12,6 +12,7 @@ export type WishlistItem = {
 
 export async function getWishlistFromBackend(token: string): Promise<WishlistItem[]> {
   const response = await fetch(`${API_BASE_URL}/wishlist`, {
+    credentials: "include",
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -32,6 +33,7 @@ export async function setWishlistItemOnBackend(
   saved: boolean
 ): Promise<{ saved: boolean; item?: WishlistItem }> {
   const response = await fetch(`${API_BASE_URL}/wishlist/${productId}`, {
+    credentials: "include",
     method: "PUT",
     headers: {
       "Content-Type": "application/json",

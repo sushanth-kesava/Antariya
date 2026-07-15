@@ -106,6 +106,7 @@ export type SuperAdminManagedAccount = {
 
 export async function getSuperAdminDashboardFromBackend(token: string): Promise<SuperAdminDashboardPayload> {
   const response = await fetch(`${API_BASE_URL}/superadmin/dashboard`, {
+    credentials: "include",
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -143,6 +144,7 @@ export async function createAccessRequestOnBackend(
   }
 ): Promise<SuperAdminAccessRequest> {
   const response = await fetch(`${API_BASE_URL}/superadmin/access-requests`, {
+    credentials: "include",
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -174,6 +176,7 @@ export async function submitAdminApplicationOnBackend(payload: {
   notes?: string;
 }): Promise<SuperAdminAccessRequest> {
   const response = await fetch(`${API_BASE_URL}/superadmin/admin-applications`, {
+    credentials: "include",
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -197,6 +200,7 @@ export async function reviewAccessRequestOnBackend(
   reviewNote?: string
 ): Promise<SuperAdminAccessRequest> {
   const response = await fetch(`${API_BASE_URL}/superadmin/access-requests/${requestId}`, {
+    credentials: "include",
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
@@ -222,6 +226,7 @@ export async function updateUserRoleOnBackend(
   }
 ): Promise<SuperAdminManagedAccount> {
   const response = await fetch(`${API_BASE_URL}/superadmin/users/role`, {
+    credentials: "include",
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",

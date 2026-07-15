@@ -75,6 +75,7 @@ export async function createOrderOnBackend(
   payment?: PaymentVerification
 ): Promise<Order> {
   const response = await fetch(`${API_BASE_URL}/orders`, {
+    credentials: "include",
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -94,6 +95,7 @@ export async function createOrderOnBackend(
 
 export async function getMyOrdersFromBackend(token: string): Promise<Order[]> {
   const response = await fetch(`${API_BASE_URL}/orders/my`, {
+    credentials: "include",
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -134,6 +136,7 @@ export type AdminDashboardPayload = {
 
 export async function getAdminDashboardFromBackend(token: string): Promise<AdminDashboardPayload> {
   const response = await fetch(`${API_BASE_URL}/orders/admin/dashboard`, {
+    credentials: "include",
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -158,6 +161,7 @@ export async function updateAdminOrderStatusOnBackend(
   status: Order["status"]
 ): Promise<Order> {
   const response = await fetch(`${API_BASE_URL}/orders/admin/${orderId}/status`, {
+    credentials: "include",
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",

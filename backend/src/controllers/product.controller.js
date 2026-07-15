@@ -10,7 +10,7 @@ const multer = require("multer");
 const { hasCloudinaryCredentials, uploadProductImageBuffer } = require("../services/cloudinary.service");
 
 const MAX_PRODUCT_IMAGES = 10;
-const MAX_PRODUCT_IMAGE_SIZE_BYTES = 50 * 1024 * 1024;
+const MAX_PRODUCT_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
 // Curated Antariya storefront categories (order defines the marketplace bar order).
 const ANTARIYA_CATEGORIES = [
     "Oversized T-Shirts",

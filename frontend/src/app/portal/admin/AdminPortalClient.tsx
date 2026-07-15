@@ -134,6 +134,7 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
   const [formData, setFormData] = useState({
     name: "",
     description: "",
+    category: "",
     price: "",
     stock: "100",
     customizable: false,
@@ -822,6 +823,7 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
       const created = await createProductOnBackend(authToken, {
         name: formData.name,
         description: formData.description,
+        category: formData.category,
         price: parseFloat(formData.price),
         image: uploadedImages[0],
         images: uploadedImages,
@@ -854,6 +856,7 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
       setFormData({
         name: "",
         description: "",
+        category: formData.category,
         price: "",
         stock: "100",
         customizable: false,

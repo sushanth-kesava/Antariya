@@ -36,7 +36,7 @@ const frontendOrigins = String(process.env.FRONTEND_URL || "")
 
 const defaultFrontendOrigins = [
   "https://antariyaofficial.com",
-  "https://antariya.onrender.com",
+  "https://www.antariyaofficial.com",
   "http://localhost:3000",
   "http://127.0.0.1:3000",
   "http://localhost:9002",
@@ -50,23 +50,15 @@ const env = {
   nodeEnv: process.env.NODE_ENV || "development",
   mongoUri: normalizeMongoUri(process.env.MONGODB_URI),
   jwtSecret: process.env.JWT_SECRET,
-  jwtExpiresIn: process.env.JWT_EXPIRES_IN,
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN || "7d",
   frontendUrl: resolvedFrontendOrigins[0],
   frontendUrls: resolvedFrontendOrigins,
-  appName: process.env.APP_NAME || "StitchMart",
+  appName: process.env.APP_NAME || "Antariya",
   adminAllowedEmails: String(process.env.ADMIN_ALLOWED_EMAILS || "")
     .split(",")
     .map((value) => value.trim().toLowerCase())
     .filter(Boolean),
-  superAdminAllowedEmails: (process.env.SUPERADMIN_ALLOWED_EMAILS
-    ? String(process.env.SUPERADMIN_ALLOWED_EMAILS)
-    : [
-        "2300030795cseird@gmail.com",
-        "sushanthkesava@gmail.com",
-        "annabathulasarath@gmail.com",
-        "abhijnavinjamuri@gmail.com",
-        "lakshmisnehitha52@gmail.com",
-      ].join(","))
+  superAdminAllowedEmails: String(process.env.SUPERADMIN_ALLOWED_EMAILS || "")
     .split(",")
     .map((value) => value.trim().toLowerCase())
     .filter(Boolean),
@@ -87,7 +79,7 @@ const env = {
   smtpUser: process.env.SMTP_USER || process.env.EMAIL_USER,
   smtpPass: process.env.SMTP_PASS || process.env.EMAIL_PASSWORD,
   mailFromEmail: process.env.MAIL_FROM_EMAIL || process.env.EMAIL_USER,
-  mailFromName: process.env.MAIL_FROM_NAME || process.env.APP_NAME || "StitchMart",
+  mailFromName: process.env.MAIL_FROM_NAME || process.env.APP_NAME || "Antariya",
   cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME,
   cloudinaryApiKey: process.env.CLOUDINARY_API_KEY,
   cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET,
@@ -95,7 +87,7 @@ const env = {
   razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET,
 };
 
-const requiredVars = ["MONGODB_URI", "JWT_SECRET"];
+const requiredVars = ["MONGODB_URI", "JWT_SECRET", "SUPERADMIN_ALLOWED_EMAILS"];
 
 for (const key of requiredVars) {
   if (!process.env[key]) {

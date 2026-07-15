@@ -220,6 +220,7 @@ export async function getProductReviewsFromBackend(productId: string): Promise<{
 
 export async function getReviewEligibilityFromBackend(token: string, productId: string): Promise<ReviewEligibility> {
   const response = await fetch(`${API_BASE_URL}/products/${productId}/review-eligibility`, {
+    credentials: "include",
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -240,6 +241,7 @@ export async function addProductReviewOnBackend(
   payload: ProductReviewInput
 ): Promise<ProductReview> {
   const response = await fetch(`${API_BASE_URL}/products/${productId}/reviews`, {
+    credentials: "include",
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -267,6 +269,7 @@ export async function getReviewModerationQueueFromBackend(
   });
 
   const response = await fetch(`${API_BASE_URL}/products/admin/reviews${query ? `?${query}` : ""}`, {
+    credentials: "include",
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -287,6 +290,7 @@ export async function updateReviewModerationOnBackend(
   payload: { moderationStatus: ReviewModerationStatus; moderationNote?: string }
 ): Promise<ModerationReview> {
   const response = await fetch(`${API_BASE_URL}/products/admin/reviews/${reviewId}`, {
+    credentials: "include",
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
@@ -325,6 +329,7 @@ export async function getReviewModerationActivityFromBackend(
 
 export async function createProductOnBackend(token: string, payload: ProductInput): Promise<Product> {
   const response = await fetch(`${API_BASE_URL}/products`, {
+    credentials: "include",
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -350,6 +355,7 @@ export async function uploadProductImagesToBackend(token: string, files: File[])
   }
 
   const response = await fetch(`${API_BASE_URL}/products/upload-images`, {
+    credentials: "include",
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -368,6 +374,7 @@ export async function uploadProductImagesToBackend(token: string, files: File[])
 
 export async function deleteProductOnBackend(token: string, productId: string): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/products/${productId}`, {
+    credentials: "include",
     method: "DELETE",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -407,6 +414,7 @@ export type InventoryReport = {
 
 export async function getInventoryReportFromBackend(token: string): Promise<InventoryReport> {
   const response = await fetch(`${API_BASE_URL}/products/admin/inventory`, {
+    credentials: "include",
     headers: { Authorization: `Bearer ${token}` },
   });
   const data = await response.json();
@@ -441,6 +449,7 @@ export async function adjustStockOnBackend(
   payload: { type: "add" | "remove" | "set"; quantity: number; variantSku?: string; reason?: string }
 ): Promise<{ adjustment: StockAdjustmentEntry; product: Product }> {
   const response = await fetch(`${API_BASE_URL}/products/${productId}/adjust-stock`, {
+    credentials: "include",
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify(payload),
@@ -455,6 +464,7 @@ export async function adjustStockOnBackend(
 export async function getStockHistoryFromBackend(token: string, productId?: string): Promise<StockAdjustmentEntry[]> {
   const query = productId ? `?productId=${encodeURIComponent(productId)}` : "";
   const response = await fetch(`${API_BASE_URL}/products/admin/stock-history${query}`, {
+    credentials: "include",
     headers: { Authorization: `Bearer ${token}` },
   });
   const data = await response.json();
@@ -470,6 +480,7 @@ export async function updateInventorySettingsOnBackend(
   payload: { reorderPoint?: number; variantReorderPoints?: Record<string, number> }
 ): Promise<Product> {
   const response = await fetch(`${API_BASE_URL}/products/${productId}/inventory-settings`, {
+    credentials: "include",
     method: "PATCH",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify(payload),
@@ -484,6 +495,7 @@ export async function updateInventorySettingsOnBackend(
 
 export async function exportInventoryCsvFromBackend(token: string): Promise<string> {
   const response = await fetch(`${API_BASE_URL}/products/admin/inventory/export`, {
+    credentials: "include",
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!response.ok) {
@@ -497,6 +509,7 @@ export async function importInventoryCsvToBackend(
   csv: string
 ): Promise<{ updated: number; errors: string[] }> {
   const response = await fetch(`${API_BASE_URL}/products/admin/inventory/import`, {
+    credentials: "include",
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({ csv }),

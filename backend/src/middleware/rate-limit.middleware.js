@@ -1,4 +1,6 @@
 const DEFAULT_WINDOW_MS = 15 * 60 * 1000;
+const CLEANUP_INTERVAL_MS = 5 * 60 * 1000; // Sweep expired entries every 5 min
+const MAX_STORE_SIZE = 50000; // Emergency cap to prevent OOM
 
 function createRateLimiter({
   windowMs = DEFAULT_WINDOW_MS,
@@ -8,12 +10,36 @@ function createRateLimiter({
 } = {}) {
   const store = new Map();
 
+  // Periodic cleanup of expired entries to prevent memory leaks
+  const cleanupTimer = setInterval(() => {
+    const now = Date.now();
+    for (const [key, entry] of store) {
+      if (entry.expiresAt <= now) {
+        store.delete(key);
+      }
+    }
+  }, CLEANUP_INTERVAL_MS);
+
+  // Allow the process to exit cleanly without waiting for the timer
+  if (cleanupTimer.unref) {
+    cleanupTimer.unref();
+  }
+
   return function rateLimiter(req, res, next) {
     const now = Date.now();
     const key = String(keyGenerator(req) || "unknown");
     const current = store.get(key);
 
     if (!current || current.expiresAt <= now) {
+      // Emergency eviction if store is too large (DoS mitigation)
+      if (store.size >= MAX_STORE_SIZE) {
+        const cutoff = now - windowMs;
+        for (const [k, v] of store) {
+          if (v.expiresAt <= cutoff) store.delete(k);
+          if (store.size < MAX_STORE_SIZE * 0.8) break;
+        }
+      }
+
       store.set(key, {
         count: 1,
         expiresAt: now + windowMs,

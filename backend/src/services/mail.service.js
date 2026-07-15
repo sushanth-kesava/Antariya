@@ -368,7 +368,44 @@ async function sendBrandedEmail({ to, subject, bodyHtml, unsubscribeUrl, vars })
   const html = wrapBrandedEmail({ title: renderedSubject, bodyHtml: renderedBody, unsubscribeUrl });
   // Plain-text fallback: strip tags from the rendered body.
   const text = renderedBody.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-  return sendMail({ to, subject: renderedSubject, html, text });
+return sendMail({ to, subject: renderedSubject, html, text });
+}
+
+/**
+ * Send a password reset email with a secure link.
+ */
+async function sendPasswordResetEmail(to, resetUrl, displayName) {
+  if (!hasMailConfig()) {
+    console.warn("[Mail] Skipping password reset email — SMTP not configured");
+    return;
+  }
+
+  const name = displayName || to.split("@")[0];
+  const subject = "Reset your Antariya password";
+  const html = wrapBrandedEmail(`
+    <h2 style="color:#1a1a1a;margin:0 0 16px">Password Reset Request</h2>
+    <p style="color:#333;font-size:15px;line-height:1.6">
+      Hi ${escapeHtml(name)},
+    </p>
+    <p style="color:#333;font-size:15px;line-height:1.6">
+      We received a request to reset your password. Click the button below to set a new password.
+      This link expires in 30 minutes.
+    </p>
+    <div style="text-align:center;margin:28px 0">
+      <a href="${resetUrl}" style="display:inline-block;background:#1a1a1a;color:#fff;padding:12px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px">
+        Reset Password
+      </a>
+    </div>
+    <p style="color:#666;font-size:13px;line-height:1.5">
+      If you didn't request this, you can safely ignore this email. Your password will remain unchanged.
+    </p>
+    <p style="color:#999;font-size:12px;margin-top:20px">
+      If the button doesn't work, copy and paste this URL into your browser:<br>
+      <a href="${resetUrl}" style="color:#555;word-break:break-all">${resetUrl}</a>
+    </p>
+  `);
+
+  return sendMail({ to, subject, html });
 }
 
 module.exports = {
@@ -381,4 +418,5 @@ module.exports = {
   renderPlaceholders,
   escapeHtml,
   hasMailConfig,
+  sendPasswordResetEmail,
 };

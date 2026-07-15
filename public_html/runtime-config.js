@@ -1,13 +1,9 @@
-// Runtime configuration for Antariya pre-launch website
-// This file is loaded at runtime to allow dynamic API endpoint configuration
-// without requiring a rebuild for different deployment environments
+// Runtime configuration for Antariya (PRODUCTION)
+// This file tells the frontend where the backend API lives.
 
-(function() {
-  // Default: use the same origin (relative path)
-  const apiBaseUrl = '';
-  
-  // Export configuration
+(function () {
   window.__ANTARIYA_RUNTIME_CONFIG__ = {
-    apiBaseUrl: apiBaseUrl
+    apiBaseUrl: "https://api.antariyaofficial.com",
+    razorpayKeyId: "", // Set your live Razorpay key: "rzp_live_xxxxxx"
   };
 })();

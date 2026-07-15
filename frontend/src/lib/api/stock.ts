@@ -33,6 +33,7 @@ export async function checkStockAvailability(
   items: StockCheckRequest[]
 ): Promise<StockCheckResponse> {
   const response = await fetch(`${API_BASE_URL}/inventory/check-stock`, {
+    credentials: "include",
     method: "POST",
     headers: {
       "Content-Type": "application/json",

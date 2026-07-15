@@ -8,6 +8,7 @@ export async function subscribeToNewsletter(
   source = "footer"
 ): Promise<{ message: string }> {
   const response = await fetch(`${API_BASE_URL}/newsletter/subscribe`, {
+    credentials: "include",
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, name, source }),

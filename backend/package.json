@@ -7,6 +7,7 @@
     "build": "node -e \"console.log('Backend build: no transpilation step required')\"",
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
+    "test": "jest --forceExit --detectOpenHandles",
     "db:cleanup": "node scripts/cleanup-database.js",
     "db:import-products": "node scripts/import-products.js",
     "db:reassign-owners": "node scripts/reassign-product-owners.js",
@@ -17,6 +18,7 @@
     "axios": "^1.7.4",
     "bcryptjs": "^3.0.3",
     "cloudinary": "^2.9.0",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "express": "^4.21.2",
@@ -29,10 +31,13 @@
     "multer": "^2.1.1",
     "nodemailer": "^8.0.4",
     "razorpay": "^2.9.6",
-    "socket.io": "^4.8.3"
+    "socket.io": "^4.8.3",
+    "zod": "^3.24.2"
   },
   "devDependencies": {
-    "nodemon": "^3.1.10"
+    "nodemon": "^3.1.10",
+    "jest": "^29.7.0",
+    "supertest": "^6.3.4"
   },
   "engines": {
     "node": ">=18.0.0"
