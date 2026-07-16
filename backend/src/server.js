@@ -105,6 +105,7 @@ app.use(errorHandler);
 async function startServer() {
   try {
     await connectDb(env.mongoUri);
+     console.log("MongoDB Connected Successfully");
 
     // Guarantee the DEFAULT warehouse exists before serving traffic, so the
     // inventory system never needs a manual migration to function.

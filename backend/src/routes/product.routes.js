@@ -1,6 +1,7 @@
 const express = require("express");
 const {
   getProducts,
+  getFeaturedProducts,
   getMarketplaceLayout,
   getProductById,
   uploadProductImages,
@@ -25,6 +26,7 @@ const { requireAuth, requireRole } = require("../middleware/auth.middleware");
 const router = express.Router();
 
 router.get("/", getProducts);
+router.get("/featured", getFeaturedProducts);
 router.get("/marketplace", getMarketplaceLayout);
 router.get("/admin/inventory", requireAuth, requireRole("admin", "superadmin"), getInventoryReport);
 router.get("/admin/stock-history", requireAuth, requireRole("admin", "superadmin"), getStockHistory);

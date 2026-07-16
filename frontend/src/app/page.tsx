@@ -34,7 +34,14 @@ export default function Home() {
     async function fetchData() {
       try {
         const [catalogResponse, statsResponse, layoutResponse] = await Promise.all([
-          getProductsFromBackend({ limit: 500 }),
+          fetch(`${API_BASE_URL}/products/featured?limit=5`, { credentials: "include" }).then(async (response) => {
+            const data = await response.json();
+            if (!response.ok || !data?.success) {
+              // Fallback to legacy full-catalog fetch
+              return getProductsFromBackend({ limit: 5 });
+            }
+            return { products: data.products as Product[], pagination: { total: data.count } };
+          }).catch(() => getProductsFromBackend({ limit: 5 })),
           fetch(`${API_BASE_URL}/stats/home`, { credentials: "include" }).then(async (response) => {
             const data = await response.json();
 

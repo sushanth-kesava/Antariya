@@ -13,20 +13,20 @@ const MAX_PRODUCT_IMAGES = 10;
 const MAX_PRODUCT_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
 // Curated Antariya storefront categories (order defines the marketplace bar order).
 const ANTARIYA_CATEGORIES = [
-    "Oversized T-Shirts",
-    "Regular Fit T-Shirts",
-    "Premium Cotton T-Shirts",
-    "Graphic Printed",
-    "Minimal Collection",
-    "Motorsport Collection",
-    "Anime Collection",
-    "Streetwear Collection",
-    "Signature Collection",
-    "Limited Edition",
-    "Essentials",
-    "Full Sleeve T-Shirts",
-    "Polo T-Shirts",
-    "Sleeveless T-Shirts",
+  "Oversized T-Shirts",
+  "Regular Fit T-Shirts",
+  "Premium Cotton T-Shirts",
+  "Graphic Printed",
+  "Minimal Collection",
+  "Motorsport Collection",
+  "Anime Collection",
+  "Streetwear Collection",
+  "Signature Collection",
+  "Limited Edition",
+  "Essentials",
+  "Full Sleeve T-Shirts",
+  "Polo T-Shirts",
+  "Sleeveless T-Shirts",
 ];
 
 const MARKETPLACE_ROLE_CATEGORIES = {
@@ -119,16 +119,16 @@ function normalizeProduct(doc) {
     reorderPoint: Number(doc.reorderPoint) || 0,
     variants: Array.isArray(doc.variants)
       ? doc.variants.map((variant) => ({
-          sku: variant.sku || "",
-          size: variant.size || "",
-          color: variant.color || "",
-          gender: variant.gender || "",
-          neckType: variant.neckType || "",
-          pattern: variant.pattern || "",
-          price: Number.isFinite(Number(variant.price)) ? Number(variant.price) : 0,
-          stock: Number.isFinite(Number(variant.stock)) ? Number(variant.stock) : 0,
-          reorderPoint: Number.isFinite(Number(variant.reorderPoint)) ? Number(variant.reorderPoint) : 0,
-        }))
+        sku: variant.sku || "",
+        size: variant.size || "",
+        color: variant.color || "",
+        gender: variant.gender || "",
+        neckType: variant.neckType || "",
+        pattern: variant.pattern || "",
+        price: Number.isFinite(Number(variant.price)) ? Number(variant.price) : 0,
+        stock: Number.isFinite(Number(variant.stock)) ? Number(variant.stock) : 0,
+        reorderPoint: Number.isFinite(Number(variant.reorderPoint)) ? Number(variant.reorderPoint) : 0,
+      }))
       : [],
     dealerId: doc.dealerId,
     dealerName: doc.dealerName || "Unknown Admin",
@@ -522,10 +522,15 @@ async function getProducts(req, res, next) {
     }
 
     if (search) {
+      const escapedSearch = String(search).replace(
+        /[.*+?^${}()|[\]\\]/g,
+        "\\$&"
+      );
+
       andClauses.push({
         $or: [
-          { name: { $regex: search, $options: "i" } },
-          { description: { $regex: search, $options: "i" } },
+          { name: { $regex: escapedSearch, $options: "i" } },
+          { description: { $regex: escapedSearch, $options: "i" } },
         ],
       });
     }
@@ -711,27 +716,27 @@ async function createProduct(req, res, next) {
     const cleanStringArray = (value) =>
       Array.isArray(value)
         ? Array.from(
-            new Set(
-              value
-                .map((item) => String(item || "").trim())
-                .filter((item) => item.length > 0)
-            )
+          new Set(
+            value
+              .map((item) => String(item || "").trim())
+              .filter((item) => item.length > 0)
           )
+        )
         : [];
 
     const normalizedVariants = Array.isArray(variants)
       ? variants
-          .map((variant) => ({
-            sku: String(variant?.sku || "").trim(),
-            size: String(variant?.size || "").trim(),
-            color: String(variant?.color || "").trim(),
-            gender: String(variant?.gender || "").trim(),
-            neckType: String(variant?.neckType || "").trim(),
-            pattern: String(variant?.pattern || "").trim(),
-            price: Number.isFinite(Number(variant?.price)) ? Math.max(0, Number(variant.price)) : 0,
-            stock: Number.isFinite(Number(variant?.stock)) ? Math.max(0, Number(variant.stock)) : 0,
-          }))
-          .slice(0, 500)
+        .map((variant) => ({
+          sku: String(variant?.sku || "").trim(),
+          size: String(variant?.size || "").trim(),
+          color: String(variant?.color || "").trim(),
+          gender: String(variant?.gender || "").trim(),
+          neckType: String(variant?.neckType || "").trim(),
+          pattern: String(variant?.pattern || "").trim(),
+          price: Number.isFinite(Number(variant?.price)) ? Math.max(0, Number(variant.price)) : 0,
+          stock: Number.isFinite(Number(variant?.stock)) ? Math.max(0, Number(variant.stock)) : 0,
+        }))
+        .slice(0, 500)
       : [];
 
     const variantStockTotal = normalizedVariants.reduce((sum, variant) => sum + variant.stock, 0);
@@ -924,10 +929,10 @@ async function createProductReview(req, res, next) {
 
     const normalizedTags = Array.isArray(tags)
       ? tags
-          .filter((tag) => typeof tag === "string")
-          .map((tag) => tag.trim())
-          .filter((tag) => tag.length > 0)
-          .slice(0, 5)
+        .filter((tag) => typeof tag === "string")
+        .map((tag) => tag.trim())
+        .filter((tag) => tag.length > 0)
+        .slice(0, 5)
       : [];
 
     if (Array.isArray(images) && images.length > 4) {
@@ -1014,8 +1019,22 @@ async function getReviewModerationQueue(req, res, next) {
     }
 
     if (search) {
-      const searchRegex = { $regex: String(search), $options: "i" };
-      filter.$or = [{ title: searchRegex }, { comment: searchRegex }, { userName: searchRegex }, { userEmail: searchRegex }];
+      const escapedSearch = String(search).replace(
+        /[.*+?^${}()|[\]\\]/g,
+        "\\$&"
+      );
+
+      const searchRegex = {
+        $regex: escapedSearch,
+        $options: "i",
+      };
+
+      filter.$or = [
+        { title: searchRegex },
+        { comment: searchRegex },
+        { userName: searchRegex },
+        { userEmail: searchRegex },
+      ];
     }
 
     const reviews = await Review.find(filter)
@@ -1619,7 +1638,41 @@ async function importInventoryCsv(req, res, next) {
   }
 }
 
+/**
+ * GET /api/products/featured
+ * Returns a small set of top-rated, in-stock products for the homepage.
+ * Query params:
+ *   - limit (default 4, max 12)
+ *   - category (optional filter)
+ */
+async function getFeaturedProducts(req, res, next) {
+  try {
+    const limitNum = Math.min(12, Math.max(1, Number.parseInt(String(req.query.limit || "4"), 10) || 4));
+    const filter = { published: true, stock: { $gt: 0 } };
+
+    if (req.query.category) {
+      filter.category = String(req.query.category).trim();
+    }
+
+    const products = await Product.find(filter)
+      .sort({ rating: -1, stock: -1, createdAt: -1 })
+      .limit(limitNum)
+      .lean();
+
+    const normalized = products.map(normalizeProduct);
+
+    return res.status(200).json({
+      success: true,
+      products: normalized,
+      count: normalized.length,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
+  getFeaturedProducts,
   getProducts,
   getMarketplaceLayout,
   getProductById,
