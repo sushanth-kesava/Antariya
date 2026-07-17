@@ -40,6 +40,9 @@ function issueAuthResponse(authDocument, inferredRole, res) {
   return {
     success: true,
     message: "Authenticated successfully",
+    // Token is also in the response body because the frontend needs it for:
+    // (1) Next.js middleware cookie (non-HttpOnly, read by middleware.ts)
+    // (2) Bearer header fallback in fetch-client.ts
     token: appToken,
     user: {
       id: authDocument._id,
@@ -220,9 +223,9 @@ async function loginWithGoogle(req, res, next) {
       oauth: {
         provider: "google",
         providerUserId: googleProfile.sub,
-        accessToken: googleAccessToken,
-        tokenType,
-        scope,
+        // Access token is NOT persisted — used only for the initial userinfo call.
+        tokenType: null,
+        scope: null,
         expiresAt: calculateExpiryDate(expiresIn),
         lastLoginAt: new Date(),
       },

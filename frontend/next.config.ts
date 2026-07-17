@@ -3,8 +3,10 @@ import type { NextConfig } from "next";
 const isProduction = process.env.NODE_ENV === "production";
 
 const nextConfig: NextConfig = {
-  // Only use static export for production builds (Hostinger).
-  // In dev mode, skip it so dynamic routes like /product/[id] work normally.
+  // Static export for Hostinger deployment (produces /out folder).
+  // NOTE: This disables dynamic server features (ISR, middleware redirects).
+  // If you move to Vercel/Render for the frontend, REMOVE this line to enable
+  // full SSR and middleware capabilities.
   ...(isProduction ? { output: "export" } : {}),
   trailingSlash: true,
   typescript: {

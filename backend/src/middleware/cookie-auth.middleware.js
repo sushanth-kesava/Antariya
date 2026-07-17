@@ -14,7 +14,7 @@ function setAuthCookie(res, token) {
   res.cookie(COOKIE_NAME, token, {
     httpOnly: true,          // Not accessible via JS (XSS protection)
     secure: isProduction,    // HTTPS only in production
-    sameSite: isProduction ? "none" : "lax", // cross-origin (frontend on different domain)
+    sameSite: "lax",         // Protects against CSRF — safe since frontend/backend share antariyaofficial.com
     maxAge: COOKIE_MAX_AGE_SECONDS * 1000,
     path: "/",
   });
@@ -29,7 +29,7 @@ function clearAuthCookie(res) {
   res.clearCookie(COOKIE_NAME, {
     httpOnly: true,
     secure: isProduction,
-    sameSite: isProduction ? "none" : "lax",
+    sameSite: "lax",
     path: "/",
   });
 }

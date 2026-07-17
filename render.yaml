@@ -17,7 +17,7 @@ services:
         sync: false
       # ─── CORS: Frontend origins that can call this backend ───────────────
       - key: FRONTEND_URL
-        value: https://antariyaofficial.com,https://www.antariyaofficial.com,https://api.antariyaofficial.com
+        value: https://antariyaofficial.com,https://www.antariyaofficial.com
       - key: NODE_ENV
         value: production
       # ─── Optional: Payments ─────────────────────────────────────────────

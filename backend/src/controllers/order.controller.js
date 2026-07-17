@@ -16,7 +16,9 @@ const INDIA_FREE_SHIPPING_THRESHOLD = 1499;
 const INDIA_STANDARD_SHIPPING = 99;
 // GST set to 0 — business is not GST-registered (no GSTIN).
 const INDIA_GST_RATE = 0;
-const LEGACY_USD_TO_INR_RATE = 83;
+// TODO: Replace with a live exchange rate API or remove USD pricing entirely.
+// This hardcoded rate drifts over time and causes financial discrepancies.
+const LEGACY_USD_TO_INR_RATE = Number(process.env.USD_TO_INR_RATE) || 85;
 // Minutes an unpaid online order holds its reserved stock before the expiry
 // sweeper releases it back to available.
 const ORDER_HOLD_MINUTES = Number(process.env.ORDER_HOLD_MINUTES || 30);
