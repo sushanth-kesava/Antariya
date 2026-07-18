@@ -353,6 +353,7 @@ async function loginWithGoogle(req, res, next) {
       }
     }
 
+    console.log("[DEBUG] shouldSendWelcomeEmail:", shouldSendWelcomeEmail, "| email:", authDocument?.email);
     if (shouldSendWelcomeEmail) {
       sendWelcomeEmail({
         to: authDocument.email,
