@@ -4,6 +4,7 @@ export interface Employee {
   _id: string; employeeId: string; firstName: string; lastName: string; email: string;
   phone: string; department: string; designation: string; branch: string;
   joiningDate: string; status: string; employmentType: string;
+  gender?: string;
   salary: { basic: number; hra: number; allowances: number; grossSalary: number; netSalary: number; pf: number; esi: number; professionalTax: number; tds: number };
   leaveBalance: { casual: number; sick: number; paid: number; lop: number };
   fullName: string; createdAt: string;

@@ -387,6 +387,7 @@ export async function setErpProductPublished(
 /* ── Inventory: warehouses & transfers ── */
 export type ErpWarehouse = {
   id: string;
+  _id?: string;
   code: string;
   name: string;
   city: string;
