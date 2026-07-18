@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Package, Heart, Download, Settings, Star, LayoutDashboard, Sparkles, ShoppingBag, ArrowRight, ChevronDown, Mail, Phone, MessageCircle, MessageSquare, User as UserIcon } from "lucide-react";
+import { Package, Heart, Download, Settings, Star, LayoutDashboard, Sparkles, ShoppingBag, ArrowRight, ChevronDown, Mail, Phone, MessageCircle, MessageSquare, User as UserIcon, Headphones, Send, Loader2 as Spinner } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { type Product } from "@/app/lib/mock-data";
 import { getMyOrdersFromBackend } from "@/lib/api/orders";
@@ -23,6 +24,8 @@ import { getProductsFromBackend } from "@/lib/api/products";
 import { formatINR, formatIndianDate, normalizeCatalogPriceToINR } from "@/lib/india";
 import { clearAuthSession, getPortalPathForRole } from "@/lib/auth-session";
 import { getCustomerProfileFromBackend, type CustomerProfileData } from "@/lib/api/customerProfile";
+import { createSupportTicket } from "@/lib/api/support";
+import { Input } from "@/components/ui/input";
 import { generateInvoicePdf } from "@/lib/invoice";
 import { useAuth } from "@/context/AuthContext";
 
@@ -115,6 +118,11 @@ export default function CustomerDashboardClient() {
   const [dataLoaded, setDataLoaded] = useState(false);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [supportOpen, setSupportOpen] = useState(false);
+  const [ticketFormOpen, setTicketFormOpen] = useState(false);
+  const [ticketForm, setTicketForm] = useState({ category: "order_issue", subject: "", description: "" });
+  const [ticketSaving, setTicketSaving] = useState(false);
+  const [ticketSuccess, setTicketSuccess] = useState(false);
+  const [ticketError, setTicketError] = useState<string | null>(null);
 
   const scrollToSection = (id: string) => {
     if (typeof document === "undefined") return;
@@ -581,6 +589,16 @@ export default function CustomerDashboardClient() {
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
+          <button
+            onClick={() => { setSupportOpen(false); setTicketFormOpen(true); setTicketSuccess(false); setTicketError(null); }}
+            className="flex items-center gap-3 rounded-xl border-2 border-primary/30 bg-primary/5 px-4 py-3 hover:border-primary/60 transition-colors w-full text-left"
+          >
+            <Headphones className="h-5 w-5 text-primary shrink-0" />
+            <div>
+              <p className="text-sm font-semibold">Raise a Support Ticket</p>
+              <p className="text-xs text-muted-foreground">Get a tracked response — we&apos;ll resolve your issue</p>
+            </div>
+          </button>
           <a
             href="mailto:antariyaofficial@gmail.com?subject=Support%20request%20from%20my%20account"
             className="flex items-center gap-3 rounded-xl border border-border bg-muted/40 px-4 py-3 hover:border-primary/50 transition-colors"
@@ -627,6 +645,67 @@ export default function CustomerDashboardClient() {
         </div>
       </DialogContent>
     </Dialog>
+
+    {/* Raise Ticket Dialog */}
+    <Dialog open={ticketFormOpen} onOpenChange={setTicketFormOpen}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2"><Headphones className="h-5 w-5 text-primary" /> Raise Support Ticket</DialogTitle>
+          <DialogDescription>Describe your issue and we&apos;ll get back to you within 24 hours.</DialogDescription>
+        </DialogHeader>
+        {ticketSuccess ? (
+          <div className="text-center py-6 space-y-3">
+            <div className="mx-auto w-12 h-12 bg-green-100 rounded-full flex items-center justify-center"><Send className="h-6 w-6 text-green-600" /></div>
+            <p className="font-semibold text-green-700">Ticket Submitted!</p>
+            <p className="text-sm text-muted-foreground">Our team will reach out to you soon. Check your email for updates.</p>
+            <Button variant="outline" onClick={() => setTicketFormOpen(false)}>Close</Button>
+          </div>
+        ) : (
+          <div className="space-y-4 py-2">
+            {ticketError && <p className="text-sm text-destructive">{ticketError}</p>}
+            <div>
+              <label className="text-xs font-medium">Issue Category</label>
+              <select className="w-full border rounded-md px-3 py-2 text-sm bg-background mt-1" value={ticketForm.category} onChange={e => setTicketForm({...ticketForm, category: e.target.value})}>
+                <option value="order_issue">Order Issue</option>
+                <option value="payment">Payment</option>
+                <option value="refund">Refund</option>
+                <option value="exchange">Exchange</option>
+                <option value="return">Return</option>
+                <option value="delivery">Delivery</option>
+                <option value="product_inquiry">Product Inquiry</option>
+                <option value="complaint">Complaint</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-medium">Subject</label>
+              <Input className="mt-1" placeholder="Brief description of your issue" value={ticketForm.subject} onChange={e => setTicketForm({...ticketForm, subject: e.target.value})} />
+            </div>
+            <div>
+              <label className="text-xs font-medium">Details</label>
+              <textarea className="w-full border rounded-md p-2 text-sm bg-background mt-1" rows={4} placeholder="Please describe your issue in detail..." value={ticketForm.description} onChange={e => setTicketForm({...ticketForm, description: e.target.value})} />
+            </div>
+            <Button className="w-full" disabled={ticketSaving} onClick={async () => {
+              if (!ticketForm.subject || !ticketForm.description) { setTicketError("Please fill subject and details"); return; }
+              setTicketSaving(true); setTicketError(null);
+              try {
+                const token = localStorage.getItem("app_auth_token") || "";
+                const name = customerProfile?.displayName || user?.name || "Customer";
+                const email = customerProfile?.email || user?.email || "";
+                await createSupportTicket(token, { customerName: name, customerEmail: email, category: ticketForm.category, subject: ticketForm.subject, description: ticketForm.description, priority: "medium", source: "website" });
+                setTicketSuccess(true);
+                setTicketForm({ category: "order_issue", subject: "", description: "" });
+              } catch (e: any) { setTicketError(e.message || "Failed to submit ticket"); }
+              setTicketSaving(false);
+            }}>
+              {ticketSaving ? <Spinner className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
+              Submit Ticket
+            </Button>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+
     </div>
   );
 }

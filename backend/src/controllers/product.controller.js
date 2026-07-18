@@ -787,6 +787,33 @@ async function createProduct(req, res, next) {
       dealerId: req.auth.sub,
     });
 
+    // ─── AUTO-GENERATE SKU & BARCODE ────────────────────────────────
+    // Use SKU as the barcode number. If no SKU exists, generate one from
+    // the product ID. Then create barcode records automatically.
+    const autoSku = product.sku || `SKU-${product._id.toString().slice(-8).toUpperCase()}`;
+    if (!product.sku) {
+      product.sku = autoSku;
+      await product.save();
+    }
+
+    // Auto-generate barcode in the background (non-blocking)
+    try {
+      const BarcodeService = require("../services/barcode.service");
+      const Warehouse = require("../models/Warehouse");
+      const defaultWarehouse = await Warehouse.findOne({ code: "DEFAULT" }) || await Warehouse.findOne({ isDefault: true }) || await Warehouse.findOne({});
+      if (defaultWarehouse) {
+        await BarcodeService.generateBarcode({
+          productId: product._id,
+          warehouseId: defaultWarehouse._id,
+          variantId: null,
+          userId: req.auth.sub,
+        });
+      }
+    } catch (barcodeErr) {
+      // Non-critical — log but don't fail product creation
+      console.warn("[Barcode] Auto-generation failed for product:", product._id, barcodeErr.message);
+    }
+
     return res.status(201).json({
       success: true,
       message: "Product created",

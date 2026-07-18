@@ -28,6 +28,8 @@ import {
   Heart,
   X,
   Pencil,
+  ScanBarcode,
+  Download,
 } from "lucide-react";
 import {
   createProductOnBackend,
@@ -57,6 +59,7 @@ import {
 import { useInventoryUpdates } from "@/hooks/use-inventory-updates";
 import { useInventoryAlerts } from "@/hooks/use-inventory-alerts";
 import { getApiBaseUrl } from "@/lib/api/base-url";
+import { downloadProductLabel } from "@/lib/api/barcode";
 import { formatINR, formatIndianDate, formatIndianDateTime, normalizeCatalogPriceToINR } from "@/lib/india";
 import { PRODUCT_ATTRIBUTES } from "@/lib/categories";
 import { MultiSelectCreatable } from "@/components/multi-select-creatable";
@@ -883,6 +886,16 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
     }
   };
 
+  const handleDownloadLabel = async (product: any) => {
+    try {
+      // Use first variant SKU if available
+      const variantSku = product.variants?.[0]?.sku || undefined;
+      await downloadProductLabel(authToken, product.id, variantSku);
+    } catch (err: any) {
+      setError(err.message || "Failed to download label");
+    }
+  };
+
   const handleDelete = async (id: string) => {
     try {
       if (confirm("Are you sure you want to delete this product from your catalog?")) {
@@ -1668,6 +1681,10 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
                       <Button variant="ghost" size="sm" onClick={() => openStockEditor(product)} className="gap-1.5 text-gray-600 hover:text-primary hover:bg-primary/5 rounded-lg">
                         <Pencil className="h-4 w-4" />
                         Edit stock
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleDownloadLabel(product)} className="gap-1.5 text-gray-600 hover:text-primary hover:bg-primary/5 rounded-lg" title="Download product label with barcode">
+                        <Download className="h-4 w-4" />
+                        Label
                       </Button>
                       <Button variant="ghost" size="icon" onClick={() => handleDelete(product.id)} className="text-red-500 hover:text-red-600 hover:bg-red-50">
                         <Trash2 className="h-5 w-5" />

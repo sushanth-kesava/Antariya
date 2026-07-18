@@ -23,6 +23,10 @@
 
 const MODULES = {
   HR: "hr",
+  HR_PAYROLL: "hr_payroll",
+  QC: "qc",
+  SUPPORT: "support",
+  FORECAST: "forecast",
   ORDERS: "orders",
   INVENTORY: "inventory",
   CATALOG: "catalog",
@@ -33,6 +37,10 @@ const MODULES = {
 
 const MODULE_META = {
   [MODULES.HR]: { label: "HR / People & Permissions", icon: "Users" },
+  [MODULES.HR_PAYROLL]: { label: "HR / Payroll & Attendance", icon: "Wallet" },
+  [MODULES.QC]: { label: "Quality Control", icon: "ClipboardCheck" },
+  [MODULES.SUPPORT]: { label: "Customer Support", icon: "Headphones" },
+  [MODULES.FORECAST]: { label: "AI Forecasting", icon: "Brain" },
   [MODULES.ORDERS]: { label: "Orders & Fulfillment", icon: "ShoppingCart" },
   [MODULES.INVENTORY]: { label: "Inventory & Warehouses", icon: "Package" },
   [MODULES.CATALOG]: { label: "Catalog / Products", icon: "Tags" },
@@ -96,6 +104,36 @@ const PERMISSIONS = [
   { key: "governance.ratelimit.view", module: MODULES.GOVERNANCE, label: "View rate limits", description: "See rate-limit rules and current throttling activity." },
   { key: "governance.ratelimit.manage", module: MODULES.GOVERNANCE, label: "Manage rate limits", description: "Edit rate-limit windows, thresholds, and toggles." },
   { key: "governance.settings.manage", module: MODULES.GOVERNANCE, label: "Manage system settings", description: "Change global ERP configuration and settings." },
+
+  // ── HR / Payroll & Attendance ──────────────────────────────────────────────
+  { key: "hr_payroll.employees.view", module: MODULES.HR_PAYROLL, label: "View employees", description: "See employee profiles, salary, and leave balance." },
+  { key: "hr_payroll.employees.manage", module: MODULES.HR_PAYROLL, label: "Manage employees", description: "Add, edit, deactivate employees." },
+  { key: "hr_payroll.attendance.view", module: MODULES.HR_PAYROLL, label: "View attendance", description: "See attendance records for all employees." },
+  { key: "hr_payroll.attendance.mark", module: MODULES.HR_PAYROLL, label: "Mark attendance", description: "Record daily attendance for employees." },
+  { key: "hr_payroll.leaves.view", module: MODULES.HR_PAYROLL, label: "View leave requests", description: "See all leave applications." },
+  { key: "hr_payroll.leaves.approve", module: MODULES.HR_PAYROLL, label: "Approve / reject leaves", description: "Approve or reject employee leave requests." },
+  { key: "hr_payroll.payroll.view", module: MODULES.HR_PAYROLL, label: "View payroll", description: "See payroll records and salary slips." },
+  { key: "hr_payroll.payroll.process", module: MODULES.HR_PAYROLL, label: "Process payroll", description: "Run monthly payroll calculations." },
+  { key: "hr_payroll.payroll.approve", module: MODULES.HR_PAYROLL, label: "Approve payroll", description: "Final approval before salary disbursement." },
+
+  // ── Quality Control ────────────────────────────────────────────────────────
+  { key: "qc.view", module: MODULES.QC, label: "View QC inspections", description: "See quality inspection records and reports." },
+  { key: "qc.create", module: MODULES.QC, label: "Create inspections", description: "Initiate new quality inspections at any stage." },
+  { key: "qc.inspect", module: MODULES.QC, label: "Perform inspections", description: "Update checklists, add defects, upload images." },
+  { key: "qc.approve", module: MODULES.QC, label: "Approve / reject QC", description: "Pass, reject, or mark items for rework." },
+  { key: "qc.reports", module: MODULES.QC, label: "View QC reports", description: "Access quality dashboards, supplier scores, defect trends." },
+
+  // ── Customer Support ───────────────────────────────────────────────────────
+  { key: "support.view", module: MODULES.SUPPORT, label: "View support tickets", description: "Browse and search customer support tickets." },
+  { key: "support.create", module: MODULES.SUPPORT, label: "Create tickets", description: "Open new support tickets on behalf of customers." },
+  { key: "support.respond", module: MODULES.SUPPORT, label: "Respond to tickets", description: "Add notes and replies to support tickets." },
+  { key: "support.assign", module: MODULES.SUPPORT, label: "Assign tickets", description: "Assign tickets to agents or teams." },
+  { key: "support.resolve", module: MODULES.SUPPORT, label: "Resolve / close tickets", description: "Mark tickets as resolved or closed." },
+  { key: "support.escalate", module: MODULES.SUPPORT, label: "Escalate tickets", description: "Escalate tickets to higher priority or management." },
+
+  // ── AI Forecasting ─────────────────────────────────────────────────────────
+  { key: "forecast.view", module: MODULES.FORECAST, label: "View forecasts", description: "See demand forecasts, stockout predictions, and trends." },
+  { key: "forecast.configure", module: MODULES.FORECAST, label: "Configure AI models", description: "Adjust forecast parameters and data sources." },
 ];
 
 const ALL_PERMISSION_KEYS = PERMISSIONS.map((p) => p.key);
@@ -125,6 +163,13 @@ const DEFAULT_ROLES = [
     permissions: [
       "hr.people.view",
       "hr.access_requests.view",
+      "hr_payroll.employees.view", "hr_payroll.employees.manage",
+      "hr_payroll.attendance.view", "hr_payroll.attendance.mark",
+      "hr_payroll.leaves.view", "hr_payroll.leaves.approve",
+      "hr_payroll.payroll.view", "hr_payroll.payroll.process",
+      "qc.view", "qc.create", "qc.approve", "qc.reports",
+      "support.view", "support.create", "support.respond", "support.assign", "support.resolve",
+      "forecast.view",
       "orders.view", "orders.edit", "orders.status.override", "orders.cancel",
       "inventory.view", "inventory.adjust", "inventory.transfer",
       "catalog.view", "catalog.create", "catalog.edit", "catalog.publish", "catalog.reviews.moderate",
@@ -144,6 +189,10 @@ const DEFAULT_ROLES = [
       "hr.people.view", "hr.people.invite", "hr.people.deactivate",
       "hr.roles.assign", "hr.permissions.override",
       "hr.access_requests.view", "hr.access_requests.review",
+      "hr_payroll.employees.view", "hr_payroll.employees.manage",
+      "hr_payroll.attendance.view", "hr_payroll.attendance.mark",
+      "hr_payroll.leaves.view", "hr_payroll.leaves.approve",
+      "hr_payroll.payroll.view", "hr_payroll.payroll.process", "hr_payroll.payroll.approve",
       "governance.roles.view", "governance.audit.view",
     ],
     system: true,
@@ -206,6 +255,57 @@ const DEFAULT_ROLES = [
     permissions: [],
     system: true,
     locked: true,
+  },
+  {
+    key: "qc_inspector",
+    name: "QC Inspector",
+    description: "Quality control staff who inspect products at various production stages.",
+    permissions: [
+      "qc.view", "qc.create", "qc.inspect", "qc.reports",
+      "inventory.view",
+      "catalog.view",
+    ],
+    system: true,
+    locked: false,
+  },
+  {
+    key: "support_agent",
+    name: "Support Agent",
+    description: "Customer support staff who handle tickets and resolve issues.",
+    permissions: [
+      "support.view", "support.create", "support.respond", "support.resolve",
+      "orders.view",
+      "catalog.view",
+    ],
+    system: true,
+    locked: false,
+  },
+  {
+    key: "warehouse_staff",
+    name: "Warehouse Staff",
+    description: "Warehouse and logistics team handling stock, barcodes, and dispatch.",
+    permissions: [
+      "inventory.view", "inventory.adjust", "inventory.transfer",
+      "qc.view", "qc.inspect",
+      "catalog.view",
+    ],
+    system: true,
+    locked: false,
+  },
+  {
+    key: "finance_manager",
+    name: "Finance Manager",
+    description: "Manages accounting, expenses, payroll approvals, and financial reporting.",
+    permissions: [
+      "finance.view", "finance.reports.export", "finance.refunds.approve",
+      "hr_payroll.payroll.view", "hr_payroll.payroll.process", "hr_payroll.payroll.approve",
+      "hr_payroll.employees.view",
+      "forecast.view",
+      "orders.view",
+      "governance.audit.view",
+    ],
+    system: true,
+    locked: false,
   },
 ];
 

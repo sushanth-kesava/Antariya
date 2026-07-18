@@ -1,0 +1,13 @@
+const express = require('express');
+const router = express.Router();
+const c = require('../controllers/support.controller');
+const { requireAuth, requireRole } = require('../middleware/auth.middleware');
+router.use(requireAuth);
+router.get('/dashboard', requireRole('admin', 'superadmin', 'manager', 'support'), c.getDashboard);
+router.post('/', requireRole('admin', 'superadmin', 'manager', 'support'), c.createTicket);
+router.get('/', requireRole('admin', 'superadmin', 'manager', 'support'), c.getTickets);
+router.get('/:id', requireRole('admin', 'superadmin', 'manager', 'support'), c.getTicketById);
+router.patch('/:id/status', requireRole('admin', 'superadmin', 'manager', 'support'), c.updateStatus);
+router.patch('/:id/assign', requireRole('admin', 'superadmin', 'manager'), c.assignTicket);
+router.post('/:id/notes', requireRole('admin', 'superadmin', 'manager', 'support'), c.addNote);
+module.exports = router;

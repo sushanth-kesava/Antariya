@@ -12,11 +12,13 @@
     "db:import-products": "node scripts/import-products.js",
     "db:reassign-owners": "node scripts/reassign-product-owners.js",
     "db:inspect-products": "node scripts/inspect-products.js",
-    "db:migrate-inventory": "node scripts/migrate-inventory.js"
+    "db:migrate-inventory": "node scripts/migrate-inventory.js",
+    "db:generate-barcodes": "node scripts/generate-barcodes.js"
   },
   "dependencies": {
     "axios": "^1.7.4",
     "bcryptjs": "^3.0.3",
+    "bwip-js": "^4.11.2",
     "cloudinary": "^2.9.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",

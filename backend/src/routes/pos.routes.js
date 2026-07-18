@@ -1,0 +1,13 @@
+const express = require('express');
+const router = express.Router();
+const c = require('../controllers/pos.controller');
+const { requireAuth, requireRole } = require('../middleware/auth.middleware');
+router.use(requireAuth);
+router.get('/dashboard', requireRole('admin', 'superadmin', 'manager'), c.getDashboard);
+router.get('/search', requireRole('admin', 'superadmin', 'manager'), c.searchProducts);
+router.post('/sale', requireRole('admin', 'superadmin', 'manager'), c.createSale);
+router.get('/invoices', requireRole('admin', 'superadmin', 'manager'), c.getInvoices);
+router.get('/invoices/:id', requireRole('admin', 'superadmin', 'manager'), c.getInvoiceById);
+router.get('/invoices/:id/pdf', requireRole('admin', 'superadmin', 'manager'), c.downloadInvoicePdf);
+router.post('/invoices/:id/return', requireRole('admin', 'superadmin', 'manager'), c.processReturn);
+module.exports = router;

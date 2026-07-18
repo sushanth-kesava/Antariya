@@ -7,6 +7,11 @@ import {
   Users,
   ShoppingCart,
   Package,
+  ScanBarcode,
+  ClipboardCheck,
+  Headphones,
+  Brain,
+  Store,
   Tags,
   Wallet,
   ShieldCheck,
@@ -25,12 +30,19 @@ import { ErpActor } from "@/lib/api/erp";
 import { DashboardModule } from "./modules/DashboardModule";
 import { GovernanceModule } from "./modules/GovernanceModule";
 import { PeopleModule } from "./modules/PeopleModule";
+import { HRModule } from "./modules/HRModule";
 import { OrdersModule } from "./modules/OrdersModule";
 import { InventoryModule } from "./modules/InventoryModule";
 import { CatalogModule } from "./modules/CatalogModule";
 import { FinanceModule } from "./modules/FinanceModule";
+import { FinanceModuleV2 } from "./modules/FinanceModuleV2";
 import { CommsModule } from "./modules/CommsModule";
 import { CouponsModule } from "./modules/CouponsModule";
+import { BarcodeModule } from "./modules/BarcodeModule";
+import { QCModule } from "./modules/QCModule";
+import { SupportModule } from "./modules/SupportModule";
+import { ForecastModule } from "./modules/ForecastModule";
+import { POSModule } from "./modules/POSModule";
 
 type ErpUser = {
   id: string | null;
@@ -52,11 +64,16 @@ const NAV_ITEMS: NavItem[] = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "people", label: "HR / People", icon: Users, anyOf: ["hr.people.view", "hr.access_requests.view", "hr.permissions.override"] },
   { key: "orders", label: "Orders & Fulfillment", icon: ShoppingCart, anyOf: ["orders.view"] },
+  { key: "pos", label: "Offline Store (POS)", icon: Store },
   { key: "inventory", label: "Inventory & Warehouses", icon: Package, anyOf: ["inventory.view"] },
+  { key: "barcode", label: "Barcode & QR", icon: ScanBarcode, anyOf: ["inventory.view"] },
+  { key: "qc", label: "Quality Control", icon: ClipboardCheck, anyOf: ["inventory.view"] },
   { key: "catalog", label: "Catalog / Products", icon: Tags, anyOf: ["catalog.view"] },
   { key: "finance", label: "Finance & Reports", icon: Wallet, anyOf: ["finance.view"] },
   { key: "comms", label: "Communications", icon: Mail, anyOf: ["comms.campaigns.view", "comms.templates.view", "comms.subscribers.view", "comms.logs.view"] },
   { key: "coupons", label: "Coupons & Offers", icon: Ticket },
+  { key: "support", label: "Customer Support", icon: Headphones },
+  { key: "forecast", label: "AI Forecasting", icon: Brain },
   { key: "governance", label: "Governance", icon: ShieldCheck, anyOf: ["governance.roles.view", "governance.audit.view", "governance.settings.manage"] },
 ];
 
@@ -90,19 +107,29 @@ export function ErpShell({
       case "governance":
         return <GovernanceModule token={token} has={has} />;
       case "people":
-        return <PeopleModule token={token} has={has} />;
+        return <HRModule token={token} has={has} />;
       case "orders":
         return <OrdersModule token={token} has={has} />;
+      case "pos":
+        return <POSModule token={token} has={has} />;
       case "inventory":
         return <InventoryModule token={token} has={has} />;
+      case "barcode":
+        return <BarcodeModule token={token} has={has} />;
+      case "qc":
+        return <QCModule token={token} has={has} />;
       case "catalog":
         return <CatalogModule token={token} has={has} />;
       case "finance":
-        return <FinanceModule token={token} has={has} />;
+        return <FinanceModuleV2 token={token} has={has} />;
       case "comms":
         return <CommsModule token={token} has={has} />;
       case "coupons":
         return <CouponsModule token={token} has={has} />;
+      case "support":
+        return <SupportModule token={token} has={has} />;
+      case "forecast":
+        return <ForecastModule token={token} has={has} />;
       default:
         return <DashboardModule token={token} actor={actor} onNavigate={setActive} />;
     }
