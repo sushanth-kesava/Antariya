@@ -8,6 +8,7 @@ const {
   processReturn,
   transferStock,
   checkStockAvailability,
+  getProductStock,
   runVerification,
 } = require("../controllers/inventory.controller");
 
@@ -22,6 +23,7 @@ router.get("/", ...staff, getInventory);
 router.get("/ledger", ...staff, getLedger);
 router.post("/returns", ...staff, processReturn);
 router.post("/check-stock", ...customer, checkStockAvailability);
+router.get("/product/:productId/stock", ...customer, getProductStock);
 router.post("/transfer", ...staff, transferStock);
 router.post("/verify", ...staff, runVerification);
 

@@ -285,6 +285,58 @@ async function runVerification(req, res, next) {
   }
 }
 
+// --- Single product stock details (customer/storefront-facing) -------------
+// GET /inventory/product/:productId/stock
+// Returns aggregated stock info for a product across all warehouses,
+// including per-variant breakdown.
+async function getProductStock(req, res, next) {
+  try {
+    const { productId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(400).json({ success: false, message: "Invalid productId" });
+    }
+
+    const product = await Product.findById(productId).select("name sku stock variants");
+    if (!product) {
+      return res.status(404).json({ success: false, message: "Product not found" });
+    }
+
+    // Aggregate inventory rows across all warehouses
+    const invRows = await Inventory.find({ product: productId }).populate("warehouse", "code name");
+
+    const warehouses = invRows.map((r) => ({
+      warehouseId: r.warehouse?._id?.toString() || "",
+      warehouseCode: r.warehouse?.code || "",
+      warehouseName: r.warehouse?.name || "",
+      variantSku: r.variantSku,
+      available: r.available,
+      reserved: r.reserved,
+      damaged: r.damaged,
+      returned: r.returned,
+    }));
+
+    const totalAvailable = invRows.reduce((sum, r) => sum + r.available, 0);
+
+    return res.status(200).json({
+      success: true,
+      productId,
+      productName: product.name,
+      sku: product.sku || "",
+      totalStock: product.stock || 0,
+      totalAvailable,
+      variants: (product.variants || []).map((v) => ({
+        sku: v.sku,
+        size: v.size || "",
+        color: v.color || "",
+        stock: v.stock || 0,
+      })),
+      warehouses,
+    });
+  } catch (err) {
+    return next(err);
+  }
+}
+
 module.exports = {
   listWarehouses,
   createWarehouse,
@@ -294,4 +346,5 @@ module.exports = {
   transferStock,
   runVerification,
   checkStockAvailability,
+  getProductStock,
 };

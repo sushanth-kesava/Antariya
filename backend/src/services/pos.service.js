@@ -95,7 +95,6 @@ class POSService {
         if (invRow) {
           oldQty = invRow.available;
           invRow.available = Math.max(0, invRow.available - item.quantity);
-          invRow.onHand = Math.max(0, (invRow.onHand || 0) - item.quantity);
           await invRow.save();
         } else {
           // Fallback: read current stock from product
