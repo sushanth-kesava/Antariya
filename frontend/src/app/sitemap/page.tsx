@@ -47,12 +47,39 @@ export default function SitemapPage() {
             </li>
             <li>
               <a href="/customize" className="text-blue-600 hover:text-blue-800 hover:underline flex items-center">
-                <span className="mr-2">🎨</span> Customize
+                <span className="mr-2">🎨</span> Customize Studio
               </a>
             </li>
             <li>
               <a href="/wishlist" className="text-blue-600 hover:text-blue-800 hover:underline flex items-center">
                 <span className="mr-2">❤️</span> Wishlist
+              </a>
+            </li>
+          </ul>
+        </section>
+
+        {/* Company */}
+        <section className="mb-12 bg-white rounded-lg shadow-md p-8">
+          <h2 className="text-2xl font-bold text-slate-900 mb-6">Company</h2>
+          <ul className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <li>
+              <a href="/about" className="text-blue-600 hover:text-blue-800 hover:underline flex items-center">
+                <span className="mr-2">ℹ️</span> About Us
+              </a>
+            </li>
+            <li>
+              <a href="/contact-support" className="text-blue-600 hover:text-blue-800 hover:underline flex items-center">
+                <span className="mr-2">💬</span> Contact Support
+              </a>
+            </li>
+            <li>
+              <a href="/track-order" className="text-blue-600 hover:text-blue-800 hover:underline flex items-center">
+                <span className="mr-2">📦</span> Track Order
+              </a>
+            </li>
+            <li>
+              <a href="/coming-soon" className="text-blue-600 hover:text-blue-800 hover:underline flex items-center">
+                <span className="mr-2">🚀</span> Coming Soon
               </a>
             </li>
           </ul>
@@ -79,7 +106,7 @@ export default function SitemapPage() {
             </li>
             <li>
               <a href="/order-status" className="text-blue-600 hover:text-blue-800 hover:underline flex items-center">
-                <span className="mr-2">📦</span> Order Status
+                <span className="mr-2">✅</span> Order Status
               </a>
             </li>
             <li>
@@ -107,6 +134,11 @@ export default function SitemapPage() {
             <li>
               <a href="/admin-login" className="text-blue-600 hover:text-blue-800 hover:underline flex items-center">
                 <span className="mr-2">🔐</span> Admin Login
+              </a>
+            </li>
+            <li>
+              <a href="/admin-login/apply" className="text-blue-600 hover:text-blue-800 hover:underline flex items-center">
+                <span className="mr-2">📋</span> Apply for Admin
               </a>
             </li>
             <li>
@@ -191,14 +223,14 @@ export default function SitemapPage() {
             <div className="p-4 bg-blue-50 rounded border border-blue-200">
               <p className="font-semibold text-slate-900 mb-2">📍 XML Sitemap</p>
               <a href="/sitemap.xml" className="text-blue-600 hover:text-blue-800 break-all">
-                https://antariya.onrender.com/sitemap.xml
+                https://antariyaofficial.com/sitemap.xml
               </a>
               <p className="text-sm text-slate-600 mt-2">For search engines (Google, Bing)</p>
             </div>
             <div className="p-4 bg-green-50 rounded border border-green-200">
               <p className="font-semibold text-slate-900 mb-2">🤖 Robots.txt</p>
               <a href="/robots.txt" className="text-blue-600 hover:text-blue-800 break-all">
-                https://antariya.onrender.com/robots.txt
+                https://antariyaofficial.com/robots.txt
               </a>
               <p className="text-sm text-slate-600 mt-2">Crawl instructions for bots</p>
             </div>
@@ -208,7 +240,7 @@ export default function SitemapPage() {
         {/* Footer Info */}
         <div className="mt-12 text-center text-slate-600">
           <p>
-            Have questions? <a href="/legal/policies" className="text-blue-600 hover:text-blue-800">Contact us</a>
+            Have questions? <a href="/contact-support" className="text-blue-600 hover:text-blue-800">Contact us</a>
           </p>
           <p className="text-sm mt-2">
             Last Updated: {new Date().toLocaleDateString("en-IN", { year: "numeric", month: "long", day: "numeric" })}

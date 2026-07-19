@@ -1,4 +1,5 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5004/api";
+import { getApiBaseUrl } from "@/lib/api/base-url";
+const API_BASE = getApiBaseUrl();
 
 export interface Employee {
   _id: string; employeeId: string; firstName: string; lastName: string; email: string;

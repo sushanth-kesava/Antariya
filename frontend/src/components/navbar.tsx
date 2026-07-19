@@ -82,6 +82,7 @@ export function Navbar() {
     { href: "/marketplace", label: "Marketplace", icon: null },
     { href: "/shop", label: "Shop", icon: <ShoppingBag className="h-4 w-4" /> },
     { href: "/customize", label: "Studio", icon: <Palette className="h-4 w-4" />, highlight: true },
+    { href: "/about", label: "About Us", icon: null },
   ];
 
   return (

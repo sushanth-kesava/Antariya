@@ -14,27 +14,26 @@ const PUBLIC_SECTIONS = [
   {
     title: "Marketplace",
     links: [
-      { label: "Embroidery Designs", href: "/marketplace" },
-      { label: "Premium Threads", href: "/shop/hoodies" },
-      { label: "Industrial Fabrics", href: "/shop" },
-      { label: "Machine Parts", href: "/shop" },
+      { label: "Embroidery Designs", href: "/coming-soon" },
+      { label: "Premium Threads", href: "/coming-soon" },
+      { label: "Industrial Fabrics", href: "/coming-soon" },
+      { label: "Machine Parts", href: "/coming-soon" },
     ],
   },
   {
     title: "Company",
     links: [
-      { label: "About Us", href: "/#hero" },
+      { label: "About Us", href: "/about" },
       { label: "Dealer Program", href: "/portal/admin" },
-      { label: "Careers", href: "/#hero" },
-      { label: "Contact Support", href: "/#hero" },
+      { label: "Careers", href: "/coming-soon" },
     ],
   },
   {
     title: "Support",
     links: [
-      { label: "Tracking Orders", href: "/portal/customer" },
+      { label: "Tracking Orders", href: "/track-order" },
       { label: "Policies Hub", href: "/legal/policies" },
-      { label: "Contact Support", href: "/#hero" },
+      { label: "Contact Support", href: "/contact-support" },
     ],
   },
 ];

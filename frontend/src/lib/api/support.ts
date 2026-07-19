@@ -1,4 +1,5 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5004/api";
+import { getApiBaseUrl } from "@/lib/api/base-url";
+const API_BASE = getApiBaseUrl();
 
 export interface SupportTicket { _id: string; ticketNumber: string; source: string; customerName: string; customerEmail: string; category: string; subject: string; description: string; status: string; priority: string; assignedTo: { _id: string; displayName: string } | null; notes: { _id: string; message: string; isInternal: boolean; createdBy: { displayName: string }; createdAt: string }[]; resolvedAt: string | null; createdAt: string; }
 export interface SupportDashboard { openTickets: number; inProgress: number; resolved: number; totalThisMonth: number; todayNew: number; resolutionRate: number; avgResponseHours: string | number; topCategories: { _id: string; count: number }[]; }

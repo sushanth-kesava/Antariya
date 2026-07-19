@@ -1,6 +1,6 @@
 
 import type {Metadata} from 'next';
-import { Inter, Literata } from 'next/font/google';
+import { Inter, Literata, Cormorant_Garamond } from 'next/font/google';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { BRAND_ICON_URL, BRAND_LOGO_URL } from '@/lib/brand';
@@ -15,6 +15,12 @@ const inter = Inter({
 const literata = Literata({
   subsets: ['latin'],
   variable: '--font-literata',
+});
+
+const cormorant = Cormorant_Garamond({
+  subsets: ['latin'],
+  variable: '--font-cormorant',
+  weight: ['300', '400', '500', '600', '700'],
 });
 
 export const metadata: Metadata = {
@@ -68,7 +74,7 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href={BRAND_ICON_URL} />
         <script src="/runtime-config.js" />
       </head>
-      <body className={`${inter.variable} ${literata.variable} font-body antialiased selection:bg-primary selection:text-white`}>
+      <body className={`${inter.variable} ${literata.variable} ${cormorant.variable} font-body antialiased selection:bg-primary selection:text-white`}>
         <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "YOUR_GOOGLE_CLIENT_ID"}>
           <AuthProvider>
             {children}

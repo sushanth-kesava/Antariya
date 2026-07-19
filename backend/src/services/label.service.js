@@ -33,11 +33,11 @@ class LabelService {
     const barcodePng = await bwipjs.toBuffer({
       bcid: 'code128',
       text: sku,
-      scale: 3,
-      height: 12,
+      scale: 4,
+      height: 15,
       includetext: true,
       textxalign: 'center',
-      textsize: 8,
+      textsize: 10,
     });
 
     // Convert PNG to base64 for jsPDF
@@ -57,13 +57,13 @@ class LabelService {
         doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
         break;
       case 'thermal':
-        width = 80; height = 40;
-        doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [80, 40] });
+        width = 80; height = 50;
+        doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [80, 50] });
         break;
       case '50x30':
       default:
-        width = 50; height = 30;
-        doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [50, 30] });
+        width = 60; height = 40;
+        doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [60, 40] });
         break;
     }
 
@@ -170,32 +170,40 @@ class LabelService {
   // ─── INTERNAL RENDERERS ────────────────────────────────────────
 
   static _renderSingleLabel(doc, { product, variant, sku, price, size, color, barcodeBase64, width, height }) {
-    // Brand
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'bold');
-    doc.text('ANTARIYA', width / 2, 4, { align: 'center' });
+    const centerX = width / 2;
 
-    // Product name
-    doc.setFontSize(6);
+    // Border
+    doc.setDrawColor(180);
+    doc.setLineWidth(0.3);
+    doc.rect(1, 1, width - 2, height - 2);
+
+    // Brand name
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('ANTARIYA', centerX, 7, { align: 'center' });
+
+    // Product name (truncated)
+    doc.setFontSize(7);
     doc.setFont('helvetica', 'normal');
-    const name = product.name?.slice(0, 35) || '';
-    doc.text(name, width / 2, 7.5, { align: 'center' });
+    const name = product.name?.slice(0, 40) || '';
+    doc.text(name, centerX, 11, { align: 'center' });
 
     // Size & Color
     if (size || color) {
-      doc.setFontSize(5);
+      doc.setFontSize(6);
       const details = [size, color].filter(Boolean).join(' | ');
-      doc.text(details, width / 2, 10, { align: 'center' });
+      doc.text(details, centerX, 14.5, { align: 'center' });
     }
 
     // Barcode
-    const barcodeY = size || color ? 11 : 9;
-    doc.addImage(barcodeBase64, 'PNG', 3, barcodeY, width - 6, height - barcodeY - 6);
+    const barcodeY = size || color ? 16 : 13;
+    const barcodeH = height - barcodeY - 10;
+    doc.addImage(barcodeBase64, 'PNG', 5, barcodeY, width - 10, barcodeH);
 
     // Price
-    doc.setFontSize(9);
+    doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.text(`MRP ₹${price}`, width / 2, height - 2, { align: 'center' });
+    doc.text(`MRP ₹${price}`, centerX, height - 3, { align: 'center' });
   }
 
   static _renderA4Sheet(doc, { product, variant, sku, price, size, color, barcodeBase64 }) {

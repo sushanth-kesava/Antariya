@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const NewsletterSubscriber = require("../models/NewsletterSubscriber");
+const { sendMail, wrapBrandedEmail } = require("../services/mail.service");
 
 function normalizeEmail(v) {
   return String(v || "").trim().toLowerCase();
@@ -29,6 +30,34 @@ async function subscribe(req, res, next) {
       },
       { new: true, upsert: true }
     );
+
+    // Fire-and-forget welcome email for newsletter subscriber
+    sendMail({
+      to: sub.email,
+      subject: "Welcome to Antariya Newsletter — Successfully Subscribed!",
+      html: wrapBrandedEmail({
+        title: "Welcome to Antariya Newsletter",
+        bodyHtml: `
+          <h2 style="margin:0 0 12px;color:#1a1a2e;">Welcome to Antariya Newsletter!</h2>
+          <p style="font-size:15px;line-height:1.7;color:#4a4a5a;">
+            Hi there! Thanks for subscribing to the Antariya newsletter.
+          </p>
+          <p style="font-size:15px;line-height:1.7;color:#4a4a5a;">
+            You'll now receive updates on:
+          </p>
+          <ul style="font-size:14px;line-height:2;color:#4a4a5a;">
+            <li>New premium embroidery collections</li>
+            <li>Exclusive deals and early access</li>
+            <li>Industry tips and trends</li>
+            <li>Special announcements</li>
+          </ul>
+          <p style="font-size:14px;color:#5a5a6a;margin-top:16px;">
+            We're glad to have you in our community!
+          </p>
+        `
+      }),
+      text: "Welcome to the Antariya newsletter! You'll receive updates on new collections, exclusive deals, and more."
+    }).catch((err) => console.error("[Newsletter] Failed to send welcome email:", err.message));
 
     return res.status(201).json({
       success: true,

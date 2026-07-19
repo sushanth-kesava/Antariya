@@ -1,4 +1,5 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5004/api";
+import { getApiBaseUrl } from "@/lib/api/base-url";
+const API_BASE = getApiBaseUrl();
 
 export interface POSInvoice { _id: string; invoiceNumber: string; customerName: string; customerPhone: string; items: { productName: string; variantSku: string; size: string; color: string; quantity: number; unitPrice: number; lineTotal: number }[]; subtotal: number; discountAmount: number; totalAmount: number; paymentMethod: string; paymentStatus: string; amountPaid: number; changeGiven: number; balanceDue: number; billedBy: { displayName: string }; createdAt: string; status: string; }
 export interface POSDashboard { todayRevenue: number; todayOrders: number; monthRevenue: number; monthOrders: number; recentInvoices: POSInvoice[]; topProducts: { _id: string; totalQty: number; totalRevenue: number }[]; }

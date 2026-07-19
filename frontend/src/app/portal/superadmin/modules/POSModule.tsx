@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { getPOSDashboard, searchPOSProducts, createPOSSale, getPOSInvoices, type POSDashboard, type POSInvoice, type POSProduct } from "@/lib/api/pos";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5004/api";
+import { getApiBaseUrl } from "@/lib/api/base-url";
+const API_BASE = getApiBaseUrl();
 
 type Tab = "billing" | "invoices" | "dashboard";
 
