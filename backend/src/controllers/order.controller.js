@@ -511,16 +511,6 @@ async function getAdminDashboard(req, res, next) {
       });
     }
 
-    // Record coupon usage after successful reservation
-    if (couponCode && couponData.code) {
-      recordCouponUsage({
-        code: couponData.code,
-        userId: req.auth.sub,
-        email: req.auth.email,
-        orderId: order._id.toString(),
-      });
-    }
-
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
     const isSuperAdmin = req.auth?.role === "superadmin";

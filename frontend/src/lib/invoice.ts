@@ -40,6 +40,7 @@ function paymentMethodLabel(method?: string): string {
 function paymentStatusLabel(status?: string, method?: string): string {
   if (status === "paid") return "Paid";
   if (status === "failed") return "Failed";
+  if (status === "refund_pending") return "Refund Pending";
   if (status === "pending") return method === "cod" ? "Payable on Delivery" : "Pending";
   return "—";
 }
@@ -320,6 +321,24 @@ export function generateInvoicePdf(order: Order, buyer: BuyerDetails = {}): void
   doc.setTextColor(MUTED.r, MUTED.g, MUTED.b);
   doc.text(SELLER.web, pageWidth - marginX, footerY, { align: "right" });
   doc.text("This is a computer-generated invoice.", pageWidth - marginX, footerY + 12, { align: "right" });
+
+  // ============ CANCELLED Watermark ============
+  if (order.status === "Cancelled") {
+    doc.saveGraphicsState();
+    // Large diagonal "CANCELLED" stamp across the page
+    const centerX = pageWidth / 2;
+    const centerY = pageHeight / 2;
+    doc.setTextColor(220, 53, 69); // red
+    doc.setFontSize(72);
+    doc.setFont("helvetica", "bold");
+    // @ts-ignore — jsPDF supports GState for opacity
+    doc.setGState(new (doc as any).GState({ opacity: 0.15 }));
+    doc.text("CANCELLED", centerX, centerY, {
+      align: "center",
+      angle: 45,
+    });
+    doc.restoreGraphicsState();
+  }
 
   doc.save(`Antariya-Invoice-INV-${shortId}.pdf`);
 }
