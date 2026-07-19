@@ -271,6 +271,153 @@ async function sendPasswordResetEmail(to, resetUrl, displayName) {
   return sendMail({ to, subject, html });
 }
 
+/**
+ * Send an order notification email to all superadmin/admin users so they
+ * are immediately aware of new purchases (online or POS).
+ */
+async function sendAdminOrderNotificationEmail({ order, customerEmail, customerName, source }) {
+  if (!hasMailConfig()) {
+    return { sent: false, skipped: true, reason: "Mail not configured" };
+  }
+
+  const adminEmails = Array.isArray(env.superAdminAllowedEmails) ? env.superAdminAllowedEmails : [];
+  if (adminEmails.length === 0) {
+    return { sent: false, skipped: true, reason: "No admin emails configured" };
+  }
+
+  const shortId = order.id ? order.id.slice(-8).toUpperCase() : "N/A";
+  const sourceLabel = source ? ` [${source}]` : "";
+  const subject = `🛒 New Order Received${sourceLabel} - INV-${shortId}`;
+
+  const formatINR = (v) => `₹${Number(v || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  const itemRows = (order.items || [])
+    .map(
+      (item) =>
+        `<tr>
+          <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:14px;">${escapeHtml(item.name)}${item.variantSku ? ` <span style="color:#6b7280;font-size:12px;">(${escapeHtml(item.variantSku)})</span>` : ""}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:14px;text-align:center;">${item.quantity}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:14px;text-align:right;">${formatINR(item.price * item.quantity)}</td>
+        </tr>`
+    )
+    .join("");
+
+  const discountRow = Number(order.discount) > 0
+    ? `<tr><td colspan="2" style="padding:4px 12px;font-size:14px;color:#059669;">Discount${order.coupon?.code ? ` (${escapeHtml(order.coupon.code)})` : ""}</td><td style="padding:4px 12px;font-size:14px;text-align:right;color:#059669;">- ${formatINR(order.discount)}</td></tr>`
+    : "";
+
+  const bodyHtml = `
+    <h2 style="margin:0 0 8px;font-size:20px;color:#1f2937;">New Order Placed!</h2>
+    <p style="margin:0 0 16px;font-size:15px;color:#4b5563;">
+      <strong>${escapeHtml(customerName || "Customer")}</strong> (${escapeHtml(customerEmail || "unknown")}) just placed an order.
+    </p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;">
+      <tr style="background:#f9fafb;">
+        <td style="padding:6px 12px;font-size:12px;font-weight:700;text-transform:uppercase;color:#6b7280;">Item</td>
+        <td style="padding:6px 12px;font-size:12px;font-weight:700;text-transform:uppercase;color:#6b7280;text-align:center;">Qty</td>
+        <td style="padding:6px 12px;font-size:12px;font-weight:700;text-transform:uppercase;color:#6b7280;text-align:right;">Amount</td>
+      </tr>
+      ${itemRows}
+    </table>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:2px solid #e5e7eb;padding-top:8px;">
+      <tr><td colspan="2" style="padding:4px 12px;font-size:14px;color:#6b7280;">Subtotal</td><td style="padding:4px 12px;font-size:14px;text-align:right;">${formatINR(order.subtotal)}</td></tr>
+      <tr><td colspan="2" style="padding:4px 12px;font-size:14px;color:#6b7280;">Shipping</td><td style="padding:4px 12px;font-size:14px;text-align:right;">${Number(order.shipping) > 0 ? formatINR(order.shipping) : "Free"}</td></tr>
+      ${discountRow}
+      <tr><td colspan="2" style="padding:8px 12px;font-size:16px;font-weight:700;color:#1f2937;">Total</td><td style="padding:8px 12px;font-size:16px;font-weight:700;text-align:right;color:#1f2937;">${formatINR(order.total)}</td></tr>
+    </table>
+    <p style="margin:16px 0 4px;font-size:13px;color:#6b7280;">
+      <strong>Order ID:</strong> ${escapeHtml(order.id || "N/A")}<br/>
+      <strong>Payment:</strong> ${order.paymentMethod === "upi" ? "Online (UPI/Card/NetBanking)" : order.paymentMethod || "—"} · ${order.paymentStatus === "paid" ? "✅ Paid" : order.paymentStatus || "Pending"}<br/>
+      <strong>Razorpay ID:</strong> ${escapeHtml(order.razorpayPaymentId || "—")}
+    </p>
+  `;
+
+  const html = wrapBrandedEmail({ title: `New Order - INV-${shortId}`, bodyHtml });
+
+  const results = [];
+  for (const adminEmail of adminEmails) {
+    try {
+      const result = await sendMail({ to: adminEmail, subject, html });
+      results.push(result);
+    } catch (err) {
+      console.error(`[Mail] Failed to notify admin ${adminEmail}:`, err.message);
+      results.push({ sent: false, error: err.message });
+    }
+  }
+
+  return results;
+}
+
+async function sendAdminCancellationEmail({ order, customerEmail, customerName, reason }) {
+  if (!hasMailConfig()) {
+    return { sent: false, skipped: true, reason: "Mail not configured" };
+  }
+
+  const adminEmails = Array.isArray(env.superAdminAllowedEmails) ? env.superAdminAllowedEmails : [];
+  if (adminEmails.length === 0) {
+    return { sent: false, skipped: true, reason: "No admin emails configured" };
+  }
+
+  const shortId = order.id ? order.id.slice(-8).toUpperCase() : "N/A";
+  const subject = `❌ Order Cancelled - INV-${shortId}`;
+
+  const formatINR = (v) => `₹${Number(v || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  const itemRows = (order.items || [])
+    .map(
+      (item) =>
+        `<tr>
+          <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:14px;">${escapeHtml(item.name)}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:14px;text-align:center;">${item.quantity}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:14px;text-align:right;">${formatINR(item.price * item.quantity)}</td>
+        </tr>`
+    )
+    .join("");
+
+  const reasonSection = reason
+    ? `<p style="margin:12px 0;font-size:14px;color:#6b7280;"><strong>Reason:</strong> ${escapeHtml(reason)}</p>`
+    : "";
+
+  const bodyHtml = `
+    <div style="margin-bottom:16px;">
+      <p style="font-size:16px;font-weight:600;color:#dc2626;margin:0 0 8px;">⚠️ Order Cancellation Notice</p>
+      <p style="font-size:14px;color:#374151;margin:0;">A customer has cancelled their order.</p>
+    </div>
+    <table style="width:100%;margin:12px 0;font-size:14px;color:#374151;">
+      <tr><td style="padding:4px 0;font-weight:600;">Customer:</td><td>${escapeHtml(customerName || "N/A")}</td></tr>
+      <tr><td style="padding:4px 0;font-weight:600;">Email:</td><td>${escapeHtml(customerEmail || "N/A")}</td></tr>
+      <tr><td style="padding:4px 0;font-weight:600;">Order ID:</td><td style="font-family:monospace;">${escapeHtml(order.id || "N/A")}</td></tr>
+      <tr><td style="padding:4px 0;font-weight:600;">Order Total:</td><td style="font-weight:700;">${formatINR(order.total)}</td></tr>
+      <tr><td style="padding:4px 0;font-weight:600;">Payment Method:</td><td>${escapeHtml(order.paymentMethod === "upi" ? "Online (UPI/Card/NetBanking)" : order.paymentMethod || "N/A")}</td></tr>
+    </table>
+    ${reasonSection}
+    <p style="font-size:13px;font-weight:600;color:#6b7280;margin:16px 0 8px;">CANCELLED ITEMS:</p>
+    <table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
+      <thead><tr style="background:#fef2f2;">
+        <th style="padding:8px 12px;text-align:left;font-size:13px;color:#991b1b;">Item</th>
+        <th style="padding:8px 12px;text-align:center;font-size:13px;color:#991b1b;">Qty</th>
+        <th style="padding:8px 12px;text-align:right;font-size:13px;color:#991b1b;">Amount</th>
+      </tr></thead>
+      <tbody>${itemRows}</tbody>
+    </table>
+    <p style="margin:16px 0 0;font-size:13px;color:#6b7280;">Inventory has been automatically released back to available stock.</p>
+  `;
+
+  const html = wrapBrandedEmail({ title: "Order Cancelled", bodyHtml });
+
+  const results = [];
+  for (const adminEmail of adminEmails) {
+    try {
+      await sendMail({ to: adminEmail, subject, html });
+      results.push({ sent: true, to: adminEmail });
+    } catch (err) {
+      results.push({ sent: false, to: adminEmail, error: err.message });
+    }
+  }
+
+  return results;
+}
+
 module.exports = {
   sendWelcomeEmail,
   sendWaitlistConfirmationEmail,
@@ -282,4 +429,6 @@ module.exports = {
   escapeHtml,
   hasMailConfig,
   sendPasswordResetEmail,
+  sendAdminOrderNotificationEmail,
+  sendAdminCancellationEmail,
 };

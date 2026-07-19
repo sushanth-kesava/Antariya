@@ -41,6 +41,14 @@ const orderSchema = new mongoose.Schema(
     items: { type: [orderItemSchema], required: true, validate: [(arr) => arr.length > 0, "Order must have at least one item"] },
     subtotal: { type: Number, required: true, min: 0 },
     shipping: { type: Number, required: true, min: 0 },
+    discount: { type: Number, default: 0, min: 0 },
+    coupon: {
+      code: { type: String, default: "", trim: true },
+      discountType: { type: String, enum: ["percentage", "flat", "free_shipping", ""], default: "" },
+      discountValue: { type: Number, default: 0 },
+      discountAmount: { type: Number, default: 0 },
+      freeShipping: { type: Boolean, default: false },
+    },
     tax: { type: Number, required: true, min: 0 },
     total: { type: Number, required: true, min: 0 },
     status: {

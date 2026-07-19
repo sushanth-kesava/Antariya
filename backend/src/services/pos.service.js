@@ -4,6 +4,7 @@ const Inventory = require('../models/Inventory');
 const FinanceTransaction = require('../models/FinanceTransaction');
 const StockMovement = require('../models/StockMovement');
 const Warehouse = require('../models/Warehouse');
+const { sendAdminOrderNotificationEmail } = require('./mail.service');
 
 class POSService {
 
@@ -159,6 +160,29 @@ class POSService {
     } catch (err) {
       console.warn('[POS] Finance transaction creation failed:', err.message);
     }
+
+    // Fire-and-forget: notify admin(s) about the POS sale
+    (async () => {
+      try {
+        await sendAdminOrderNotificationEmail({
+          order: {
+            id: invoice._id.toString(),
+            items: lineItems.map((li) => ({ name: li.productName, quantity: li.quantity, price: li.unitPrice })),
+            subtotal,
+            discount: discountAmount,
+            shipping: 0,
+            tax: 0,
+            total: totalAmount,
+            paymentMethod: paymentMethod || "cash",
+          },
+          customerEmail: customerEmail || "",
+          customerName: customerName || "Walk-in Customer",
+          source: "POS",
+        });
+      } catch (emailErr) {
+        console.warn("[POS] Admin notification email failed:", emailErr.message);
+      }
+    })();
 
     return invoice;
   }

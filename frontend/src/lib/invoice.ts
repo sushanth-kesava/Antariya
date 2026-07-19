@@ -234,6 +234,10 @@ export function generateInvoicePdf(order: Order, buyer: BuyerDetails = {}): void
     ["Shipping", Number(order.shipping) > 0 ? inr(order.shipping) : "Free", false],
   ];
   if (Number(order.tax) > 0) rows.push(["Tax", inr(order.tax), false]);
+  if (Number(order.discount) > 0) {
+    const discLabel = order.coupon?.code ? `Coupon (${order.coupon.code})` : "Discount";
+    rows.push([discLabel, `- ${inr(order.discount)}`, false]);
+  }
 
   const rowH = 16;
   const panelPadTop = 12;

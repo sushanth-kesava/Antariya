@@ -24,6 +24,7 @@ const createOrderSchema = z.object({
   razorpay_order_id: z.string().max(100).optional(),
   razorpay_payment_id: z.string().max(100).optional(),
   razorpay_signature: z.string().max(200).optional(),
+  couponCode: z.string().max(20).optional(),
   shippingAddress: z.object({
     fullName: z.string().min(1).max(200).optional(),
     phone: z.string().max(20).optional(),

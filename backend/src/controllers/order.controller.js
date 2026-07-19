@@ -5,12 +5,14 @@ const Review = require("../models/Review");
 const WishlistItem = require("../models/WishlistItem");
 const CustomerProfile = require("../models/CustomerProfile");
 const { isValidRazorpaySignature, isRazorpayConfigured } = require("./payment.controller");
-const { sendOrderInvoiceEmail } = require("../services/mail.service");
+const { sendOrderInvoiceEmail, sendAdminOrderNotificationEmail } = require("../services/mail.service");
 const {
   reserveForOrder,
   releaseForOrder,
   commitForOrder,
 } = require("../services/inventory.service");
+const Coupon = require("../models/Coupon");
+const { recordCouponUsage } = require("./coupon.controller");
 
 const INDIA_FREE_SHIPPING_THRESHOLD = 1499;
 const INDIA_STANDARD_SHIPPING = 99;
@@ -58,6 +60,8 @@ function normalizeOrder(order) {
     })),
     subtotal: order.subtotal,
     shipping: order.shipping,
+    discount: order.discount || 0,
+    coupon: order.coupon || null,
     tax: order.tax,
     total: order.total,
     status: order.status,
@@ -317,9 +321,54 @@ async function createOrder(req, res, next) {
       subtotal += unitPriceINR * item.quantity;
     }
 
-    const shipping = subtotal >= INDIA_FREE_SHIPPING_THRESHOLD ? 0 : INDIA_STANDARD_SHIPPING;
+    // --- Coupon validation (server-side re-check) ----------------------------
+    const couponCode = typeof req.body?.couponCode === "string" ? req.body.couponCode.trim().toUpperCase() : "";
+    let couponDiscount = 0;
+    let couponFreeShipping = false;
+    let couponData = { code: "", discountType: "", discountValue: 0, discountAmount: 0, freeShipping: false };
+
+    if (couponCode) {
+      const coupon = await Coupon.findOne({ code: couponCode, active: true });
+      if (coupon) {
+        const now = new Date();
+        const isValid = now >= coupon.validFrom && now <= coupon.validUntil;
+        const subtotalPaise = Math.round(subtotal * 100);
+        const totalQuantity = Array.from(quantitiesByProductId.values()).reduce((s, q) => s + q, 0);
+        const meetsMin = subtotalPaise >= (coupon.minOrderValue || 0);
+        const meetsQty = !coupon.minQuantity || totalQuantity >= coupon.minQuantity;
+
+        if (isValid && meetsMin && meetsQty) {
+          if (coupon.discountType === "percentage") {
+            couponDiscount = Math.round((subtotalPaise * coupon.discountValue) / 100);
+            if (coupon.maxDiscount !== null && couponDiscount > coupon.maxDiscount) {
+              couponDiscount = coupon.maxDiscount;
+            }
+          } else if (coupon.discountType === "flat") {
+            couponDiscount = coupon.discountValue;
+          } else if (coupon.discountType === "free_shipping") {
+            couponFreeShipping = true;
+          }
+          // Never discount more than subtotal (paise)
+          if (couponDiscount > subtotalPaise) couponDiscount = subtotalPaise;
+          // Convert discount from paise to rupees
+          couponDiscount = couponDiscount / 100;
+
+          couponData = {
+            code: coupon.code,
+            discountType: coupon.discountType,
+            discountValue: coupon.discountValue,
+            discountAmount: couponDiscount,
+            freeShipping: couponFreeShipping,
+          };
+        }
+      }
+    }
+    // -------------------------------------------------------------------------
+
+    const baseShipping = subtotal >= INDIA_FREE_SHIPPING_THRESHOLD ? 0 : INDIA_STANDARD_SHIPPING;
+    const shipping = couponFreeShipping ? 0 : baseShipping;
     const tax = subtotal * INDIA_GST_RATE;
-    const total = subtotal + shipping + tax;
+    const total = Math.max(0, subtotal + shipping + tax - couponDiscount);
 
     // Online-payment only: the full total is paid up front, nothing is due on
     // delivery. (COD has been removed.)
@@ -338,6 +387,8 @@ async function createOrder(req, res, next) {
       items: orderItems,
       subtotal,
       shipping,
+      discount: couponDiscount,
+      coupon: couponData,
       tax,
       total,
       status: "Processing",
@@ -409,6 +460,25 @@ async function createOrder(req, res, next) {
       }
     })();
 
+    // Record coupon usage (fire-and-forget)
+    if (couponCode && couponDiscount > 0 || couponFreeShipping) {
+      recordCouponUsage({
+        code: couponCode,
+        userId: req.auth.sub,
+        email: req.auth.email,
+        orderId: order._id.toString(),
+      }).catch((err) => console.error("[Order] Failed to record coupon usage:", err.message));
+    }
+
+    // Admin notification (fire-and-forget)
+    sendAdminOrderNotificationEmail({
+      order: normalizeOrder(order),
+      customerEmail: req.auth.email,
+      customerName: req.auth.email.split("@")[0],
+    }).catch((err) => {
+      console.error("[Order] Failed to send admin notification:", err.message);
+    });
+
     return res.status(201).json({
       success: true,
       message: "Order placed successfully",
@@ -438,6 +508,16 @@ async function getAdminDashboard(req, res, next) {
       return res.status(403).json({
         success: false,
         message: "Admin access required",
+      });
+    }
+
+    // Record coupon usage after successful reservation
+    if (couponCode && couponData.code) {
+      recordCouponUsage({
+        code: couponData.code,
+        userId: req.auth.sub,
+        email: req.auth.email,
+        orderId: order._id.toString(),
       });
     }
 
@@ -663,9 +743,80 @@ async function updateAdminOrderStatus(req, res, next) {
   }
 }
 
+async function cancelMyOrder(req, res, next) {
+  try {
+    const { orderId } = req.params;
+
+    const order = await Order.findById(orderId);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found",
+      });
+    }
+
+    // Ensure the customer owns this order
+    if (order.userId !== req.auth.sub) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only cancel your own orders",
+      });
+    }
+
+    // Already cancelled
+    if (order.status === "Cancelled") {
+      return res.status(400).json({
+        success: false,
+        message: "This order is already cancelled.",
+      });
+    }
+
+    // Cannot cancel after dispatch
+    if (["Shipped", "Delivered"].includes(order.status)) {
+      return res.status(409).json({
+        success: false,
+        message: "This order has already been dispatched and cannot be cancelled. Please use the return/refund process instead.",
+      });
+    }
+
+    // Release reserved inventory
+    await releaseForOrder({
+      orderId: order._id,
+      reason: "Customer cancelled order",
+      actor: { userId: req.auth.sub, email: req.auth.email, role: req.auth.role },
+    });
+
+    const updatedOrder = await Order.findByIdAndUpdate(orderId, { status: "Cancelled" }, { new: true });
+
+    // Fire-and-forget: notify admin about the cancellation
+    const { sendAdminCancellationEmail } = require("../services/mail.service");
+    (async () => {
+      try {
+        await sendAdminCancellationEmail({
+          order: normalizeOrder(updatedOrder),
+          customerEmail: req.auth.email || order.userEmail,
+          customerName: req.auth.email ? req.auth.email.split("@")[0] : "Customer",
+        });
+      } catch (emailErr) {
+        console.warn("[Order] Admin cancellation email failed:", emailErr.message);
+      }
+    })();
+
+    return res.status(200).json({
+      success: true,
+      message: "Order cancelled successfully",
+      order: normalizeOrder(updatedOrder),
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
 module.exports = {
   createOrder,
   getMyOrders,
   getAdminDashboard,
   updateAdminOrderStatus,
+  cancelMyOrder,
 };

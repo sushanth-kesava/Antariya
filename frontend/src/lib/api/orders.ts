@@ -50,6 +50,13 @@ export type Order = {
   items: OrderItem[];
   subtotal: number;
   shipping: number;
+  discount: number;
+  coupon?: {
+    code: string;
+    discountType: string;
+    discountAmount: number;
+    freeShipping: boolean;
+  } | null;
   tax: number;
   total: number;
   status: string;
@@ -72,7 +79,8 @@ export async function createOrderOnBackend(
   token: string,
   items: OrderItemInput[],
   paymentMethod?: "upi" | "cod",
-  payment?: PaymentVerification
+  payment?: PaymentVerification,
+  couponCode?: string
 ): Promise<Order> {
   const response = await fetch(`${API_BASE_URL}/orders`, {
     credentials: "include",
@@ -81,7 +89,7 @@ export async function createOrderOnBackend(
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ items, paymentMethod, ...(payment || {}) }),
+    body: JSON.stringify({ items, paymentMethod, couponCode: couponCode || undefined, ...(payment || {}) }),
   });
 
   const data = await response.json();
@@ -174,6 +182,25 @@ export async function updateAdminOrderStatusOnBackend(
 
   if (!response.ok || !data?.success) {
     throw new Error(data?.message || "Failed to update order status");
+  }
+
+  return data.order as Order;
+}
+
+export async function cancelMyOrderOnBackend(token: string, orderId: string): Promise<Order> {
+  const response = await fetch(`${API_BASE_URL}/orders/my/${orderId}/cancel`, {
+    credentials: "include",
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data?.success) {
+    throw new Error(data?.message || "Failed to cancel order");
   }
 
   return data.order as Order;

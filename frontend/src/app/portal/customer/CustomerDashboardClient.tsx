@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Package, Heart, Download, Settings, Star, LayoutDashboard, Sparkles, ShoppingBag, ArrowRight, ChevronDown, Mail, Phone, MessageCircle, MessageSquare, User as UserIcon, Headphones, Send, Loader2 as Spinner } from "lucide-react";
+import { XCircle, AlertTriangle, Truck } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,7 +18,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { type Product } from "@/app/lib/mock-data";
-import { getMyOrdersFromBackend } from "@/lib/api/orders";
+import { getMyOrdersFromBackend, cancelMyOrderOnBackend } from "@/lib/api/orders";
 import { getWishlistFromBackend, WishlistItem } from "@/lib/api/wishlist";
 import { useInventoryUpdates } from "@/hooks/use-inventory-updates";
 import { getProductsFromBackend } from "@/lib/api/products";
@@ -123,6 +124,9 @@ export default function CustomerDashboardClient() {
   const [ticketSaving, setTicketSaving] = useState(false);
   const [ticketSuccess, setTicketSuccess] = useState(false);
   const [ticketError, setTicketError] = useState<string | null>(null);
+  const [cancelDialogOrderId, setCancelDialogOrderId] = useState<string | null>(null);
+  const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   const scrollToSection = (id: string) => {
     if (typeof document === "undefined") return;
@@ -152,6 +156,28 @@ export default function CustomerDashboardClient() {
       phone: customerProfile?.phone,
       address: addressText,
     });
+  };
+
+  const handleCancelOrder = async () => {
+    if (!cancelDialogOrderId) return;
+    const token = localStorage.getItem("app_auth_token") || "";
+    if (!token) return;
+
+    setCancellingOrderId(cancelDialogOrderId);
+    setCancelError(null);
+
+    try {
+      const updatedOrder = await cancelMyOrderOnBackend(token, cancelDialogOrderId);
+      // Update local state
+      setOrders((prev) =>
+        prev.map((o) => (o.id === cancelDialogOrderId ? { ...o, ...updatedOrder } : o))
+      );
+      setCancelDialogOrderId(null);
+    } catch (err: any) {
+      setCancelError(err.message || "Failed to cancel order");
+    } finally {
+      setCancellingOrderId(null);
+    }
   };
 
   useEffect(() => {
@@ -460,7 +486,29 @@ export default function CustomerDashboardClient() {
                                   <span className="text-muted-foreground">Subtotal: <span className="font-semibold text-foreground">{formatINR(Number(order.subtotal || 0))}</span></span>
                                   <span className="text-muted-foreground">Shipping: <span className="font-semibold text-foreground">{formatINR(Number(order.shipping || 0))}</span></span>
                                   <span className="text-muted-foreground">Tax: <span className="font-semibold text-foreground">{formatINR(Number(order.tax || 0))}</span></span>
+                                  {Number((order as any).discount || 0) > 0 && <span className="text-green-600">Discount: <span className="font-semibold">-{formatINR(Number((order as any).discount))}</span>{(order as any).coupon?.code && <span className="text-xs ml-1">({(order as any).coupon.code})</span>}</span>}
                                   <span className="text-muted-foreground">Total: <span className="font-bold text-foreground">{formatINR(Number(order.total || 0))}</span></span>
+                                </div>
+                                {/* Cancellation section */}
+                                <div className="pt-3 border-t border-gray-100 mt-3">
+                                  {order.status === "Processing" && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="rounded-full border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 gap-1.5"
+                                      onClick={() => { setCancelError(null); setCancelDialogOrderId(order.id); }}
+                                      disabled={cancellingOrderId === order.id}
+                                    >
+                                      <XCircle className="h-3.5 w-3.5" />
+                                      {cancellingOrderId === order.id ? "Cancelling..." : "Cancel Order"}
+                                    </Button>
+                                  )}
+                                  {["Shipped", "Delivered"].includes(order.status) && (
+                                    <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Truck className="h-3.5 w-3.5" /> This order has been dispatched and cannot be cancelled.</p>
+                                  )}
+                                  {order.status === "Cancelled" && (
+                                    <p className="text-xs text-red-500 flex items-center gap-1.5"><XCircle className="h-3.5 w-3.5" /> This order has been cancelled.</p>
+                                  )}
                                 </div>
                               </div>
                             </td>
@@ -703,6 +751,39 @@ export default function CustomerDashboardClient() {
             </Button>
           </div>
         )}
+      </DialogContent>
+    </Dialog>
+
+    {/* Cancel Order Confirmation Dialog */}
+    <Dialog open={cancelDialogOrderId !== null} onOpenChange={(open) => { if (!open) { setCancelDialogOrderId(null); setCancelError(null); } }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-red-600"><AlertTriangle className="h-5 w-5" /> Cancel Order</DialogTitle>
+          <DialogDescription>
+            Are you sure you want to cancel this order? This action cannot be undone. If you&apos;ve already paid, a refund will be initiated.
+          </DialogDescription>
+        </DialogHeader>
+        {cancelError && (
+          <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+            {cancelError}
+          </div>
+        )}
+        <DialogFooter className="flex gap-2 sm:gap-0">
+          <Button
+            variant="outline"
+            onClick={() => { setCancelDialogOrderId(null); setCancelError(null); }}
+            disabled={cancellingOrderId !== null}
+          >
+            Keep Order
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={handleCancelOrder}
+            disabled={cancellingOrderId !== null}
+          >
+            {cancellingOrderId ? <><Spinner className="h-4 w-4 animate-spin mr-2" /> Cancelling...</> : "Yes, Cancel Order"}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
 
