@@ -2,28 +2,22 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <!-- Main Pages -->
   <url><loc>https://antariyaofficial.com/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>
-  <url><loc>https://antariyaofficial.com/marketplace</loc><changefreq>daily</changefreq><priority>0.9</priority></url>
-  <url><loc>https://antariyaofficial.com/shop</loc><changefreq>daily</changefreq><priority>0.9</priority></url>
-  <url><loc>https://antariyaofficial.com/shop/hoodies</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://antariyaofficial.com/customize</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://antariyaofficial.com/marketplace/</loc><changefreq>daily</changefreq><priority>0.9</priority></url>
+  <url><loc>https://antariyaofficial.com/shop/</loc><changefreq>daily</changefreq><priority>0.9</priority></url>
+  <url><loc>https://antariyaofficial.com/shop/hoodies/</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://antariyaofficial.com/customize/</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
 
   <!-- Company -->
-  <url><loc>https://antariyaofficial.com/about</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
-  <url><loc>https://antariyaofficial.com/contact-support</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://antariyaofficial.com/track-order</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://antariyaofficial.com/coming-soon</loc><changefreq>monthly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://antariyaofficial.com/about/</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://antariyaofficial.com/contact-support/</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://antariyaofficial.com/track-order/</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
 
   <!-- Account -->
-  <url><loc>https://antariyaofficial.com/login</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://antariyaofficial.com/signup</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://antariyaofficial.com/wishlist</loc><changefreq>weekly</changefreq><priority>0.5</priority></url>
-  <url><loc>https://antariyaofficial.com/cart</loc><changefreq>daily</changefreq><priority>0.5</priority></url>
+  <url><loc>https://antariyaofficial.com/login/</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://antariyaofficial.com/signup/</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://antariyaofficial.com/wishlist/</loc><changefreq>weekly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://antariyaofficial.com/cart/</loc><changefreq>daily</changefreq><priority>0.5</priority></url>
 
   <!-- Legal -->
-  <url><loc>https://antariyaofficial.com/legal/policies</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
-  <url><loc>https://antariyaofficial.com/sitemap</loc><changefreq>weekly</changefreq><priority>0.4</priority></url>
-
-  <!-- Admin Application -->
-  <url><loc>https://antariyaofficial.com/admin-login</loc><changefreq>monthly</changefreq><priority>0.4</priority></url>
-  <url><loc>https://antariyaofficial.com/admin-login/apply</loc><changefreq>monthly</changefreq><priority>0.4</priority></url>
+  <url><loc>https://antariyaofficial.com/legal/policies/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
 </urlset>

@@ -7,7 +7,10 @@ Allow: /
 # Disallow admin/private areas
 Disallow: /portal/
 Disallow: /admin-login
+Disallow: /admin-login/
 Disallow: /superadmin-login
+Disallow: /superadmin-login/
+Disallow: /complete-profile/
 
 # Sitemaps
 Sitemap: https://antariyaofficial.com/sitemap.xml

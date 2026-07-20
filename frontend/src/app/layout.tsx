@@ -5,7 +5,7 @@ import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { BRAND_ICON_URL, BRAND_LOGO_URL } from '@/lib/brand';
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://antariya.onrender.com';
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://antariyaofficial.com';
 
 const inter = Inter({
   subsets: ['latin'],
