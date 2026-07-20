@@ -120,3 +120,39 @@
 .font-theseasons {
   font-family: var(--font-cormorant), "Literata", serif;
 }
+
+/* Product description rich text styling */
+.product-description {
+  white-space: normal;
+}
+.product-description p {
+  margin-bottom: 0.75rem;
+}
+.product-description p:last-child {
+  margin-bottom: 0;
+}
+.product-description strong,
+.product-description b {
+  color: hsl(var(--foreground));
+  font-weight: 600;
+}
+.product-description ul,
+.product-description ol {
+  margin: 0.75rem 0;
+  padding-left: 1.5rem;
+}
+.product-description ul {
+  list-style-type: disc;
+}
+.product-description ol {
+  list-style-type: decimal;
+}
+.product-description li {
+  margin-bottom: 0.25rem;
+}
+.product-description h3,
+.product-description h4 {
+  color: hsl(var(--foreground));
+  font-weight: 600;
+  margin: 1rem 0 0.5rem;
+}

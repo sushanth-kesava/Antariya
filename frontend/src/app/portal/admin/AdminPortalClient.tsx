@@ -1409,14 +1409,38 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-gray-700 mb-2">Detailed Description <span className="text-red-500">*</span></label>
-                    <textarea 
-                      required 
-                      className="w-full rounded-xl border-gray-200 bg-gray-50 focus:bg-white p-4 text-base focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all" 
-                      rows={4}
-                      placeholder="Describe the quality and specs of the product..."
-                      value={formData.description}
-                      onChange={e => setFormData({...formData, description: e.target.value})}
-                    />
+                    <div className="border border-gray-200 rounded-xl overflow-hidden">
+                      <div className="flex gap-1 px-3 py-2 bg-gray-100 border-b border-gray-200 flex-wrap">
+                        <button type="button" className="px-2 py-1 text-xs font-bold rounded hover:bg-gray-200" onClick={() => document.execCommand('bold')}>B</button>
+                        <button type="button" className="px-2 py-1 text-xs italic rounded hover:bg-gray-200" onClick={() => document.execCommand('italic')}>I</button>
+                        <button type="button" className="px-2 py-1 text-xs rounded hover:bg-gray-200" onClick={() => document.execCommand('insertUnorderedList')}>• List</button>
+                        <button type="button" className="px-2 py-1 text-xs rounded hover:bg-gray-200" onClick={() => document.execCommand('insertOrderedList')}>1. List</button>
+                        <button type="button" className="px-2 py-1 text-xs font-bold rounded hover:bg-gray-200" onClick={() => {
+                          const sel = window.getSelection();
+                          if (sel && sel.rangeCount > 0) {
+                            const range = sel.getRangeAt(0);
+                            const parentH = range.startContainer.parentElement?.closest('h3');
+                            if (parentH) {
+                              const p = document.createElement('p');
+                              p.innerHTML = parentH.innerHTML;
+                              parentH.replaceWith(p);
+                            } else {
+                              document.execCommand('formatBlock', false, 'h3');
+                            }
+                          }
+                        }}>H</button>
+                        <button type="button" className="px-2 py-1 text-xs rounded hover:bg-gray-200" onClick={() => document.execCommand('removeFormat')}>Clear</button>
+                      </div>
+                      <div
+                        contentEditable
+                        suppressContentEditableWarning
+                        className="w-full bg-gray-50 focus:bg-white p-4 text-base focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all min-h-[120px] product-description"
+                        dangerouslySetInnerHTML={{ __html: formData.description }}
+                        onBlur={e => setFormData({...formData, description: e.currentTarget.innerHTML})}
+                        onInput={e => setFormData({...formData, description: e.currentTarget.innerHTML})}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">Use the toolbar to format: bold, lists, headings. Paste from docs preserves formatting.</p>
                   </div>
                 </div>
 

@@ -1018,7 +1018,13 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
                 </Badge>
               </div>
               
-              <p className="text-xl text-muted-foreground leading-relaxed">{product.description}</p>
+              <div 
+                className="text-lg text-muted-foreground leading-relaxed product-description" 
+                dangerouslySetInnerHTML={{ __html: product.description.includes('<') 
+                  ? product.description 
+                  : product.description.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br/>').replace(/^/, '<p>').replace(/$/, '</p>')
+                }}
+              />
 
               <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                 <p className="text-xs uppercase tracking-wide text-slate-600 font-semibold">Seller</p>
