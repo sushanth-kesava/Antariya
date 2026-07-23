@@ -1,13 +1,15 @@
 const Product = require("../models/Product");
 const Order = require("../models/Order");
+const POSInvoice = require("../models/POSInvoice");
 
 async function getPublicHomeStats(req, res, next) {
   try {
-    const [productCount, dealers, categories, orderCount] = await Promise.all([
+    const [productCount, dealers, categories, orderCount, posCount] = await Promise.all([
       Product.countDocuments({}),
       Product.distinct("dealerId"),
       Product.distinct("category"),
       Order.countDocuments({}),
+      POSInvoice.countDocuments({}),
     ]);
 
     return res.status(200).json({
@@ -16,7 +18,7 @@ async function getPublicHomeStats(req, res, next) {
         products: productCount,
         dealers: dealers.filter(Boolean).length,
         categories: categories.filter(Boolean).length,
-        orders: orderCount,
+        orders: orderCount + posCount,
       },
     });
   } catch (error) {
