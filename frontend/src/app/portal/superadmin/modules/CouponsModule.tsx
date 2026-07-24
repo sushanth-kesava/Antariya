@@ -79,7 +79,6 @@ export function CouponsModule({ token, has }: CouponsModuleProps) {
     heroBannerText: "",
     heroBannerColor: "#1a1a1a",
     freeDelivery: false,
-    freeDelivery: false,
   });
 
   useEffect(() => {
@@ -181,6 +180,7 @@ export function CouponsModule({ token, has }: CouponsModuleProps) {
       showOnHero: false,
       heroBannerText: "",
       heroBannerColor: "#1a1a1a",
+      freeDelivery: false,
     });
   }
 
