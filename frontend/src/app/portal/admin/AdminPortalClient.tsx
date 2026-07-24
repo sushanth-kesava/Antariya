@@ -146,6 +146,7 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
 
   const [customizationConfig, setCustomizationConfig] = useState({
     imageSource: "both" as "customer_upload" | "stock_selection" | "both",
+    stockImages: [] as { url: string; label: string; category: string }[],
     uploadFormats: ["pdf", "png", "jpg", "svg"],
     minResolutionDPI: 300,
     maxFileSizeMB: 25,
@@ -867,6 +868,7 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
         customizable: formData.customizable,
         customizationConfig: formData.customizable ? {
           imageSource: customizationConfig.imageSource,
+          stockImages: customizationConfig.stockImages.filter(img => img.url.trim()),
           uploadFormats: customizationConfig.uploadFormats,
           minResolutionDPI: customizationConfig.minResolutionDPI,
           maxFileSizeMB: customizationConfig.maxFileSizeMB,
@@ -897,6 +899,7 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
       });
       setCustomizationConfig({
         imageSource: "both",
+        stockImages: [],
         uploadFormats: ["pdf", "png", "jpg", "svg"],
         minResolutionDPI: 300,
         maxFileSizeMB: 25,
@@ -1732,6 +1735,49 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
                         ))}
                       </div>
                     </div>
+
+                    {/* Stock Images — shown when admin picks "stock_selection" or "both" */}
+                    {(customizationConfig.imageSource === "stock_selection" || customizationConfig.imageSource === "both") && (
+                      <div className="space-y-2">
+                        <label className="block text-sm font-semibold text-gray-800">Stock Design Images</label>
+                        <p className="text-xs text-gray-500">Add images customers can choose from (paste Cloudinary/CDN URLs)</p>
+                        {(customizationConfig as any).stockImages?.map((img: any, idx: number) => (
+                          <div key={idx} className="flex items-center gap-2 bg-white rounded-xl border p-2">
+                            <div className="w-10 h-10 rounded-lg overflow-hidden bg-gray-100 shrink-0">
+                              {img.url && <img src={img.url} alt={img.label} className="w-full h-full object-cover" />}
+                            </div>
+                            <Input
+                              placeholder="Image URL"
+                              value={img.url}
+                              onChange={(e) => {
+                                const updated = [...((customizationConfig as any).stockImages || [])];
+                                updated[idx] = { ...updated[idx], url: e.target.value };
+                                setCustomizationConfig({ ...customizationConfig, stockImages: updated } as any);
+                              }}
+                              className="h-8 rounded-lg text-xs flex-1"
+                            />
+                            <Input
+                              placeholder="Label"
+                              value={img.label}
+                              onChange={(e) => {
+                                const updated = [...((customizationConfig as any).stockImages || [])];
+                                updated[idx] = { ...updated[idx], label: e.target.value };
+                                setCustomizationConfig({ ...customizationConfig, stockImages: updated } as any);
+                              }}
+                              className="h-8 rounded-lg text-xs w-28"
+                            />
+                            <button type="button" onClick={() => {
+                              const updated = ((customizationConfig as any).stockImages || []).filter((_: any, i: number) => i !== idx);
+                              setCustomizationConfig({ ...customizationConfig, stockImages: updated } as any);
+                            }} className="text-red-400 hover:text-red-600 text-sm font-bold px-1">✕</button>
+                          </div>
+                        ))}
+                        <button type="button" onClick={() => {
+                          const current = (customizationConfig as any).stockImages || [];
+                          setCustomizationConfig({ ...customizationConfig, stockImages: [...current, { url: "", label: "", category: "" }] } as any);
+                        }} className="text-sm text-primary font-medium hover:underline">+ Add stock image</button>
+                      </div>
+                    )}
 
                     {/* Upload Formats */}
                     {(customizationConfig.imageSource === "customer_upload" || customizationConfig.imageSource === "both") && (

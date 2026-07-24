@@ -287,6 +287,7 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
   const [selectedVariantSku, setSelectedVariantSku] = useState<string>("");
   const [referencePreview, setReferencePreview] = useState<string | null>(null);
   const [referenceFileName, setReferenceFileName] = useState<string | null>(null);
+  const [selectedStockImage, setSelectedStockImage] = useState<string | null>(null);
   const [deliveryPincode, setDeliveryPincode] = useState("");
   const [locatingPincode, setLocatingPincode] = useState(false);
   const [reviewFilter, setReviewFilter] = useState<ReviewTag>("All");
@@ -1144,7 +1145,7 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
                   <Truck className="h-5 w-5 text-primary" />
                     <h3 className="font-bold text-lg">Delivery Availability</h3>
                   </div>
-                  <Badge variant="outline" className="rounded-full">Live Delhivery Check</Badge>
+                  <Badge variant="outline" className="rounded-full">Live Delivery Check</Badge>
                 </div>
                 <p className="text-sm text-muted-foreground">
                   Check whether we can deliver this product to your area and see the estimated timeline before placing the order.
@@ -1242,8 +1243,6 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
                         <p className="font-semibold text-foreground">Customization summary</p>
                         <div className="flex flex-wrap gap-2">
                           <Badge variant="secondary" className="rounded-full">{customization.symbol}</Badge>
-                          <Badge variant="secondary" className="rounded-full">{customization.threadColor}</Badge>
-                          <Badge variant="secondary" className="rounded-full">{customization.fabricColor}</Badge>
                           <Badge variant="secondary" className="rounded-full">{customization.size}</Badge>
                           <Badge variant="secondary" className="rounded-full">{customization.placement}</Badge>
                         </div>
@@ -1259,7 +1258,7 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
                         <p className="text-muted-foreground">Expected range: {expectedDeliveryRange}</p>
                         {deliveryResult.status === "available" ? (
                           <p className="text-muted-foreground">
-                            Dispatch: {new Date(deliveryResult.estimatedDispatchDate).toLocaleDateString()} via {deliveryResult.lastMilePartner}
+                            Dispatch: {new Date(deliveryResult.estimatedDispatchDate).toLocaleDateString()}
                           </p>
                         ) : (
                           <p className="text-muted-foreground">Check your pincode above for a live delivery estimate.</p>
@@ -1760,42 +1759,6 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
             </DialogHeader>
 
             <div className="space-y-5 max-h-[70vh] overflow-y-auto pr-1">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Cloth Color</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {fabricColors.map((fabricColor) => (
-                      <Button
-                        key={fabricColor}
-                        type="button"
-                        variant={customization.fabricColor === fabricColor ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setCustomization((prev) => ({ ...prev, fabricColor }))}
-                      >
-                        {fabricColor}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Thread Color</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {threadColors.map((threadColor) => (
-                      <Button
-                        key={threadColor}
-                        type="button"
-                        variant={customization.threadColor === threadColor ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setCustomization((prev) => ({ ...prev, threadColor }))}
-                      >
-                        {threadColor}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
               <div className="space-y-2">
                 <Label>Design</Label>
                 <div className="flex flex-wrap gap-2">
@@ -1813,7 +1776,51 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
                 </div>
               </div>
 
-              <div className="space-y-2">
+              {/* Stock Image Selection — shown when admin configured stock images */}
+              {product?.customizationConfig?.stockImages && product.customizationConfig.stockImages.length > 0 && (product.customizationConfig.imageSource === "stock_selection" || product.customizationConfig.imageSource === "both") && (
+                <div className="space-y-2">
+                  <Label>Choose from Available Designs</Label>
+                  <p className="text-xs text-muted-foreground">Select a pre-made design from our collection</p>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                    {product.customizationConfig.stockImages.map((img: { url: string; label: string; category: string }, idx: number) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          setSelectedStockImage(img.url);
+                          setReferencePreview(img.url);
+                          setReferenceFileName(img.label || `Design ${idx + 1}`);
+                          setCustomization((prev) => ({
+                            ...prev,
+                            referenceImage: img.url,
+                            referenceImageName: img.label || `Design ${idx + 1}`,
+                          }));
+                        }}
+                        className={`relative aspect-square rounded-xl border-2 overflow-hidden transition-all hover:scale-105 ${
+                          selectedStockImage === img.url
+                            ? "border-primary ring-2 ring-primary/30"
+                            : "border-gray-200 hover:border-gray-400"
+                        }`}
+                      >
+                        <Image src={img.url} alt={img.label || `Design ${idx + 1}`} fill className="object-cover" />
+                        {selectedStockImage === img.url && (
+                          <div className="absolute inset-0 bg-primary/10 flex items-center justify-center">
+                            <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
+                              <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                            </div>
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                  {product.customizationConfig.imageSource === "both" && (
+                    <p className="text-xs text-muted-foreground italic">— or upload your own below —</p>
+                  )}
+                </div>
+              )}
+
+              {/* Upload section — hidden when admin restricted to stock_selection only */}
+              {(product?.customizationConfig?.imageSource !== "stock_selection") && (<div className="space-y-2">
                 <Label>Upload Reference Photo</Label>
                 <div className="rounded-2xl border border-dashed border-border p-4 space-y-3">
                   <input
@@ -1846,7 +1853,7 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
                     </div>
                   )}
                 </div>
-              </div>
+              </div>)}
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-2">
