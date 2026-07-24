@@ -44,6 +44,13 @@ const allowedOrigins = Array.isArray(env.frontendUrls)
   : [env.frontendUrl].filter(Boolean);
 
 app.use(helmet());
+
+// ─── Block search engines from indexing the API domain ────────────────────────
+app.use((req, res, next) => {
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+  next();
+});
+
 app.use(
   cors({
     origin(origin, callback) {

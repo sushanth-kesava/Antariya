@@ -15,6 +15,14 @@ RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 RewriteCond %{HTTP_HOST} ^www\.antariyaofficial\.com$ [NC]
 RewriteRule ^ https://antariyaofficial.com%{REQUEST_URI} [L,R=301]
 
+# ══════════════════════════════════════════════════════════════════════════════
+# 0b. Strip .html extensions → clean URLs (301 redirect for SEO)
+# ══════════════════════════════════════════════════════════════════════════════
+RewriteCond %{THE_REQUEST} \s/+(.*?)\.html[\s?] [NC]
+RewriteCond %{REQUEST_URI} !^/404\.html$
+RewriteRule ^ /%1 [R=301,L]
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # 1. Product detail pages: /product/<any-id>/ → serve product/placeholder/index.html
 # ──────────────────────────────────────────────────────────────────────────────
