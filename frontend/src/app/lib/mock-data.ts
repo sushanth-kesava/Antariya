@@ -49,7 +49,22 @@ export interface Product {
   reviewCount?: number;
   reviewAverage?: number;
   reviewBreakdown?: Record<string, number>;
-  reviewImageCount?: number;
+
   customizable?: boolean;
+  customizationConfig?: {
+    imageSource: "customer_upload" | "stock_selection" | "both";
+    stockImages?: { url: string; label: string; category: string }[];
+    uploadFormats: string[];
+    minResolutionDPI: number;
+    maxFileSizeMB: number;
+    sizeUnit: "inches" | "cm" | "both";
+    maxWidth: number | null;
+    maxHeight: number | null;
+    predefinedSizes: { label: string; width: number; height: number }[];
+    positions: string[];
+    allowCustomPosition: boolean;
+    notes: string;
+    extraCharge: number;
+  } | null;
 }
 
