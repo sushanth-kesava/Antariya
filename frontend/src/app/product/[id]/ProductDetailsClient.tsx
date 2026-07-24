@@ -330,7 +330,13 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
   const symbols = ["Lotus Mandala", "Peacock Crest", "Floral Vine", "Royal Monogram", "Om Motif"];
   const threadColors = ["Gold", "Silver", "Ruby Red", "Emerald", "Royal Blue", "Ivory"];
   const fabricColors = ["Black", "Navy", "White", "Maroon", "Forest Green", "Beige"];
-  const placements = ["Left Chest", "Center Chest", "Sleeve", "Back", "Pocket"];
+  // Use admin-configured positions from customizationConfig, fallback to defaults
+  const placements = (product?.customizationConfig?.positions && product.customizationConfig.positions.length > 0)
+    ? product.customizationConfig.positions.map((p: string) => p.split("-").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" "))
+    : ["Left Chest", "Center Chest", "Sleeve", "Back", "Pocket"];
+
+  // Admin-configured extra charge
+  const customizationExtraCharge = product?.customizationConfig?.extraCharge || 0;
   const isApparelProduct = APPAREL_CATEGORIES.has(product?.category || "");
   const galleryImages = useMemo(() => {
     if (!product) {
@@ -1374,6 +1380,10 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
                   { label: "Compatibility", value: product.category === "Embroidery Designs" ? "Digital download" : "Industrial & Home Machines" },
                   { label: "Availability", value: product.stock > 0 ? "In stock" : "Out of stock" },
                   { label: "Customization", value: product.customizable ? "Available" : "Not available" },
+                  ...(product.customizable && product.customizationConfig ? [
+                    ...(product.customizationConfig.maxWidth || product.customizationConfig.maxHeight ? [{ label: "Max Print Size", value: `${product.customizationConfig.maxWidth || "—"} × ${product.customizationConfig.maxHeight || "—"} ${product.customizationConfig.sizeUnit || "inches"}` }] : []),
+                    ...(product.customizationConfig.extraCharge > 0 ? [{ label: "Customization Fee", value: `+₹${product.customizationConfig.extraCharge.toLocaleString("en-IN")}` }] : []),
+                  ] : []),
                 ].map((spec, i) => (
                   <div key={i} className="flex justify-between gap-4 py-5 border-b border-border/50">
                     <span className="text-muted-foreground font-medium text-lg">{spec.label}</span>
@@ -1739,6 +1749,14 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
               <DialogDescription>
                 Configure the product directly here. The AI Studio is separate and is only for building from scratch.
               </DialogDescription>
+              {customizationExtraCharge > 0 && (
+                <p className="text-sm text-amber-700 font-medium mt-1">
+                  +₹{customizationExtraCharge.toLocaleString("en-IN")} customization charge applies
+                </p>
+              )}
+              {product?.customizationConfig?.uploadFormats && product.customizationConfig.uploadFormats.length > 0 && (
+                <p className="text-xs text-muted-foreground mt-1">Accepted formats: {product.customizationConfig.uploadFormats.map((f: string) => f.toUpperCase()).join(", ")} • Min {product.customizationConfig.minResolutionDPI || 300} DPI</p>
+              )}
             </DialogHeader>
 
             <div className="space-y-5 max-h-[70vh] overflow-y-auto pr-1">

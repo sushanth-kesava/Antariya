@@ -144,6 +144,21 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
     rating: "0",
   });
 
+  const [customizationConfig, setCustomizationConfig] = useState({
+    imageSource: "both" as "customer_upload" | "stock_selection" | "both",
+    uploadFormats: ["pdf", "png", "jpg", "svg"],
+    minResolutionDPI: 300,
+    maxFileSizeMB: 25,
+    sizeUnit: "inches" as "inches" | "cm" | "both",
+    maxWidth: "",
+    maxHeight: "",
+    predefinedSizes: [] as { label: string; width: string; height: string }[],
+    positions: ["front-center", "back-center", "left-chest"],
+    allowCustomPosition: false,
+    extraCharge: "",
+    notes: "",
+  });
+
   // Multi-select attribute values (Size/Color/Gender/Neck/Pattern) -> variant axes.
   const [attrValues, setAttrValues] = useState<Record<string, string[]>>({
     size: [],
@@ -850,6 +865,20 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
           ? variants.reduce((sum, row) => sum + (parseInt(row.stock, 10) || 0), 0)
           : parseInt(formData.stock, 10),
         customizable: formData.customizable,
+        customizationConfig: formData.customizable ? {
+          imageSource: customizationConfig.imageSource,
+          uploadFormats: customizationConfig.uploadFormats,
+          minResolutionDPI: customizationConfig.minResolutionDPI,
+          maxFileSizeMB: customizationConfig.maxFileSizeMB,
+          sizeUnit: customizationConfig.sizeUnit,
+          maxWidth: customizationConfig.maxWidth ? parseFloat(customizationConfig.maxWidth) : null,
+          maxHeight: customizationConfig.maxHeight ? parseFloat(customizationConfig.maxHeight) : null,
+          predefinedSizes: customizationConfig.predefinedSizes.map(s => ({ label: s.label, width: parseFloat(s.width) || 0, height: parseFloat(s.height) || 0 })),
+          positions: customizationConfig.positions,
+          allowCustomPosition: customizationConfig.allowCustomPosition,
+          extraCharge: customizationConfig.extraCharge ? parseFloat(customizationConfig.extraCharge) : 0,
+          notes: customizationConfig.notes,
+        } : null,
         rating: parseFloat(formData.rating),
       });
 
@@ -865,6 +894,20 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
         stock: "100",
         customizable: false,
         rating: "0",
+      });
+      setCustomizationConfig({
+        imageSource: "both",
+        uploadFormats: ["pdf", "png", "jpg", "svg"],
+        minResolutionDPI: 300,
+        maxFileSizeMB: 25,
+        sizeUnit: "inches",
+        maxWidth: "",
+        maxHeight: "",
+        predefinedSizes: [],
+        positions: ["front-center", "back-center", "left-chest"],
+        allowCustomPosition: false,
+        extraCharge: "",
+        notes: "",
       });
       setSelectedImageFiles([]);
       setAttrValues({ size: [], color: [], gender: [], neckType: [], pattern: [] });
@@ -1658,6 +1701,187 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
                     <div className="w-14 h-7 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-primary"></div>
                   </label>
                 </div>
+
+                {/* Customization Configuration Panel — shown when toggle is ON */}
+                {formData.customizable && (
+                  <div className="mt-4 p-5 bg-amber-50/60 border border-amber-200 rounded-2xl space-y-5 animate-in slide-in-from-top-2 duration-300">
+                    <h4 className="text-sm font-bold text-amber-900 uppercase tracking-wider">Customization Preferences</h4>
+
+                    {/* Image Source */}
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-gray-800">Image Source</label>
+                      <p className="text-xs text-gray-500">How the customer provides their design image</p>
+                      <div className="flex flex-wrap gap-2">
+                        {([
+                          { value: "customer_upload", label: "Customer Uploads" },
+                          { value: "stock_selection", label: "Pick from Stock" },
+                          { value: "both", label: "Both Options" },
+                        ] as const).map((opt) => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => setCustomizationConfig({ ...customizationConfig, imageSource: opt.value })}
+                            className={`px-4 py-2 rounded-full text-sm font-medium border transition-all ${
+                              customizationConfig.imageSource === opt.value
+                                ? "bg-primary text-white border-primary"
+                                : "bg-white text-gray-700 border-gray-300 hover:border-primary"
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Upload Formats */}
+                    {(customizationConfig.imageSource === "customer_upload" || customizationConfig.imageSource === "both") && (
+                      <div className="space-y-2">
+                        <label className="block text-sm font-semibold text-gray-800">Accepted Upload Formats</label>
+                        <div className="flex flex-wrap gap-2">
+                          {["pdf", "png", "jpg", "svg", "webp", "tiff"].map((fmt) => (
+                            <label key={fmt} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border bg-white text-sm cursor-pointer hover:border-primary transition-all">
+                              <input
+                                type="checkbox"
+                                checked={customizationConfig.uploadFormats.includes(fmt)}
+                                onChange={(e) => {
+                                  const updated = e.target.checked
+                                    ? [...customizationConfig.uploadFormats, fmt]
+                                    : customizationConfig.uploadFormats.filter((f) => f !== fmt);
+                                  setCustomizationConfig({ ...customizationConfig, uploadFormats: updated });
+                                }}
+                                className="rounded border-gray-300 text-primary focus:ring-primary"
+                              />
+                              <span className="uppercase font-medium">{fmt}</span>
+                            </label>
+                          ))}
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 mt-2">
+                          <div>
+                            <label className="block text-xs text-gray-600 mb-1">Min Resolution (DPI)</label>
+                            <Input
+                              type="number"
+                              value={customizationConfig.minResolutionDPI}
+                              onChange={(e) => setCustomizationConfig({ ...customizationConfig, minResolutionDPI: parseInt(e.target.value) || 300 })}
+                              className="h-10 rounded-xl"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-600 mb-1">Max File Size (MB)</label>
+                            <Input
+                              type="number"
+                              value={customizationConfig.maxFileSizeMB}
+                              onChange={(e) => setCustomizationConfig({ ...customizationConfig, maxFileSizeMB: parseInt(e.target.value) || 25 })}
+                              className="h-10 rounded-xl"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Size Constraints */}
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-gray-800">Size Configuration</label>
+                      <div className="flex items-center gap-3 mb-2">
+                        <span className="text-xs text-gray-600">Unit:</span>
+                        {(["inches", "cm", "both"] as const).map((unit) => (
+                          <button
+                            key={unit}
+                            type="button"
+                            onClick={() => setCustomizationConfig({ ...customizationConfig, sizeUnit: unit })}
+                            className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${
+                              customizationConfig.sizeUnit === unit
+                                ? "bg-primary text-white border-primary"
+                                : "bg-white text-gray-600 border-gray-300 hover:border-primary"
+                            }`}
+                          >
+                            {unit === "both" ? "Inches & CM" : unit.charAt(0).toUpperCase() + unit.slice(1)}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">Max Width ({customizationConfig.sizeUnit === "both" ? "in" : customizationConfig.sizeUnit})</label>
+                          <Input
+                            type="number"
+                            placeholder="e.g. 12"
+                            value={customizationConfig.maxWidth}
+                            onChange={(e) => setCustomizationConfig({ ...customizationConfig, maxWidth: e.target.value })}
+                            className="h-10 rounded-xl"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">Max Height ({customizationConfig.sizeUnit === "both" ? "in" : customizationConfig.sizeUnit})</label>
+                          <Input
+                            type="number"
+                            placeholder="e.g. 12"
+                            value={customizationConfig.maxHeight}
+                            onChange={(e) => setCustomizationConfig({ ...customizationConfig, maxHeight: e.target.value })}
+                            className="h-10 rounded-xl"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Position Options */}
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-gray-800">Position Options</label>
+                      <p className="text-xs text-gray-500">Where the customization can be placed on the product</p>
+                      <div className="flex flex-wrap gap-2">
+                        {["front-center", "back-center", "left-chest", "right-chest", "left-sleeve", "right-sleeve", "full-back", "collar", "hem"].map((pos) => (
+                          <label key={pos} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border bg-white text-sm cursor-pointer hover:border-primary transition-all">
+                            <input
+                              type="checkbox"
+                              checked={customizationConfig.positions.includes(pos)}
+                              onChange={(e) => {
+                                const updated = e.target.checked
+                                  ? [...customizationConfig.positions, pos]
+                                  : customizationConfig.positions.filter((p) => p !== pos);
+                                setCustomizationConfig({ ...customizationConfig, positions: updated });
+                              }}
+                              className="rounded border-gray-300 text-primary focus:ring-primary"
+                            />
+                            <span className="capitalize">{pos.replace("-", " ")}</span>
+                          </label>
+                        ))}
+                      </div>
+                      <label className="flex items-center gap-2 mt-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={customizationConfig.allowCustomPosition}
+                          onChange={(e) => setCustomizationConfig({ ...customizationConfig, allowCustomPosition: e.target.checked })}
+                          className="rounded border-gray-300 text-primary focus:ring-primary"
+                        />
+                        <span className="text-sm text-gray-700">Allow customer to specify custom position</span>
+                      </label>
+                    </div>
+
+                    {/* Extra Charge */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-800 mb-1">Extra Charge (₹)</label>
+                        <Input
+                          type="number"
+                          placeholder="0"
+                          value={customizationConfig.extraCharge}
+                          onChange={(e) => setCustomizationConfig({ ...customizationConfig, extraCharge: e.target.value })}
+                          className="h-10 rounded-xl"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Studio Notes */}
+                    <div className="space-y-1">
+                      <label className="block text-sm font-semibold text-gray-800">Studio Notes (Internal)</label>
+                      <p className="text-xs text-gray-500">Instructions for the scratch-build studio team</p>
+                      <textarea
+                        value={customizationConfig.notes}
+                        onChange={(e) => setCustomizationConfig({ ...customizationConfig, notes: e.target.value })}
+                        placeholder="e.g. Use waterproof thread for outdoor items, handle HD PDF at 300 DPI minimum..."
+                        className="w-full h-20 px-3 py-2 text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
+                      />
+                    </div>
+                  </div>
+                )}
 
                 <div className="pt-8">
                   <Button 

@@ -106,6 +106,7 @@ async function refundOrder(req, res, next) {
 const EDITABLE_FIELDS = [
   "name", "description", "price", "category", "subCategory",
   "size", "color", "gender", "neckType", "pattern",
+  "customizable", "customizationConfig",
   "sizes", "colors", "genders", "neckTypes", "patterns",
   "image", "images", "galleryImages", "reorderPoint", "customizable",
 ];
