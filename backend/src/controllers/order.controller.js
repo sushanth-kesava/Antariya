@@ -348,6 +348,10 @@ async function createOrder(req, res, next) {
           } else if (coupon.discountType === "free_shipping") {
             couponFreeShipping = true;
           }
+          // If coupon has freeDelivery flag, waive shipping regardless of discount type
+          if (coupon.freeDelivery) {
+            couponFreeShipping = true;
+          }
           // Never discount more than subtotal (paise)
           if (couponDiscount > subtotalPaise) couponDiscount = subtotalPaise;
           // Convert discount from paise to rupees

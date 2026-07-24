@@ -24,6 +24,7 @@ export type Coupon = {
   heroBannerText: string;
   heroBannerColor: string;
   applicableCategories: string[];
+  freeDelivery: boolean;
   active: boolean;
   isValid: boolean;
   createdBy: string;
@@ -61,6 +62,7 @@ export type CreateCouponPayload = {
   heroBannerText?: string;
   heroBannerColor?: string;
   applicableCategories?: string[];
+  freeDelivery?: boolean;
 };
 
 // ─── Public: Get hero coupons for homepage ───────────────────────────────────

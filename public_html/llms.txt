@@ -1,0 +1,33 @@
+# Antariya
+
+> Antariya is a premium Indian contemporary fashion label blending streetwear edge with luxury embroidery craft.
+
+## About
+
+Antariya designs and sells premium embroidered apparel — tees, hoodies, and accessories — that fuse traditional Indian craft with modern streetwear aesthetics. Based in India, shipping nationwide.
+
+## Pages
+
+- [Home](https://antariyaofficial.com/)
+- [Our Story](https://antariyaofficial.com/story)
+- [Products](https://antariyaofficial.com/products)
+- [Contact](https://antariyaofficial.com/contact)
+- [Wishlist](https://antariyaofficial.com/wishlist)
+- [Cart](https://antariyaofficial.com/cart)
+
+## Legal
+
+- [Privacy Policy](https://antariyaofficial.com/legal/privacy)
+- [Terms & Conditions](https://antariyaofficial.com/legal/terms)
+- [Shipping Policy](https://antariyaofficial.com/legal/shipping)
+- [Returns & Refunds](https://antariyaofficial.com/legal/returns)
+
+## API
+
+The API is private and not intended for external consumption.
+
+## Contact
+
+- Website: https://antariyaofficial.com
+- Instagram: [@antariya.official](https://www.instagram.com/antariya.official/)
+- Email: support@antariyaofficial.com

@@ -134,8 +134,8 @@ export function Navbar() {
           >
             <Search className="h-5 w-5" />
           </Button>
-          
-          <Link href="/wishlist">
+
+          <Link href="/wishlist" aria-label="Wishlist">
             <Button variant="ghost" size="icon" className="relative hidden sm:flex rounded-full" aria-label="Wishlist">
               <Heart className="h-5 w-5" />
             </Button>

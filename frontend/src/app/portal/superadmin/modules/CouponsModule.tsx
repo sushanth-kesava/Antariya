@@ -78,6 +78,8 @@ export function CouponsModule({ token, has }: CouponsModuleProps) {
     showOnHero: false,
     heroBannerText: "",
     heroBannerColor: "#1a1a1a",
+    freeDelivery: false,
+    freeDelivery: false,
   });
 
   useEffect(() => {
@@ -404,6 +406,20 @@ export function CouponsModule({ token, has }: CouponsModuleProps) {
               )}
             </div>
 
+            {/* Free Delivery Toggle */}
+            <div className="rounded-lg border p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium flex items-center gap-2"><Truck className="h-4 w-4" /> Free Delivery</p>
+                  <p className="text-sm text-muted-foreground">Waive delivery charges when this coupon is applied</p>
+                </div>
+                <Switch
+                  checked={form.freeDelivery || false}
+                  onCheckedChange={(checked) => setForm({ ...form, freeDelivery: checked })}
+                />
+              </div>
+            </div>
+
             {/* Actions */}
             <div className="flex gap-3 pt-2">
               <Button onClick={handleCreate} disabled={saving}>
@@ -453,6 +469,7 @@ export function CouponsModule({ token, has }: CouponsModuleProps) {
                         {isNotStarted && <Badge variant="secondary">Scheduled</Badge>}
                         {!coupon.active && <Badge variant="outline">Disabled</Badge>}
                         {coupon.showOnHero && <Badge variant="secondary">🏠 Hero</Badge>}
+                        {coupon.freeDelivery && <Badge variant="secondary">🚚 Free Delivery</Badge>}
                       </div>
                       <p className="font-medium">{coupon.title}</p>
                       <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">

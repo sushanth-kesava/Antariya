@@ -141,7 +141,7 @@ img {
   aspect-ratio: 1 / 1;
   background:
     linear-gradient(130deg, rgba(17, 17, 17, 0.46), rgba(17, 17, 17, 0.15)),
-    url("../images/homepage.png");
+    url("../images/homepage.webp");
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;

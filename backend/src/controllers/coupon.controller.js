@@ -247,7 +247,7 @@ async function validateCoupon(req, res, next) {
         discountType: coupon.discountType,
         discountValue: coupon.discountValue,
         discount, // actual discount amount in paise
-        freeShipping: coupon.discountType === "free_shipping",
+        freeShipping: coupon.discountType === "free_shipping" || coupon.freeDelivery === true,
       },
     });
   } catch (error) {
