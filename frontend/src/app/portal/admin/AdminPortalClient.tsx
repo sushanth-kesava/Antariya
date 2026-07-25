@@ -30,6 +30,10 @@ import {
   Pencil,
   ScanBarcode,
   Download,
+  Store,
+  Globe,
+  TrendingUp,
+  IndianRupee,
 } from "lucide-react";
 import {
   createProductOnBackend,
@@ -56,6 +60,10 @@ import {
   getAdminDashboardFromBackend,
   updateAdminOrderStatusOnBackend,
 } from "@/lib/api/orders";
+import {
+  UnifiedOperationsPayload,
+  getUnifiedOperationsStatsFromBackend,
+} from "@/lib/api/unified-stats";
 import { useInventoryUpdates } from "@/hooks/use-inventory-updates";
 import { useInventoryAlerts } from "@/hooks/use-inventory-alerts";
 import { getApiBaseUrl } from "@/lib/api/base-url";
@@ -100,6 +108,9 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
   const [loadingModerationActivity, setLoadingModerationActivity] = useState(false);
   const [moderationActivityError, setModerationActivityError] = useState<string | null>(null);
   const [dashboardData, setDashboardData] = useState<AdminDashboardPayload | null>(null);
+  const [unifiedStats, setUnifiedStats] = useState<UnifiedOperationsPayload | null>(null);
+  const [loadingUnifiedStats, setLoadingUnifiedStats] = useState(false);
+  const [unifiedStatsError, setUnifiedStatsError] = useState<string | null>(null);
   const [inventory, setInventory] = useState<InventoryReport | null>(null);
   const [loadingInventory, setLoadingInventory] = useState(false);
   const [stockHistory, setStockHistory] = useState<StockAdjustmentEntry[]>([]);
@@ -283,6 +294,15 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
             setDashboardError("Dashboard data could not be loaded right now. Use Refresh to retry.");
           })
           .finally(() => setLoadingDashboard(false));
+
+        setLoadingUnifiedStats(true);
+        getUnifiedOperationsStatsFromBackend(sessionToken)
+          .then((stats) => setUnifiedStats(stats))
+          .catch((err) => {
+            console.error("Failed to load unified operations stats", err);
+            setUnifiedStatsError("Unified analytics could not be loaded. Use Refresh to retry.");
+          })
+          .finally(() => setLoadingUnifiedStats(false));
 
         setLoadingInventory(true);
         getInventoryReportFromBackend(sessionToken)
@@ -553,6 +573,23 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
       setDashboardError(err instanceof Error ? err.message : "Failed to load admin dashboard.");
     } finally {
       setLoadingDashboard(false);
+    }
+  };
+
+  const loadUnifiedStats = async () => {
+    if (!authToken) {
+      return;
+    }
+
+    try {
+      setUnifiedStatsError(null);
+      setLoadingUnifiedStats(true);
+      const stats = await getUnifiedOperationsStatsFromBackend(authToken);
+      setUnifiedStats(stats);
+    } catch (err) {
+      setUnifiedStatsError(err instanceof Error ? err.message : "Failed to load unified analytics.");
+    } finally {
+      setLoadingUnifiedStats(false);
     }
   };
 
@@ -1040,61 +1077,182 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
               <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                 <div>
                   <CardTitle className="text-xl">Live Business Snapshot</CardTitle>
-                  <CardDescription>Admin metrics inspired by customer dashboard depth, focused on store operations.</CardDescription>
+                  <CardDescription>Unified analytics combining online marketplace and offline POS sales.</CardDescription>
                 </div>
                 <Button
                   type="button"
                   variant="secondary"
                   className="h-10 rounded-xl"
-                  onClick={() => loadDashboard()}
-                  disabled={loadingDashboard}
+                  onClick={() => { loadDashboard(); loadUnifiedStats(); }}
+                  disabled={loadingDashboard || loadingUnifiedStats}
                 >
-                  {loadingDashboard ? <Loader2 className="h-4 w-4 animate-spin" /> : "Refresh"}
+                  {(loadingDashboard || loadingUnifiedStats) ? <Loader2 className="h-4 w-4 animate-spin" /> : "Refresh"}
                 </Button>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {dashboardError ? (
-                  <div className="p-3 rounded-xl border border-red-200 bg-red-50 text-red-700 text-sm">{dashboardError}</div>
+              <CardContent className="space-y-6">
+                {(dashboardError || unifiedStatsError) ? (
+                  <div className="p-3 rounded-xl border border-red-200 bg-red-50 text-red-700 text-sm">{dashboardError || unifiedStatsError}</div>
                 ) : null}
 
+                {/* Revenue Overview Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                   <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4">
-                    <p className="text-xs uppercase tracking-wide text-emerald-700 font-semibold">Revenue</p>
+                    <p className="text-xs uppercase tracking-wide text-emerald-700 font-semibold">Total Revenue</p>
                     <p className="text-2xl font-black text-emerald-900 mt-1 flex items-center gap-2">
-                      {formatINR(Number(dashboardData?.summary.totalRevenue || 0))}
+                      {formatINR(Number(unifiedStats?.revenue.total || 0))}
                     </p>
-                    <p className="text-sm text-emerald-700 mt-1">AOV {formatINR(Number(dashboardData?.summary.averageOrderValue || 0))}</p>
+                    <div className="flex items-center gap-3 mt-2 text-xs text-emerald-700">
+                      <span className="flex items-center gap-1"><Globe className="h-3 w-3" /> {formatINR(Number(unifiedStats?.revenue.marketplace || 0))}</span>
+                      <span className="flex items-center gap-1"><Store className="h-3 w-3" /> {formatINR(Number(unifiedStats?.revenue.pos || 0))}</span>
+                    </div>
                   </div>
 
                   <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
-                    <p className="text-xs uppercase tracking-wide text-blue-700 font-semibold">Orders</p>
+                    <p className="text-xs uppercase tracking-wide text-blue-700 font-semibold">Today&apos;s Revenue</p>
                     <p className="text-2xl font-black text-blue-900 mt-1 flex items-center gap-2">
-                      <ShoppingCart className="h-5 w-5" />
-                      {dashboardData?.summary.totalOrders || 0}
+                      <IndianRupee className="h-5 w-5" />
+                      {formatINR(Number(unifiedStats?.revenue.today || 0))}
                     </p>
-                    <p className="text-sm text-blue-700 mt-1">{dashboardData?.summary.todayOrders || 0} placed today</p>
+                    <p className="text-sm text-blue-700 mt-1">{unifiedStats?.orders.today || 0} orders today</p>
                   </div>
 
                   <div className="rounded-2xl border border-violet-100 bg-violet-50/70 p-4">
-                    <p className="text-xs uppercase tracking-wide text-violet-700 font-semibold">Customers</p>
-                    <p className="text-2xl font-black text-violet-900 mt-1 flex items-center gap-2">
-                      <Users className="h-5 w-5" />
-                      {dashboardData?.summary.customers || 0}
+                    <p className="text-xs uppercase tracking-wide text-violet-700 font-semibold">Weekly Revenue</p>
+                    <p className="text-2xl font-black text-violet-900 mt-1">
+                      {formatINR(Number(unifiedStats?.revenue.week || 0))}
                     </p>
-                    <p className="text-sm text-violet-700 mt-1">Active shopper accounts</p>
+                    <p className="text-sm text-violet-700 mt-1">{unifiedStats?.orders.week || 0} orders this week</p>
                   </div>
 
-                  <div className="rounded-2xl border border-rose-100 bg-rose-50/70 p-4">
-                    <p className="text-xs uppercase tracking-wide text-rose-700 font-semibold">Attention Needed</p>
-                    <p className="text-2xl font-black text-rose-900 mt-1 flex items-center gap-2">
-                      <ClipboardCheck className="h-5 w-5" />
-                      {(dashboardData?.summary.lowStockProducts || 0) + (dashboardData?.summary.pendingReviews || 0)}
+                  <div className="rounded-2xl border border-amber-100 bg-amber-50/70 p-4">
+                    <p className="text-xs uppercase tracking-wide text-amber-700 font-semibold">Monthly Revenue</p>
+                    <p className="text-2xl font-black text-amber-900 mt-1">
+                      {formatINR(Number(unifiedStats?.revenue.month || 0))}
                     </p>
-                    <p className="text-sm text-rose-700 mt-1">
-                      {dashboardData?.summary.lowStockProducts || 0} low stock, {dashboardData?.summary.pendingReviews || 0} pending reviews
-                    </p>
+                    <p className="text-sm text-amber-700 mt-1">{unifiedStats?.orders.month || 0} orders this month</p>
                   </div>
                 </div>
+
+                {/* Order Metrics Row */}
+                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+                  <div className="rounded-xl border border-border bg-card p-3">
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Total Orders</p>
+                    <p className="text-xl font-black mt-1 flex items-center gap-1">
+                      <ShoppingCart className="h-4 w-4 text-blue-600" />
+                      {unifiedStats?.orders.total || 0}
+                    </p>
+                    <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground">
+                      <span className="flex items-center gap-0.5"><Globe className="h-2.5 w-2.5" />{unifiedStats?.orders.marketplace || 0}</span>
+                      <span className="flex items-center gap-0.5"><Store className="h-2.5 w-2.5" />{unifiedStats?.orders.pos || 0}</span>
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-border bg-card p-3">
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Today&apos;s Orders</p>
+                    <p className="text-xl font-black mt-1">{unifiedStats?.orders.today || 0}</p>
+                  </div>
+                  <div className="rounded-xl border border-yellow-200 bg-yellow-50 p-3">
+                    <p className="text-[11px] uppercase tracking-wide text-yellow-700 font-semibold">Processing</p>
+                    <p className="text-xl font-black mt-1 text-yellow-800">{unifiedStats?.statusBreakdown.Processing || dashboardData?.statusBreakdown.Processing || 0}</p>
+                  </div>
+                  <div className="rounded-xl border border-blue-200 bg-blue-50 p-3">
+                    <p className="text-[11px] uppercase tracking-wide text-blue-700 font-semibold">Shipped</p>
+                    <p className="text-xl font-black mt-1 text-blue-800">{unifiedStats?.statusBreakdown.Shipped || dashboardData?.statusBreakdown.Shipped || 0}</p>
+                  </div>
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                    <p className="text-[11px] uppercase tracking-wide text-emerald-700 font-semibold">Delivered</p>
+                    <p className="text-xl font-black mt-1 text-emerald-800">{unifiedStats?.statusBreakdown.Delivered || dashboardData?.statusBreakdown.Delivered || 0}</p>
+                  </div>
+                  <div className="rounded-xl border border-rose-200 bg-rose-50 p-3">
+                    <p className="text-[11px] uppercase tracking-wide text-rose-700 font-semibold">Cancelled</p>
+                    <p className="text-xl font-black mt-1 text-rose-800">{unifiedStats?.statusBreakdown.Cancelled || dashboardData?.statusBreakdown.Cancelled || 0}</p>
+                  </div>
+                </div>
+
+                {/* Channel Breakdown + AOV */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="rounded-2xl border border-indigo-100 bg-indigo-50/50 p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Globe className="h-4 w-4 text-indigo-600" />
+                      <p className="text-sm font-bold text-indigo-900">Online Marketplace</p>
+                    </div>
+                    <p className="text-lg font-black text-indigo-900">{formatINR(Number(unifiedStats?.breakdown.marketplace.revenue || 0))}</p>
+                    <p className="text-xs text-indigo-700 mt-1">{unifiedStats?.breakdown.marketplace.orders || 0} total orders</p>
+                    <p className="text-xs text-indigo-600 mt-0.5">{unifiedStats?.breakdown.marketplace.todayOrders || 0} today · {formatINR(Number(unifiedStats?.breakdown.marketplace.todayRevenue || 0))}</p>
+                  </div>
+
+                  <div className="rounded-2xl border border-orange-100 bg-orange-50/50 p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Store className="h-4 w-4 text-orange-600" />
+                      <p className="text-sm font-bold text-orange-900">POS / In-Store</p>
+                    </div>
+                    <p className="text-lg font-black text-orange-900">{formatINR(Number(unifiedStats?.breakdown.pos.revenue || 0))}</p>
+                    <p className="text-xs text-orange-700 mt-1">{unifiedStats?.breakdown.pos.orders || 0} total orders</p>
+                    <p className="text-xs text-orange-600 mt-0.5">{unifiedStats?.breakdown.pos.todayOrders || 0} today · {formatINR(Number(unifiedStats?.breakdown.pos.todayRevenue || 0))}</p>
+                  </div>
+
+                  <div className="rounded-2xl border border-teal-100 bg-teal-50/50 p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <TrendingUp className="h-4 w-4 text-teal-600" />
+                      <p className="text-sm font-bold text-teal-900">Performance</p>
+                    </div>
+                    <p className="text-lg font-black text-teal-900">{formatINR(Number(unifiedStats?.averageOrderValue || 0))}</p>
+                    <p className="text-xs text-teal-700 mt-1">Average Order Value</p>
+                    <p className="text-xs text-teal-600 mt-0.5">{dashboardData?.summary.customers || 0} customers · {dashboardData?.summary.wishlistItems || 0} wishlisted</p>
+                  </div>
+                </div>
+
+                {/* Revenue Trend (last 7 days) */}
+                {unifiedStats?.revenueTrend && unifiedStats.revenueTrend.length > 0 && (
+                  <div className="rounded-2xl border border-border bg-card p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <p className="text-sm font-bold">Revenue Trend (Last 7 Days)</p>
+                        <p className="text-xs text-muted-foreground">Marketplace vs POS daily revenue</p>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      {unifiedStats.revenueTrend.map((day) => {
+                        const maxRevenue = Math.max(...unifiedStats.revenueTrend.map(d => d.totalRevenue), 1);
+                        const barWidth = (day.totalRevenue / maxRevenue) * 100;
+                        const mktPct = day.totalRevenue > 0 ? (day.marketplace / day.totalRevenue) * 100 : 0;
+                        return (
+                          <div key={day.date} className="flex items-center gap-3">
+                            <span className="text-xs text-muted-foreground w-20 shrink-0">{new Date(day.date + "T00:00:00").toLocaleDateString("en-IN", { weekday: "short", month: "short", day: "numeric" })}</span>
+                            <div className="flex-1 h-6 bg-gray-100 rounded-full overflow-hidden relative">
+                              <div className="absolute inset-y-0 left-0 flex rounded-full overflow-hidden" style={{ width: `${barWidth}%` }}>
+                                {mktPct > 0 && <div className="h-full bg-indigo-400" style={{ width: `${mktPct}%` }} />}
+                                {(100 - mktPct) > 0 && <div className="h-full bg-orange-400" style={{ width: `${100 - mktPct}%` }} />}
+                              </div>
+                            </div>
+                            <span className="text-xs font-semibold w-24 text-right shrink-0">{formatINR(day.totalRevenue)}</span>
+                          </div>
+                        );
+                      })}
+                      <div className="flex items-center gap-4 mt-2 text-[11px] text-muted-foreground">
+                        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-indigo-400 inline-block" /> Marketplace</span>
+                        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-orange-400 inline-block" /> POS</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Top Selling Products */}
+                {unifiedStats?.topSellingProducts && unifiedStats.topSellingProducts.length > 0 && (
+                  <div className="rounded-2xl border border-border bg-card p-4">
+                    <p className="text-sm font-bold mb-3">Top Selling Products</p>
+                    <div className="space-y-2">
+                      {unifiedStats.topSellingProducts.map((product, idx) => (
+                        <div key={`${product.name}-${idx}`} className="flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2">
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold truncate">{product.name}</p>
+                            <p className="text-xs text-muted-foreground">{product.totalQty} units sold</p>
+                          </div>
+                          <p className="text-sm font-bold text-emerald-700 shrink-0">{formatINR(product.totalRevenue)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Inventory Snapshot */}
                 <div className="rounded-2xl border border-border bg-card p-4">
@@ -1297,12 +1455,13 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
                   )}
                 </div>
 
+                {/* Recent Orders (Unified: Online + POS) */}
                 <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
                   <div className="xl:col-span-2 rounded-2xl border border-gray-100 bg-gray-50/60 p-4">
                     <div className="flex flex-col gap-3 mb-3">
                       <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm font-semibold text-gray-800">Recent Orders</p>
-                        <span className="text-xs text-gray-500">Latest 8</span>
+                        <p className="text-sm font-semibold text-gray-800">Recent Orders (All Channels)</p>
+                        <span className="text-xs text-gray-500">Latest 12</span>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                         <select
@@ -1338,15 +1497,70 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
                       </div>
                     </div>
 
-                    {!dashboardData?.recentOrders?.length ? (
+                    {/* Unified recent orders from the new endpoint */}
+                    {unifiedStats?.recentOrders && unifiedStats.recentOrders.length > 0 ? (
+                      <div className="space-y-2">
+                        {unifiedStats.recentOrders
+                          .filter((order) => {
+                            const matchesStatus = orderStatusFilter === "all" ? true : order.status === orderStatusFilter || (orderStatusFilter === "Delivered" && order.status === "completed");
+                            const searchValue = orderSearch.trim().toLowerCase();
+                            const matchesSearch = searchValue.length === 0 ? true : [order.id, order.customer, order.status, order.invoiceNumber || ""].join(" ").toLowerCase().includes(searchValue);
+                            return matchesStatus && matchesSearch;
+                          })
+                          .slice(0, 8)
+                          .map((order) => (
+                          <div key={order.id} className="rounded-xl border border-white bg-white px-3 py-2 flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2 min-w-0">
+                              {order.source === "marketplace" ? (
+                                <span className="shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-indigo-100" title="Online Order">
+                                  <Globe className="h-3.5 w-3.5 text-indigo-600" />
+                                </span>
+                              ) : (
+                                <span className="shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-orange-100" title="POS Sale">
+                                  <Store className="h-3.5 w-3.5 text-orange-600" />
+                                </span>
+                              )}
+                              <div className="min-w-0">
+                                <p className="text-sm font-semibold text-gray-900 truncate">{order.customer}</p>
+                                <p className="text-xs text-gray-500">{formatIndianDateTime(order.createdAt)} • {order.itemCount} items • {order.source === "pos" ? order.invoiceNumber || "POS" : "Online"}</p>
+                              </div>
+                            </div>
+                            <div className="flex flex-col items-end gap-1 text-right shrink-0">
+                              <p className="text-sm font-bold text-gray-900">{formatINR(Number(order.total || 0))}</p>
+                              <div className="flex items-center gap-1.5">
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                                  order.status === "Processing" ? "bg-yellow-100 text-yellow-800" :
+                                  order.status === "Shipped" ? "bg-blue-100 text-blue-800" :
+                                  order.status === "Delivered" || order.status === "completed" ? "bg-emerald-100 text-emerald-800" :
+                                  order.status === "Cancelled" || order.status === "cancelled" ? "bg-rose-100 text-rose-800" :
+                                  "bg-gray-100 text-gray-800"
+                                }`}>
+                                  {order.status === "completed" ? "Delivered" : order.status}
+                                </span>
+                                <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
+                                  order.paymentStatus === "paid" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+                                }`}>
+                                  {order.paymentStatus}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : !dashboardData?.recentOrders?.length ? (
                       <p className="text-sm text-muted-foreground">No orders yet.</p>
                     ) : (
                       <div className="space-y-2">
                         {visibleOrders.slice(0, 5).map((order) => (
                           <div key={order.id} className="rounded-xl border border-white bg-white px-3 py-2 flex items-center justify-between gap-3">
-                            <div>
-                              <p className="text-sm font-semibold text-gray-900">{order.userEmail || "Customer"}</p>
-                              <p className="text-xs text-gray-500">{formatIndianDateTime(order.createdAt)} • {order.items?.length || 0} items</p>
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-indigo-100" title="Online Order">
+                                <Globe className="h-3.5 w-3.5 text-indigo-600" />
+                              </span>
+                              <div>
+                                <p className="text-sm font-semibold text-gray-900">{order.userEmail || "Customer"}</p>
+                                <p className="text-xs text-gray-500">{formatIndianDateTime(order.createdAt)} • {order.items?.length || 0} items</p>
+                              </div>
                             </div>
                             <div className="flex flex-col items-end gap-2 text-right">
                               <div>
@@ -1383,19 +1597,23 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
                     <div className="space-y-2 text-sm">
                       <div className="flex items-center justify-between rounded-lg bg-white px-3 py-2 border border-gray-100">
                         <span>Processing</span>
-                        <span className="font-bold">{dashboardData?.statusBreakdown.Processing || 0}</span>
+                        <span className="font-bold">{unifiedStats?.statusBreakdown.Processing || dashboardData?.statusBreakdown.Processing || 0}</span>
                       </div>
                       <div className="flex items-center justify-between rounded-lg bg-white px-3 py-2 border border-gray-100">
                         <span>Shipped</span>
-                        <span className="font-bold">{dashboardData?.statusBreakdown.Shipped || 0}</span>
+                        <span className="font-bold">{unifiedStats?.statusBreakdown.Shipped || dashboardData?.statusBreakdown.Shipped || 0}</span>
                       </div>
                       <div className="flex items-center justify-between rounded-lg bg-white px-3 py-2 border border-gray-100">
                         <span>Delivered</span>
-                        <span className="font-bold">{dashboardData?.statusBreakdown.Delivered || 0}</span>
+                        <span className="font-bold">{unifiedStats?.statusBreakdown.Delivered || dashboardData?.statusBreakdown.Delivered || 0}</span>
                       </div>
                       <div className="flex items-center justify-between rounded-lg bg-white px-3 py-2 border border-gray-100">
                         <span>Cancelled</span>
-                        <span className="font-bold">{dashboardData?.statusBreakdown.Cancelled || 0}</span>
+                        <span className="font-bold">{unifiedStats?.statusBreakdown.Cancelled || dashboardData?.statusBreakdown.Cancelled || 0}</span>
+                      </div>
+                      <div className="flex items-center justify-between rounded-lg bg-orange-50 px-3 py-2 border border-orange-100">
+                        <span className="flex items-center gap-1"><Store className="h-3.5 w-3.5 text-orange-600" />POS Completed</span>
+                        <span className="font-bold text-orange-800">{unifiedStats?.posCompleted || 0}</span>
                       </div>
                     </div>
 
@@ -1406,6 +1624,17 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
                         {dashboardData?.summary.wishlistItems || 0}
                       </p>
                       <p className="text-xs text-gray-500 mt-1">Products currently wishlisted</p>
+                    </div>
+
+                    <div className="rounded-xl border border-dashed border-gray-300 bg-white px-3 py-3">
+                      <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Attention Needed</p>
+                      <p className="text-lg font-black text-gray-900 mt-1 flex items-center gap-2">
+                        <ClipboardCheck className="h-4 w-4 text-rose-500" />
+                        {(dashboardData?.summary.lowStockProducts || 0) + (dashboardData?.summary.pendingReviews || 0)}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {dashboardData?.summary.lowStockProducts || 0} low stock, {dashboardData?.summary.pendingReviews || 0} pending reviews
+                      </p>
                     </div>
                   </div>
                 </div>

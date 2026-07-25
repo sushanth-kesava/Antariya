@@ -7,7 +7,6 @@ import { LiveProductScroller } from "@/components/live-product-scroller";
 type HeroMetrics = {
   products: number;
   dealers: number;
-  categories: number;
   orders: number;
 };
 
@@ -68,11 +67,6 @@ export function Hero({ metrics, featuredProduct }: HeroProps) {
               <div className="space-y-1">
                 <p className="text-2xl font-bold">{formatMetric(metrics.orders)}</p>
                 <p className="text-sm text-muted-foreground">Orders</p>
-              </div>
-              <div className="w-px h-8 bg-border" />
-              <div className="space-y-1">
-                <p className="text-2xl font-bold">{formatMetric(metrics.categories)}</p>
-                <p className="text-sm text-muted-foreground">Categories</p>
               </div>
             </div>
           </div>

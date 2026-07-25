@@ -20,20 +20,19 @@ const API_BASE_URL = getApiBaseUrl();
 type HeroMetrics = {
   products: number;
   dealers: number;
-  categories: number;
   orders: number;
 };
 
 export default function Home() {
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [heroProduct, setHeroProduct] = useState<Product | null>(null);
-  const [heroMetrics, setHeroMetrics] = useState<HeroMetrics>({ products: 0, dealers: 0, categories: 0, orders: 0 });
+  const [heroMetrics, setHeroMetrics] = useState<HeroMetrics>({ products: 0, dealers: 0, orders: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchData() {
       try {
-        const [catalogResponse, statsResponse, layoutResponse] = await Promise.all([
+        const [catalogResponse, statsResponse] = await Promise.all([
           fetch(`${API_BASE_URL}/products/featured?limit=5`, { credentials: "include" }).then(async (response) => {
             const data = await response.json();
             if (!response.ok || !data?.success) {
@@ -51,20 +50,10 @@ export default function Home() {
 
             return data.stats as HeroMetrics;
           }),
-          fetch(`${API_BASE_URL}/products/marketplace?role=customer`, { credentials: "include" }).then(async (response) => {
-            const data = await response.json();
-
-            if (!response.ok || !data?.success) {
-              return [];
-            }
-
-            return (data.categories as string[]) || [];
-          }).catch(() => []),
         ]);
 
-        const { products, pagination } = catalogResponse;
+        const { products, pagination } = catalogResponse as { products: Product[]; pagination: { total: number; pages: number } };
         const liveProducts = products.length > 0 ? products : [];
-        const fetchedCategories = layoutResponse.length > 0 ? layoutResponse : Array.from(new Set(liveProducts.map((product) => product.category).filter(Boolean)));
 
         setFeaturedProducts(liveProducts.slice(0, 4));
         setHeroProduct(
@@ -81,7 +70,6 @@ export default function Home() {
         setHeroMetrics({
           products: statsResponse.products || pagination.total || liveProducts.length,
           dealers: statsResponse.dealers || new Set(liveProducts.map((product) => product.dealerId).filter(Boolean)).size,
-          categories: statsResponse.categories || fetchedCategories.length,
           orders: statsResponse.orders || 0,
         });
       } catch (error) {

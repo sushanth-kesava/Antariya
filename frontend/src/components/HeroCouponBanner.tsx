@@ -21,15 +21,6 @@ export function HeroCouponBanner() {
     });
   }, []);
 
-  // Auto-cycle every 4 seconds
-  useEffect(() => {
-    if (coupons.length <= 1) return;
-    const timer = setInterval(() => {
-      goNext();
-    }, 4000);
-    return () => clearInterval(timer);
-  }, [coupons.length, currentIndex]);
-
   const goNext = useCallback(() => {
     if (isAnimating || coupons.length <= 1) return;
     setIsAnimating(true);
@@ -49,6 +40,15 @@ export function HeroCouponBanner() {
       setIsAnimating(false);
     }, 300);
   }, [isAnimating, coupons.length]);
+
+  // Auto-cycle every 4 seconds (after goNext is defined)
+  useEffect(() => {
+    if (coupons.length <= 1) return;
+    const timer = setInterval(() => {
+      goNext();
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [coupons.length, goNext]);
 
   if (dismissed || coupons.length === 0) return null;
 

@@ -8,7 +8,7 @@ import {
   clearAuthSession,
   getPortalPathForRole,
   normalizeAppRole,
-  persistAuthSession,, isAuthenticated} from "@/lib/auth-session";
+  persistAuthSession, isAuthenticated} from "@/lib/auth-session";
 import { getMyAccess, ErpActor } from "@/lib/api/erp";
 import { ErpShell } from "./ErpShell";
 

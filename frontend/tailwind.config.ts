@@ -8,20 +8,15 @@ export default {
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
   ],
-  screens: {
-    'xs': '320px',
-    'sm': '640px',
-    'md': '768px',
-    'lg': '1024px',
-    'xl': '1280px',
-    '2xl': '1536px',
-  },
   theme: {
     extend: {
       fontFamily: {
         body: ['var(--font-inter)', 'sans-serif'],
         headline: ['var(--font-literata)', 'serif'],
         code: ['monospace'],
+      },
+      screens: {
+        'xs': '320px',
       },
       colors: {
         background: 'hsl(var(--background))',

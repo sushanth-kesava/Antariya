@@ -36,16 +36,19 @@ export const GENDER_CATEGORIES: GenderCategory[] = [
     label: "Men's",
     value: "Men",
     description: "T-shirts & apparel for him",
+    fallbackImage: "/images/categories/men.png",
   },
   {
     label: "Women's",
     value: "Women",
     description: "T-shirts & apparel for her",
+    fallbackImage: "/images/categories/women.png",
   },
   {
     label: "Unisex",
     value: "Unisex",
     description: "Styles for everyone",
+    fallbackImage: "/images/categories/unisex.png",
   },
   {
     // "All Products" is not a gender — an empty value clears the gender filter
@@ -53,6 +56,7 @@ export const GENDER_CATEGORIES: GenderCategory[] = [
     label: "All Products",
     value: "",
     description: "Browse the entire collection",
+    fallbackImage: "/images/categories/all.png",
   },
 ];
 
