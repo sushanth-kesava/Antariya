@@ -455,8 +455,11 @@ async function createOrder(req, res, next) {
             address: addressText,
           },
         });
+        console.log(`[Order] ✅ Order confirmation email SENT to ${req.auth.email} | Order: ${order._id}`);
       } catch (mailError) {
-        console.error("Failed to send invoice email:", mailError.message);
+        console.error(`[Order] ❌ Order confirmation email FAILED for ${req.auth.email} | Order: ${order._id}`);
+        console.error(`[Order] ❌ Error: ${mailError.message}`);
+        console.error(`[Order] ❌ Stack: ${mailError.stack}`);
       }
     })();
 
