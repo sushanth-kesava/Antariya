@@ -450,10 +450,17 @@ export default function CommonAuthPage({ mode }: { mode: AuthMode }) {
               onClick={() => googleAuth()}
               disabled={loading}
               variant="outline"
-              className="w-full h-12 rounded-full text-base font-bold"
+              className="w-full h-12 rounded-full text-base font-bold border-primary/30 hover:border-primary/60 hover:bg-primary/5"
             >
               Continue with Google
             </Button>
+
+            <p className="text-xs text-center text-muted-foreground">
+              <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-2.5 py-0.5 font-medium">
+                ✦ Recommended
+              </span>{" "}
+              — Faster, more secure, and gets you a welcome email instantly.
+            </p>
 
             <p className="text-sm text-muted-foreground text-center">
               {isSignup ? "Already have an account?" : "Need an account?"}{" "}

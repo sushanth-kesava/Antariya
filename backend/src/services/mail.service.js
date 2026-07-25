@@ -276,11 +276,7 @@ function wrapBrandedEmail({ title, bodyHtml, unsubscribeUrl }) {
                 <tr><td style="padding:8px;">
                   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #c9a96e;border-radius:4px;">
                     <tr><td align="center" style="padding:28px 24px;">
-                      <table role="presentation" cellpadding="0" cellspacing="0">
-                        <tr><td align="center" style="width:52px;height:52px;border:2px solid #c9a96e;border-radius:50%;">
-                          <span style="font-size:24px;font-weight:700;color:#c9a96e;font-family:Georgia,serif;line-height:48px;">A</span>
-                        </td></tr>
-                      </table>
+                      <img src="https://res.cloudinary.com/doefhzx01/image/upload/v1775491590/Antariya-icon__1_-removebg-preview_z1vqp1.png" alt="Antariya" width="52" height="52" style="display:block;width:52px;height:52px;border-radius:50%;border:2px solid #c9a96e;" />
                       <h1 style="margin:10px 0 0;font-size:22px;letter-spacing:0.15em;color:#ffffff;font-weight:400;font-family:Georgia,'Times New Roman',serif;text-transform:uppercase;">ANTARIYA</h1>
                       <p style="margin:6px 0 0;font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:#c9a96e;font-weight:400;">Premium Embroidery · Personalized For You</p>
                     </td></tr>
