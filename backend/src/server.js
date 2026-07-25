@@ -28,6 +28,7 @@ const hrRoutes = require("./routes/hr.routes");
 const supportRoutes = require("./routes/support.routes");
 const forecastRoutes = require("./routes/forecast.routes");
 const posRoutes = require("./routes/pos.routes");
+const mailTestRoutes = require("./routes/mailTest.routes");
 const { notFound, errorHandler } = require("./middleware/error.middleware");
 const { attachRealtime } = require("./services/realtime.service");
 const { extractCookieToken } = require("./middleware/cookie-auth.middleware");
@@ -120,6 +121,7 @@ app.use("/api/hr", hrRoutes);
 app.use("/api/support", supportRoutes);
 app.use("/api/forecast", forecastRoutes);
 app.use("/api/pos", posRoutes);
+app.use("/api/admin/mail", mailTestRoutes);
 app.use(notFound);
 app.use(errorHandler);
 
