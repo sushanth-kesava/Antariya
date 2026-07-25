@@ -111,7 +111,6 @@ const physicalInventoryCountSchema = new mongoose.Schema({
 });
 
 physicalInventoryCountSchema.index({ warehouseId: 1, status: 1 });
-physicalInventoryCountSchema.index({ countNumber: 1 });
 physicalInventoryCountSchema.index({ scheduledDate: 1 });
 physicalInventoryCountSchema.index({ 'items.productId': 1 });
 
