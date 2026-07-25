@@ -9,9 +9,9 @@
   ],
   "scripts": {
     "dev": "concurrently \"npm --prefix frontend run dev\" \"npm --prefix backend run dev\"",
-    "build": "npm --prefix frontend run build && npm --prefix backend run build 2>/dev/null || true",
+    "build": "npm --prefix frontend run build && npm --prefix backend run build",
     "build:frontend": "npm --prefix frontend run build",
-    "build:backend": "npm --prefix backend run build 2>/dev/null || true",
+    "build:backend": "npm --prefix backend run build",
     "start": "concurrently \"npm --prefix frontend run start\" \"npm --prefix backend run start\"",
     "start:frontend": "npm --prefix frontend run start",
     "start:backend": "npm --prefix backend run start",

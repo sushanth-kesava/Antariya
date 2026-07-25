@@ -1,6 +1,6 @@
-# StitchMart
+# Antariya
 
-The ultimate premium marketplace for embroidery designs, industrial threads, fabrics, and machine accessories in India.
+The ultimate premium marketplace for embroidery designs, industrial threads, fabrics, and machine accessories in India. (Formerly "StitchMart")
 
 ## Core Features
 

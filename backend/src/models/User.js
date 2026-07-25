@@ -23,7 +23,6 @@ const userSchema = new mongoose.Schema(
     oauth: {
       provider: { type: String, default: "google" },
       providerUserId: { type: String, default: null },
-      accessToken: { type: String, default: null },
       tokenType: { type: String, default: null },
       scope: { type: String, default: null },
       expiresAt: { type: Date, default: null },

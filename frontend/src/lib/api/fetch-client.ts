@@ -8,7 +8,7 @@ import { getAuthToken } from "@/lib/auth-session";
  * - The frontend (Hostinger) and backend (Render) are on DIFFERENT origins.
  * - We MUST send `credentials: "include"` on every request so the HttpOnly
  *   auth cookie is sent cross-origin.
- * - We also attach the [REDACTED_TOKEN] header as a fallback for backward compat.
+ * - Authentication is handled entirely via the HttpOnly cookie (no Bearer token).
  * - Centralizes error handling and base URL resolution.
  */
 

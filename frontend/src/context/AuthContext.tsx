@@ -57,7 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    fetchWithRetry(`${getApiBaseUrl()}/auth/me`, { credentials: "include", headers: { Authorization: `Bearer ${token}` } })
+    fetchWithRetry(`${getApiBaseUrl()}/auth/me`, { credentials: "include" })
       .then((r) => r.json())
       .then((data) => {
         if (data?.success && data?.user) {

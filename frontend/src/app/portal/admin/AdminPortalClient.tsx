@@ -63,7 +63,7 @@ import { downloadProductLabel } from "@/lib/api/barcode";
 import { formatINR, formatIndianDate, formatIndianDateTime, normalizeCatalogPriceToINR } from "@/lib/india";
 import { PRODUCT_ATTRIBUTES } from "@/lib/categories";
 import { MultiSelectCreatable } from "@/components/multi-select-creatable";
-import { clearAuthSession, getPortalPathForRole, normalizeAppRole, persistAuthSession } from "@/lib/auth-session";
+import { clearAuthSession, getPortalPathForRole, normalizeAppRole, persistAuthSession, isAuthenticated} from "@/lib/auth-session";
 import {
   Dialog,
   DialogContent,
@@ -228,8 +228,7 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
         const response = await fetch(`${API_BASE_URL}/auth/me`, {
           credentials: "include",
           headers: {
-            Authorization: `Bearer ${token}`,
-          },
+            },
         });
 
         const data = await response.json();
@@ -1455,13 +1454,17 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-gray-700 mb-2">Detailed Description <span className="text-red-500">*</span></label>
-                    <div className="border border-gray-200 rounded-xl overflow-hidden">
-                      <div className="flex gap-1 px-3 py-2 bg-gray-100 border-b border-gray-200 flex-wrap">
-                        <button type="button" className="px-2 py-1 text-xs font-bold rounded hover:bg-gray-200" onClick={() => document.execCommand('bold')}>B</button>
-                        <button type="button" className="px-2 py-1 text-xs italic rounded hover:bg-gray-200" onClick={() => document.execCommand('italic')}>I</button>
-                        <button type="button" className="px-2 py-1 text-xs rounded hover:bg-gray-200" onClick={() => document.execCommand('insertUnorderedList')}>• List</button>
-                        <button type="button" className="px-2 py-1 text-xs rounded hover:bg-gray-200" onClick={() => document.execCommand('insertOrderedList')}>1. List</button>
-                        <button type="button" className="px-2 py-1 text-xs font-bold rounded hover:bg-gray-200" onClick={() => {
+                    <div className="border border-gray-300 rounded-xl overflow-hidden shadow-sm focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/40 transition-all">
+                      <div className="flex gap-1 px-3 py-2 bg-gray-50 border-b border-gray-200 flex-wrap items-center sticky top-0 z-10">
+                        <button type="button" className="px-3 py-1.5 text-sm font-bold rounded-md hover:bg-white active:bg-gray-200 transition-colors border border-transparent hover:border-gray-300 hover:shadow-sm" onMouseDown={(e) => { e.preventDefault(); document.execCommand('bold'); }} title="Bold (Ctrl+B)">B</button>
+                        <button type="button" className="px-3 py-1.5 text-sm italic rounded-md hover:bg-white active:bg-gray-200 transition-colors border border-transparent hover:border-gray-300 hover:shadow-sm" onMouseDown={(e) => { e.preventDefault(); document.execCommand('italic'); }} title="Italic (Ctrl+I)">I</button>
+                        <button type="button" className="px-3 py-1.5 text-sm underline rounded-md hover:bg-white active:bg-gray-200 transition-colors border border-transparent hover:border-gray-300 hover:shadow-sm" onMouseDown={(e) => { e.preventDefault(); document.execCommand('underline'); }} title="Underline (Ctrl+U)">U</button>
+                        <span className="w-px h-5 bg-gray-300 mx-1.5" />
+                        <button type="button" className="px-3 py-1.5 text-sm rounded-md hover:bg-white active:bg-gray-200 transition-colors border border-transparent hover:border-gray-300 hover:shadow-sm" onMouseDown={(e) => { e.preventDefault(); document.execCommand('insertUnorderedList'); }} title="Bullet List">• List</button>
+                        <button type="button" className="px-3 py-1.5 text-sm rounded-md hover:bg-white active:bg-gray-200 transition-colors border border-transparent hover:border-gray-300 hover:shadow-sm" onMouseDown={(e) => { e.preventDefault(); document.execCommand('insertOrderedList'); }} title="Numbered List">1. List</button>
+                        <span className="w-px h-5 bg-gray-300 mx-1.5" />
+                        <button type="button" className="px-3 py-1.5 text-sm font-bold rounded-md hover:bg-white active:bg-gray-200 transition-colors border border-transparent hover:border-gray-300 hover:shadow-sm" title="Heading" onMouseDown={(e) => {
+                          e.preventDefault();
                           const sel = window.getSelection();
                           if (sel && sel.rangeCount > 0) {
                             const range = sel.getRangeAt(0);
@@ -1475,18 +1478,32 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
                             }
                           }
                         }}>H</button>
-                        <button type="button" className="px-2 py-1 text-xs rounded hover:bg-gray-200" onClick={() => document.execCommand('removeFormat')}>Clear</button>
+                        <span className="w-px h-5 bg-gray-300 mx-1.5" />
+                        <button type="button" className="px-3 py-1.5 text-sm rounded-md hover:bg-white active:bg-gray-200 transition-colors border border-transparent hover:border-gray-300 hover:shadow-sm text-gray-500" onMouseDown={(e) => { e.preventDefault(); document.execCommand('removeFormat'); }} title="Clear Formatting">Clear</button>
                       </div>
                       <div
                         contentEditable
                         suppressContentEditableWarning
-                        className="w-full bg-gray-50 focus:bg-white p-4 text-base focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all min-h-[120px] product-description"
-                        dangerouslySetInnerHTML={{ __html: formData.description }}
+                        ref={(el) => {
+                          if (el && !el.innerHTML && formData.description) {
+                            el.innerHTML = formData.description;
+                          }
+                        }}
+                        className="w-full bg-white p-5 text-base text-gray-900 outline-none min-h-[180px] product-description cursor-text leading-relaxed"
+                        style={{ caretColor: '#8B3A2A' }}
                         onBlur={e => setFormData({...formData, description: e.currentTarget.innerHTML})}
-                        onInput={e => setFormData({...formData, description: e.currentTarget.innerHTML})}
+                        onKeyDown={e => {
+                          // Keyboard shortcuts for formatting
+                          if (e.metaKey || e.ctrlKey) {
+                            if (e.key === 'b') { e.preventDefault(); document.execCommand('bold'); }
+                            if (e.key === 'i') { e.preventDefault(); document.execCommand('italic'); }
+                            if (e.key === 'u') { e.preventDefault(); document.execCommand('underline'); }
+                          }
+                        }}
+                        data-placeholder="Describe your product — materials, dimensions, care instructions, what makes it special..."
                       />
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">Use the toolbar to format: bold, lists, headings. Paste from docs preserves formatting.</p>
+                    <p className="text-xs text-muted-foreground mt-2">Tip: Use <kbd className="px-1 py-0.5 bg-gray-100 rounded text-[10px] font-mono">Ctrl+B</kbd> for bold, <kbd className="px-1 py-0.5 bg-gray-100 rounded text-[10px] font-mono">Ctrl+I</kbd> for italic, or use the toolbar above.</p>
                   </div>
                 </div>
 

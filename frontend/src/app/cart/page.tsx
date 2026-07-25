@@ -107,7 +107,7 @@ export default function CartPage() {
     });
     
     if (hasStockIssues) return;
-    router.push("/checkout");
+    router.push("/select-address");
   };
 
   if (items.length === 0) {

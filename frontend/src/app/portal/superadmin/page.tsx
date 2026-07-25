@@ -8,8 +8,7 @@ import {
   clearAuthSession,
   getPortalPathForRole,
   normalizeAppRole,
-  persistAuthSession,
-} from "@/lib/auth-session";
+  persistAuthSession,, isAuthenticated} from "@/lib/auth-session";
 import { getMyAccess, ErpActor } from "@/lib/api/erp";
 import { ErpShell } from "./ErpShell";
 
@@ -41,7 +40,6 @@ export default function SuperAdminPortalPage() {
       try {
         const response = await fetch(`${API_BASE_URL}/auth/me`, {
           credentials: "include",
-          headers: { Authorization: `Bearer ${token}` },
         });
         const data = await response.json();
 

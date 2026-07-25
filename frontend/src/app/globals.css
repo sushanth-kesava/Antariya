@@ -124,6 +124,7 @@
 /* Product description rich text styling */
 .product-description {
   white-space: normal;
+  color: #1a1a1a;
 }
 .product-description p {
   margin-bottom: 0.75rem;
@@ -133,8 +134,9 @@
 }
 .product-description strong,
 .product-description b {
-  color: hsl(var(--foreground));
-  font-weight: 600;
+  color: #000 !important;
+  font-weight: 700 !important;
+  -webkit-text-fill-color: #000 !important;
 }
 .product-description ul,
 .product-description ol {
@@ -152,7 +154,31 @@
 }
 .product-description h3,
 .product-description h4 {
-  color: hsl(var(--foreground));
+  color: #000;
   font-weight: 600;
   margin: 1rem 0 0.5rem;
+}
+
+/* Rich text editor area — ensure visibility of all formatted content */
+.product-description[contenteditable] {
+  color: #1f2937;
+  caret-color: hsl(var(--primary));
+}
+.product-description[contenteditable]:focus {
+  background-color: #fff;
+}
+.product-description[contenteditable] i,
+.product-description[contenteditable] em {
+  color: #374151;
+  font-style: italic;
+}
+.product-description[contenteditable]::selection {
+  background-color: hsl(var(--primary) / 0.15);
+}
+.product-description[contenteditable]:empty::before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
+  font-style: italic;
+  pointer-events: none;
+  display: block;
 }

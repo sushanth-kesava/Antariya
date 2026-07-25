@@ -44,7 +44,7 @@ export function ProfileSidebar({ open, onClose, onSaved }: ProfileSidebarProps) 
 
   useEffect(() => {
     if (!open) return;
-    const token = typeof window !== "undefined" ? localStorage.getItem("app_auth_token") : null;
+    const token = localStorage.getItem("app_auth_token");
     if (!token) {
       setError("Please log in to view your profile.");
       return;

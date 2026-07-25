@@ -18,14 +18,27 @@ import {
 export function useInventoryUpdates(options?: {
   productId?: string;
   role?: string;
+  /** Set to true to force-enable on non-admin pages (default: false) */
+  forceEnable?: boolean;
   onUpdate?: (update: InventoryUpdate) => void;
 }) {
-  const { productId, role, onUpdate } = options || {};
+  const { productId, role, forceEnable, onUpdate } = options || {};
   const [updates, setUpdates] = useState<Record<string, InventoryUpdate>>({});
   const onUpdateRef = useRef(onUpdate);
   onUpdateRef.current = onUpdate;
 
+  // Only connect on admin/superadmin pages unless explicitly forced.
+  // This prevents WebSocket connections on public pages (product cards,
+  // product detail, customer dashboard) which spam errors when the backend
+  // is sleeping on Render free tier.
+  const isAdminPage = typeof window !== "undefined" &&
+    (window.location.pathname.startsWith("/portal/admin") ||
+     window.location.pathname.startsWith("/portal/superadmin"));
+  const enabled = forceEnable || isAdminPage || role === "admin" || role === "superadmin" || role === "warehouse" || role === "vendor";
+
   useEffect(() => {
+    if (!enabled) return;
+
     const socket = getSocket(role);
 
     const handleConnect = () => {
@@ -56,7 +69,7 @@ export function useInventoryUpdates(options?: {
       socket.off("connect", handleConnect);
       socket.off("inventory:update", handleUpdate);
     };
-  }, [productId, role]);
+  }, [productId, role, enabled]);
 
   return updates;
 }

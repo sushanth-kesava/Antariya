@@ -23,7 +23,7 @@ import { getWishlistFromBackend, WishlistItem } from "@/lib/api/wishlist";
 import { useInventoryUpdates } from "@/hooks/use-inventory-updates";
 import { getProductsFromBackend } from "@/lib/api/products";
 import { formatINR, formatIndianDate, normalizeCatalogPriceToINR } from "@/lib/india";
-import { clearAuthSession, getPortalPathForRole } from "@/lib/auth-session";
+import { clearAuthSession, getPortalPathForRole, isAuthenticated} from "@/lib/auth-session";
 import { getCustomerProfileFromBackend, type CustomerProfileData } from "@/lib/api/customerProfile";
 import { createSupportTicket } from "@/lib/api/support";
 import { Input } from "@/components/ui/input";

@@ -20,6 +20,14 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isLoggedIn = hasAuthToken(request);
 
+  // Protect checkout flow pages
+  if ((pathname.startsWith("/select-address") || pathname.startsWith("/checkout")) && !isLoggedIn) {
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("next", pathname);
+    loginUrl.searchParams.set("role", "customer");
+    return NextResponse.redirect(loginUrl);
+  }
+
   if (pathname.startsWith("/portal/customer") && !isLoggedIn) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("next", pathname);
@@ -48,5 +56,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/portal/:path*", "/login", "/signup"],
+  matcher: ["/portal/:path*", "/login", "/signup", "/select-address", "/checkout"],
 };

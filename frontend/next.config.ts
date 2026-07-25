@@ -6,25 +6,8 @@ const nextConfig: NextConfig = {
   // Static export for Hostinger deployment
   ...(isProduction ? { output: "export" } : {}),
   trailingSlash: true,
-  async redirects() {
-    return [
-      // Old public_html URLs → new Next.js routes
-      { source: '/products', destination: '/shop/', permanent: true },
-      { source: '/products/', destination: '/shop/', permanent: true },
-      { source: '/story', destination: '/about/', permanent: true },
-      { source: '/story/', destination: '/about/', permanent: true },
-      { source: '/contact', destination: '/contact-support/', permanent: true },
-      { source: '/contact/', destination: '/contact-support/', permanent: true },
-      { source: '/legal/privacy', destination: '/legal/policies/', permanent: true },
-      { source: '/legal/privacy/', destination: '/legal/policies/', permanent: true },
-      { source: '/legal/terms', destination: '/legal/policies/', permanent: true },
-      { source: '/legal/terms/', destination: '/legal/policies/', permanent: true },
-      { source: '/legal/shipping', destination: '/legal/policies/', permanent: true },
-      { source: '/legal/shipping/', destination: '/legal/policies/', permanent: true },
-      { source: '/legal/returns', destination: '/legal/policies/', permanent: true },
-      { source: '/legal/returns/', destination: '/legal/policies/', permanent: true },
-    ];
-  },
+  // NOTE: Redirects moved to .htaccess — Next.js redirects() does NOT work
+  // with output: "export" (static site). See public/.htaccess for all 301s.
   typescript: {
     ignoreBuildErrors: false,
   },

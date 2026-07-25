@@ -1,3 +1,10 @@
+// ⚠️  PRODUCTION WARNING: This rate limiter uses an in-memory Map().
+// It does NOT share state across multiple server instances (e.g. Render
+// auto-scaling, PM2 cluster mode). Each instance maintains its own counter,
+// so an attacker effectively gets N × max_requests across N instances.
+// TODO: Replace with a Redis-backed store (e.g. ioredis + sliding-window)
+// before scaling to multiple instances.
+
 const DEFAULT_WINDOW_MS = 15 * 60 * 1000;
 const CLEANUP_INTERVAL_MS = 5 * 60 * 1000; // Sweep expired entries every 5 min
 const MAX_STORE_SIZE = 50000; // Emergency cap to prevent OOM
