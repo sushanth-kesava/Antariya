@@ -34,25 +34,24 @@ async function subscribe(req, res, next) {
     // Fire-and-forget welcome email for newsletter subscriber
     sendMail({
       to: sub.email,
-      subject: "Welcome to Antariya Newsletter — Successfully Subscribed!",
+      subject: "Welcome to Antariya Newsletter ✦ Successfully Subscribed",
       html: wrapBrandedEmail({
         title: "Welcome to Antariya Newsletter",
         bodyHtml: `
-          <h2 style="margin:0 0 12px;color:#1a1a2e;">Welcome to Antariya Newsletter!</h2>
-          <p style="font-size:15px;line-height:1.7;color:#4a4a5a;">
-            Hi there! Thanks for subscribing to the Antariya newsletter.
+          <p style="font-size:15px;line-height:1.7;color:#2d2d44;">
+            Hi there! Thank you for joining the Antariya community.
           </p>
-          <p style="font-size:15px;line-height:1.7;color:#4a4a5a;">
-            You'll now receive updates on:
+          <p style="font-size:15px;line-height:1.7;color:#2d2d44;">
+            You'll now receive curated updates on:
           </p>
-          <ul style="font-size:14px;line-height:2;color:#4a4a5a;">
-            <li>New premium embroidery collections</li>
-            <li>Exclusive deals and early access</li>
-            <li>Industry tips and trends</li>
-            <li>Special announcements</li>
+          <ul style="font-size:14px;line-height:2.2;color:#2d2d44;padding-left:18px;">
+            <li>🧵 New premium embroidery collections</li>
+            <li>✨ Exclusive deals & early access drops</li>
+            <li>📖 Industry tips, trends & styling guides</li>
+            <li>🎉 Special announcements & launches</li>
           </ul>
-          <p style="font-size:14px;color:#5a5a6a;margin-top:16px;">
-            We're glad to have you in our community!
+          <p style="font-size:14px;color:#4a4a5a;margin-top:20px;padding-top:16px;border-top:1px solid #e8e4de;">
+            Welcome aboard — we're glad to have you! 🙏
           </p>
         `
       }),

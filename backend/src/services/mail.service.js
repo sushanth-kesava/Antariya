@@ -266,18 +266,50 @@ function wrapBrandedEmail({ title, bodyHtml, unsubscribeUrl }) {
   <!DOCTYPE html>
   <html>
     <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>${safeTitle}</title></head>
-    <body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:24px 0;">
+    <body style="margin:0;padding:0;background:#faf8f5;font-family:Georgia,'Times New Roman',serif;color:#1a1a2e;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#faf8f5;padding:24px 0;">
         <tr><td align="center">
-          <table role="presentation" width="640" cellpadding="0" cellspacing="0" style="width:640px;max-width:94%;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb;">
-            <tr><td style="background:linear-gradient(135deg,#0f766e,#0ea5a4);padding:26px 28px;">
-              <h1 style="margin:0;font-size:26px;line-height:1.2;color:#ffffff;">${safeAppName}</h1>
+          <table role="presentation" width="640" cellpadding="0" cellspacing="0" style="width:640px;max-width:94%;background:#ffffff;overflow:hidden;box-shadow:0 4px 24px rgba(26,26,46,0.08);">
+            <!-- Header: Dark navy with gold accents -->
+            <tr><td style="background:#0d1b3e;padding:0;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr><td style="padding:8px;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #c9a96e;border-radius:4px;">
+                    <tr><td align="center" style="padding:28px 24px;">
+                      <table role="presentation" cellpadding="0" cellspacing="0">
+                        <tr><td align="center" style="width:52px;height:52px;border:2px solid #c9a96e;border-radius:50%;">
+                          <span style="font-size:24px;font-weight:700;color:#c9a96e;font-family:Georgia,serif;line-height:48px;">A</span>
+                        </td></tr>
+                      </table>
+                      <h1 style="margin:10px 0 0;font-size:22px;letter-spacing:0.15em;color:#ffffff;font-weight:400;font-family:Georgia,'Times New Roman',serif;text-transform:uppercase;">ANTARIYA</h1>
+                      <p style="margin:6px 0 0;font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:#c9a96e;font-weight:400;">Premium Embroidery · Personalized For You</p>
+                    </td></tr>
+                  </table>
+                </td></tr>
+              </table>
             </td></tr>
-            <tr><td style="padding:28px;">${bodyHtml}</td></tr>
-            <tr><td style="padding:18px 28px 30px;border-top:1px solid #f3f4f6;">
-              <p style="margin:0;font-size:13px;line-height:1.6;color:#6b7280;">Visit us at <a href="${safeWebsiteUrl}" style="color:#0f766e;">${safeWebsiteUrl}</a></p>
+            <!-- Title bar -->
+            <tr><td align="center" style="padding:28px 28px 0;background:#ffffff;">
+              <h2 style="margin:0;font-size:22px;font-weight:400;color:#0d1b3e;font-family:Georgia,'Times New Roman',serif;">${safeTitle}</h2>
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:12px auto 0;">
+                <tr>
+                  <td style="width:30px;height:1px;background:#c9a96e;"></td>
+                  <td style="padding:0 8px;"><span style="font-size:12px;color:#c9a96e;">✦</span></td>
+                  <td style="width:30px;height:1px;background:#c9a96e;"></td>
+                </tr>
+              </table>
+            </td></tr>
+            <!-- Body content -->
+            <tr><td style="padding:24px 32px 28px;background:#ffffff;font-size:15px;line-height:1.7;color:#2d2d44;">${bodyHtml}</td></tr>
+            <!-- Footer -->
+            <tr><td style="background:#0d1b3e;padding:20px 28px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr><td align="center">
+                  <p style="margin:0;font-size:12px;line-height:1.6;color:#a8a8b8;">Visit us at <a href="${safeWebsiteUrl}" style="color:#c9a96e;text-decoration:none;">${safeWebsiteUrl}</a></p>
+                </td></tr>
+              </table>
               ${unsubscribeBlock}
-              <p style="margin:12px 0 0;font-size:12px;line-height:1.6;color:#a8a29e;">© ${new Date().getFullYear()} ${safeAppName}. All rights reserved.</p>
+              <p style="margin:10px 0 0;font-size:11px;line-height:1.6;color:#6b6b7b;text-align:center;">© ${new Date().getFullYear()} ${safeAppName}. All rights reserved.</p>
             </td></tr>
           </table>
         </td></tr>
