@@ -1,4 +1,5 @@
 const nodemailer = require("nodemailer");
+const https = require("https");
 const env = require("../config/env");
 const { buildInvoicePdf } = require("./invoice.service");
 
@@ -13,16 +14,24 @@ function resolveFromAddress() {
 }
 
 function hasMailConfig() {
-  return Boolean(env.smtpHost && env.smtpUser && env.smtpPass && env.mailFromEmail);
+  return Boolean(
+    (env.resendApiKey || (env.smtpHost && env.smtpUser && env.smtpPass)) && env.mailFromEmail
+  );
+}
+
+function useResend() {
+  return Boolean(env.resendApiKey);
 }
 
 // Log SMTP config status on module load (visible in Render logs at boot)
-console.log("[Mail] SMTP Config Check:", {
+console.log("[Mail] Config Check:", {
+  transport: env.resendApiKey ? "RESEND (HTTPS API)" : "SMTP",
   host: env.smtpHost || "NOT SET",
   port: env.smtpPort,
   user: env.smtpUser ? env.smtpUser.slice(0, 4) + "***" : "NOT SET",
   pass: env.smtpPass ? "SET (" + env.smtpPass.length + " chars)" : "NOT SET",
   from: env.mailFromEmail || "NOT SET",
+  resendKey: env.resendApiKey ? "SET (" + env.resendApiKey.slice(0, 6) + "...)" : "NOT SET",
   ready: hasMailConfig(),
 });
 
@@ -52,6 +61,12 @@ function getTransporter() {
 }
 
 async function sendMail({ to, subject, html, text, attachments }) {
+  // --- Use Resend HTTPS API if configured ---
+  if (useResend()) {
+    return sendViaResend({ to, subject, html, text });
+  }
+
+  // --- Fallback to SMTP ---
   const transporter = getTransporter();
 
   if (!transporter) {
@@ -77,6 +92,53 @@ async function sendMail({ to, subject, html, text, attachments }) {
     sent: true,
     skipped: false,
   };
+}
+
+/**
+ * Send email via Resend HTTPS API (no SMTP port needed)
+ * Docs: https://resend.com/docs/api-reference/emails/send-email
+ */
+function sendViaResend({ to, subject, html, text }) {
+  return new Promise((resolve, reject) => {
+    const from = resolveFromAddress();
+    const body = JSON.stringify({
+      from,
+      to: Array.isArray(to) ? to : [to],
+      subject,
+      html: html || undefined,
+      text: text || undefined,
+    });
+
+    const options = {
+      hostname: "api.resend.com",
+      port: 443,
+      path: "/emails",
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.resendApiKey}`,
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(body),
+      },
+    };
+
+    const req = https.request(options, (res) => {
+      let data = "";
+      res.on("data", (chunk) => (data += chunk));
+      res.on("end", () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          console.log(`[Mail] ✉️  Email sent via Resend to ${to} | Subject: "${subject}"`);
+          resolve({ sent: true, skipped: false, provider: "resend", response: data });
+        } else {
+          console.error(`[Mail] Resend API error (${res.statusCode}):`, data);
+          reject(new Error(`Resend API error ${res.statusCode}: ${data}`));
+        }
+      });
+    });
+
+    req.on("error", (err) => reject(err));
+    req.write(body);
+    req.end();
+  });
 }
 
 function escapeHtml(value) {

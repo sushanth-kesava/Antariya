@@ -40,6 +40,9 @@ services:
         value: Antariya
       - key: SMTP_SECURE
         sync: false
+      # ─── Resend (HTTPS-based email API — use instead of SMTP) ────────────────
+      - key: RESEND_API_KEY
+        sync: false
       # ─── Optional: Cloudinary ───────────────────────────────────────────
       - key: CLOUDINARY_CLOUD_NAME
         sync: false
