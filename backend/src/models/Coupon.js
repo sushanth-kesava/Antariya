@@ -49,6 +49,11 @@ const couponSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    // If true, applying this coupon also waives delivery charges
+    freeDelivery: {
+      type: Boolean,
+      default: false,
+    },
     // Validity
     validFrom: {
       type: Date,

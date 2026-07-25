@@ -140,6 +140,7 @@ function normalizeProduct(doc) {
     fileDownloadLink: doc.fileDownloadLink,
     rating: doc.rating,
     customizable: doc.customizable,
+    customizationConfig: doc.customizationConfig || null,
     published: doc.published !== false,
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
@@ -698,7 +699,7 @@ async function createProduct(req, res, next) {
       });
     }
 
-    const { name, description, price, category, subCategory, size, color, gender, neckType, pattern, sizes, colors, genders, neckTypes, patterns, variants, image, images, galleryImages, stock, rating, customizable, fileDownloadLink } = req.body;
+    const { name, description, price, category, subCategory, size, color, gender, neckType, pattern, sizes, colors, genders, neckTypes, patterns, variants, image, images, galleryImages, stock, rating, customizable, customizationConfig, fileDownloadLink } = req.body;
 
     const normalizedGallery = (Array.isArray(images) ? images : Array.isArray(galleryImages) ? galleryImages : [image])
       .filter((item) => typeof item === "string")
@@ -783,6 +784,7 @@ async function createProduct(req, res, next) {
       stock: resolvedStock,
       rating: Number.isFinite(Number(rating)) ? Number(rating) : 0,
       customizable: Boolean(customizable),
+      customizationConfig: customizable && customizationConfig ? customizationConfig : null,
       fileDownloadLink: fileDownloadLink || null,
       dealerId: req.auth.sub,
     });

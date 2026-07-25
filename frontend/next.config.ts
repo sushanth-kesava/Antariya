@@ -3,9 +3,8 @@ import type { NextConfig } from "next";
 const isProduction = process.env.NODE_ENV === "production";
 
 const nextConfig: NextConfig = {
-  // Firebase App Hosting supports SSR natively — no static export needed.
-  // If you ever need static export again (e.g. for Hostinger), uncomment:
-  // ...(isProduction ? { output: "export" } : {}),
+  // Static export for Hostinger deployment
+  ...(isProduction ? { output: "export" } : {}),
   trailingSlash: true,
   async redirects() {
     return [

@@ -1,7 +1,5 @@
 User-agent: *
-Allow: /
-
-# Block .html extension URLs (canonical versions don't use .html)
 Disallow: /index.html
+Disallow: /api/
 
 Sitemap: https://antariyaofficial.com/sitemap.xml
