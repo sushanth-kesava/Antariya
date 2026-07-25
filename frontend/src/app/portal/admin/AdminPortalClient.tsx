@@ -239,7 +239,8 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
         const response = await fetch(`${API_BASE_URL}/auth/me`, {
           credentials: "include",
           headers: {
-            },
+            Authorization: `Bearer ${token}`,
+          },
         });
 
         const data = await response.json();
