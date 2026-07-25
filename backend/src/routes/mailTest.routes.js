@@ -8,9 +8,9 @@
 const express = require("express");
 const router = express.Router();
 const { sendMail } = require("../services/mail.service");
-const { authenticate, requireAdmin } = require("../middleware/auth.middleware");
+const { requireAuth, requireRole } = require("../middleware/auth.middleware");
 
-router.post("/test", authenticate, requireAdmin, async (req, res) => {
+router.post("/test", requireAuth, requireRole("superadmin"), async (req, res) => {
   const { to } = req.body;
 
   if (!to) {
