@@ -16,6 +16,16 @@ function hasMailConfig() {
   return Boolean(env.smtpHost && env.smtpUser && env.smtpPass && env.mailFromEmail);
 }
 
+// Log SMTP config status on module load (visible in Render logs at boot)
+console.log("[Mail] SMTP Config Check:", {
+  host: env.smtpHost || "NOT SET",
+  port: env.smtpPort,
+  user: env.smtpUser ? env.smtpUser.slice(0, 4) + "***" : "NOT SET",
+  pass: env.smtpPass ? "SET (" + env.smtpPass.length + " chars)" : "NOT SET",
+  from: env.mailFromEmail || "NOT SET",
+  ready: hasMailConfig(),
+});
+
 function getTransporter() {
   if (!hasMailConfig()) {
     return null;

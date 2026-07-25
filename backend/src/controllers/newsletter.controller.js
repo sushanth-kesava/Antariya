@@ -57,7 +57,11 @@ async function subscribe(req, res, next) {
         `
       }),
       text: "Welcome to the Antariya newsletter! You'll receive updates on new collections, exclusive deals, and more."
-    }).catch((err) => console.error("[Newsletter] Failed to send welcome email:", err.message));
+    }).then((result) => {
+      console.log("[Newsletter] Email result for", sub.email, JSON.stringify(result));
+    }).catch((err) => {
+      console.error("[Newsletter] Failed to send welcome email:", err.message);
+    });
 
     return res.status(201).json({
       success: true,
