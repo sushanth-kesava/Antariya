@@ -826,6 +826,72 @@ class BarcodeService {
       recentMovements
     };
   }
+
+  // ─── BARCODE LIFECYCLE: DELETION ─────────────────────────────────
+
+  /**
+   * Delete every barcode associated with a product and clean up any
+   * generated barcode image files / storage references.
+   *
+   * Guarantees no orphan barcode records remain after a product is deleted.
+   *
+   * If a Mongoose `session` is supplied, all DB deletes run inside that
+   * transaction so product + barcode removal is atomic (ACID).
+   *
+   * Returns a summary: { deletedCount, cloudinaryRemoved }.
+   */
+  static async deleteProductBarcodes(productId, { session = null } = {}) {
+    if (!productId) return { deletedCount: 0, cloudinaryRemoved: 0 };
+
+    const query = Barcode.find({ productId });
+    if (session) query.session(session);
+    const barcodes = await query.lean();
+
+    let cloudinaryRemoved = 0;
+
+    // Remove any barcode images that live in Cloudinary (best-effort; never
+    // blocks the DB deletion). Base64 data-URI images live inline in the
+    // document and are removed automatically when the record is deleted.
+    for (const bc of barcodes) {
+      const img = bc.barcodeImage;
+      if (typeof img === "string" && img.includes("res.cloudinary.com")) {
+        try {
+          const publicId = BarcodeService._extractCloudinaryPublicId(img);
+          if (publicId) {
+            const { destroyAsset } = require("./cloudinary.service");
+            if (typeof destroyAsset === "function") {
+              await destroyAsset(publicId);
+              cloudinaryRemoved += 1;
+            }
+          }
+        } catch (err) {
+          console.warn("[Barcode] Failed to remove Cloudinary image:", err.message);
+        }
+      }
+    }
+
+    const delQuery = Barcode.deleteMany({ productId });
+    if (session) delQuery.session(session);
+    const result = await delQuery;
+
+    return { deletedCount: result?.deletedCount || 0, cloudinaryRemoved };
+  }
+
+  /**
+   * Extract a Cloudinary public_id from a delivery URL so the asset can be
+   * destroyed. Returns null if the URL isn't parseable.
+   */
+  static _extractCloudinaryPublicId(url) {
+    try {
+      // .../upload/v12345/folder/name.png  ->  folder/name
+      const afterUpload = url.split("/upload/")[1];
+      if (!afterUpload) return null;
+      const withoutVersion = afterUpload.replace(/^v\d+\//, "");
+      return withoutVersion.replace(/\.[a-zA-Z0-9]+$/, "");
+    } catch {
+      return null;
+    }
+  }
 }
 
 module.exports = BarcodeService;

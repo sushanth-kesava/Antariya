@@ -99,8 +99,30 @@ const couponSchema = new mongoose.Schema(
       type: String,
       default: "#1a1a1a",
     },
+    // Optional poster/photo for the homepage hero banner. When set, the
+    // sliding banner renders this image instead of a plain colored text bar.
+    heroImage: {
+      type: String,
+      default: "",
+      trim: true,
+    },
     // Categories this coupon applies to (empty = all categories)
     applicableCategories: [{ type: String }],
+    // ─── Visibility / Restriction ──────────────────────────────────
+    // "public"    → any logged-in customer can redeem (default; backward compatible)
+    // "restricted"→ only customers whose email is in `allowedEmails` can redeem
+    visibility: {
+      type: String,
+      enum: ["public", "restricted"],
+      default: "public",
+      index: true,
+    },
+    // Allowed customer emails for restricted coupons. Stored lowercase &
+    // de-duplicated by the controller. Ignored when visibility === "public".
+    allowedEmails: {
+      type: [String],
+      default: [],
+    },
     // Status
     active: {
       type: Boolean,

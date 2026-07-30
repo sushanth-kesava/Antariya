@@ -20,6 +20,8 @@ import {
   IndianRupee,
   Truck,
   AlertCircle,
+  Loader2,
+  Upload,
 } from "lucide-react";
 import {
   listAllCoupons,
@@ -31,6 +33,7 @@ import {
   CreateCouponPayload,
 } from "@/lib/api/coupons";
 import { useToast } from "@/hooks/use-toast";
+import { uploadProductImagesToBackend } from "@/lib/api/products";
 
 type CouponsModuleProps = {
   token: string;
@@ -55,12 +58,36 @@ function formatINR(paise: number) {
   return `₹${(paise / 100).toLocaleString("en-IN")}`;
 }
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Parse a comma/newline/semicolon-separated string into a clean, lowercase,
+ * de-duplicated list of valid emails. Returns { emails, invalid, duplicates }.
+ */
+function parseEmails(input: string): { emails: string[]; invalid: number; duplicates: number } {
+  const seen = new Set<string>();
+  const emails: string[] = [];
+  let invalid = 0;
+  let duplicates = 0;
+  for (const part of String(input || "").split(/[\n,;]+/)) {
+    const email = part.trim().toLowerCase();
+    if (!email) continue;
+    if (!EMAIL_RE.test(email)) { invalid += 1; continue; }
+    if (seen.has(email)) { duplicates += 1; continue; }
+    seen.add(email);
+    emails.push(email);
+  }
+  return { emails, invalid, duplicates };
+}
+
 export function CouponsModule({ token, has }: CouponsModuleProps) {
   const { toast } = useToast();
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [csvImportStatus, setCsvImportStatus] = useState<string | null>(null);
+  const [posterUploading, setPosterUploading] = useState(false);
 
   // Form state
   const [form, setForm] = useState<CreateCouponPayload>({
@@ -78,7 +105,10 @@ export function CouponsModule({ token, has }: CouponsModuleProps) {
     showOnHero: false,
     heroBannerText: "",
     heroBannerColor: "#1a1a1a",
+    heroImage: "",
     freeDelivery: false,
+    visibility: "public",
+    allowedEmails: "",
   });
 
   useEffect(() => {
@@ -180,9 +210,78 @@ export function CouponsModule({ token, has }: CouponsModuleProps) {
       showOnHero: false,
       heroBannerText: "",
       heroBannerColor: "#1a1a1a",
+      heroImage: "",
       freeDelivery: false,
+      visibility: "public",
+      allowedEmails: "",
     });
   }
+
+  // Parse an uploaded CSV of emails and merge them into the textarea.
+  async function handleCsvUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      // Accept any delimiter (comma, newline, semicolon). Also strips a
+      // header cell like "email" if present.
+      const raw = text.replace(/^\uFEFF/, "");
+      const existing = typeof form.allowedEmails === "string"
+        ? form.allowedEmails
+        : (form.allowedEmails || []).join(", ");
+      const combined = `${existing}\n${raw}`;
+      const { emails, invalid, duplicates } = parseEmails(
+        combined.replace(/\bemail\b/gi, "")
+      );
+      setForm((prev) => ({ ...prev, allowedEmails: emails.join(", ") }));
+      setCsvImportStatus(
+        `Imported ${emails.length} valid email${emails.length === 1 ? "" : "s"}` +
+        (duplicates ? `, ${duplicates} duplicate${duplicates === 1 ? "" : "s"} removed` : "") +
+        (invalid ? `, ${invalid} invalid skipped` : "") + "."
+      );
+    } catch {
+      setCsvImportStatus("Could not read the CSV file.");
+    } finally {
+      e.target.value = ""; // allow re-uploading the same file
+    }
+  }
+
+  // Upload a coupon poster/photo for the homepage hero banner. Reuses the
+  // existing admin image-upload endpoint (Cloudinary + base64 fallback).
+  async function handlePosterUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Invalid file", description: "Please choose an image file", variant: "destructive" });
+      e.target.value = "";
+      return;
+    }
+    setPosterUploading(true);
+    try {
+      const token = localStorage.getItem("app_auth_token") || "";
+      const urls = await uploadProductImagesToBackend(token, [file]);
+      if (urls[0]) {
+        setForm((prev) => ({ ...prev, heroImage: urls[0], showOnHero: true }));
+        toast({ title: "Poster uploaded", description: "It will show on the homepage banner." });
+      } else {
+        toast({ title: "Upload failed", description: "No image URL returned", variant: "destructive" });
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Upload failed";
+      toast({ title: "Upload failed", description: msg, variant: "destructive" });
+    } finally {
+      setPosterUploading(false);
+      e.target.value = "";
+    }
+  }
+
+  // Live count of valid emails currently in the form (textarea or array).
+  const parsedAllowedCount = (() => {
+    const val = typeof form.allowedEmails === "string"
+      ? form.allowedEmails
+      : (form.allowedEmails || []).join(", ");
+    return parseEmails(val).emails.length;
+  })();
 
   function generateCode() {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -404,6 +503,43 @@ export function CouponsModule({ token, has }: CouponsModuleProps) {
                   </div>
                 </div>
               )}
+              {form.showOnHero && (
+                <div className="space-y-2 pt-1">
+                  <Label>Coupon Poster (optional)</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Upload a poster/photo to show on the homepage banner instead of the plain colored bar. Recommended wide image (e.g. 1600×400).
+                  </p>
+                  {form.heroImage ? (
+                    <div className="relative overflow-hidden rounded-lg border">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={form.heroImage} alt="Coupon poster preview" className="w-full max-h-40 object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => setForm({ ...form, heroImage: "" })}
+                        className="absolute top-2 right-2 rounded-full bg-black/60 p-1 text-white hover:bg-black/80"
+                        aria-label="Remove poster"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed py-6 text-sm text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors">
+                      {posterUploading ? (
+                        <><Loader2 className="h-4 w-4 animate-spin" /> Uploading...</>
+                      ) : (
+                        <><Upload className="h-4 w-4" /> Click to upload poster image</>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handlePosterUpload}
+                        disabled={posterUploading}
+                      />
+                    </label>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Free Delivery Toggle */}
@@ -418,6 +554,73 @@ export function CouponsModule({ token, has }: CouponsModuleProps) {
                   onCheckedChange={(checked) => setForm({ ...form, freeDelivery: checked })}
                 />
               </div>
+            </div>
+
+            {/* Coupon Visibility (Public vs Restricted / Private) */}
+            <div className="rounded-lg border p-4 space-y-3">
+              <div>
+                <p className="font-medium">Coupon Visibility</p>
+                <p className="text-sm text-muted-foreground">
+                  Public coupons work for any logged-in customer. Restricted coupons only work for selected emails.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, visibility: "public" })}
+                  className={cn(
+                    "flex-1 rounded-md border px-3 py-2 text-sm font-medium transition-colors",
+                    form.visibility !== "restricted"
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-input hover:bg-muted"
+                  )}
+                >
+                  Public Coupon
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, visibility: "restricted" })}
+                  className={cn(
+                    "flex-1 rounded-md border px-3 py-2 text-sm font-medium transition-colors",
+                    form.visibility === "restricted"
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-input hover:bg-muted"
+                  )}
+                >
+                  Restricted Coupon
+                </button>
+              </div>
+
+              {form.visibility === "restricted" && (
+                <div className="space-y-3 pt-1">
+                  <div className="space-y-2">
+                    <Label>Allowed Emails (comma or newline separated)</Label>
+                    <textarea
+                      className="flex min-h-[90px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      value={typeof form.allowedEmails === "string" ? form.allowedEmails : (form.allowedEmails || []).join(", ")}
+                      onChange={(e) => setForm({ ...form, allowedEmails: e.target.value })}
+                      placeholder={"abc@gmail.com,\njohn@test.com,\ncustomer@company.com"}
+                    />
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <label className="text-sm font-medium cursor-pointer inline-flex items-center gap-2 rounded-md border border-input px-3 py-1.5 hover:bg-muted">
+                      Upload CSV
+                      <input
+                        type="file"
+                        accept=".csv,text/csv"
+                        className="hidden"
+                        onChange={handleCsvUpload}
+                      />
+                    </label>
+                    <span className="text-xs text-muted-foreground">
+                      {parsedAllowedCount} valid email{parsedAllowedCount === 1 ? "" : "s"} detected
+                    </span>
+                  </div>
+                  {csvImportStatus && (
+                    <p className="text-xs text-muted-foreground">{csvImportStatus}</p>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Actions */}

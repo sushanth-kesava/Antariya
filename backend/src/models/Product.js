@@ -66,6 +66,12 @@ const productSchema = new mongoose.Schema(
     price: { type: Number, required: true, min: 0 },
     category: { type: String, default: "", trim: true },
     subCategory: { type: String, default: "", trim: true },
+    // Authoritative category references (nested category tree). The string
+    // `category`/`subCategory` fields above are kept for backward
+    // compatibility and denormalized display; these link to the Category model
+    // so renames propagate and filtering can use indexed ObjectId lookups.
+    categoryId: { type: mongoose.Schema.Types.ObjectId, ref: "Category", default: null, index: true },
+    subCategoryId: { type: mongoose.Schema.Types.ObjectId, ref: "Category", default: null, index: true },
     size: { type: String, default: "", trim: true },
     color: { type: String, default: "", trim: true },
     gender: { type: String, default: "", trim: true },

@@ -1,5 +1,42 @@
 const Coupon = require("../models/Coupon");
 
+// ─── Helpers ──────────────────────────────────────────────────────────────
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Normalize a raw email list into a clean, lowercase, de-duplicated array.
+ * Accepts either an array of strings or a comma / newline separated string
+ * (as produced by a textarea or a parsed CSV column).
+ * Returns { emails, invalid } so the caller can report import status.
+ */
+function normalizeEmailList(input) {
+  let raw = [];
+  if (Array.isArray(input)) {
+    raw = input;
+  } else if (typeof input === "string") {
+    raw = input.split(/[\n,;]+/);
+  }
+
+  const seen = new Set();
+  const emails = [];
+  const invalid = [];
+
+  for (const entry of raw) {
+    const email = String(entry || "").trim().toLowerCase();
+    if (!email) continue;
+    if (!EMAIL_RE.test(email)) {
+      invalid.push(email);
+      continue;
+    }
+    if (seen.has(email)) continue; // duplicate removal
+    seen.add(email);
+    emails.push(email);
+  }
+
+  return { emails, invalid };
+}
+
 // ─── Superadmin: Create a new coupon ─────────────────────────────────────────
 async function createCoupon(req, res, next) {
   try {
@@ -19,7 +56,10 @@ async function createCoupon(req, res, next) {
       showOnHero,
       heroBannerText,
       heroBannerColor,
+      heroImage,
       applicableCategories,
+      visibility,
+      allowedEmails,
     } = req.body;
 
     if (!code || !title || !discountType || discountValue === undefined || !validFrom || !validUntil) {
@@ -35,6 +75,17 @@ async function createCoupon(req, res, next) {
       return res.status(400).json({
         success: false,
         message: "Coupon code must be between 3 and 20 characters",
+      });
+    }
+
+    // Resolve visibility + allowed emails (for restricted coupons).
+    const resolvedVisibility = visibility === "restricted" ? "restricted" : "public";
+    const { emails: normalizedAllowed, invalid: invalidEmails } = normalizeEmailList(allowedEmails);
+
+    if (resolvedVisibility === "restricted" && normalizedAllowed.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "A restricted coupon needs at least one valid allowed email.",
       });
     }
 
@@ -63,13 +114,20 @@ async function createCoupon(req, res, next) {
       showOnHero: Boolean(showOnHero),
       heroBannerText: heroBannerText ? String(heroBannerText).trim() : "",
       heroBannerColor: heroBannerColor || "#1a1a1a",
+      heroImage: heroImage ? String(heroImage).trim() : "",
       applicableCategories: Array.isArray(applicableCategories) ? applicableCategories : [],
+      visibility: resolvedVisibility,
+      allowedEmails: resolvedVisibility === "restricted" ? normalizedAllowed : [],
       createdBy: req.auth?.email || "superadmin",
     });
 
     return res.status(201).json({
       success: true,
       message: "Coupon created successfully",
+      import: {
+        allowedCount: coupon.allowedEmails.length,
+        invalidSkipped: invalidEmails.length,
+      },
       coupon,
     });
   } catch (error) {
@@ -104,6 +162,19 @@ async function updateCoupon(req, res, next) {
     if (updates.maxUses !== undefined) updates.maxUses = updates.maxUses != null ? Number(updates.maxUses) : null;
     if (updates.validFrom) updates.validFrom = new Date(updates.validFrom);
     if (updates.validUntil) updates.validUntil = new Date(updates.validUntil);
+
+    // Handle visibility / allowed-email changes for restricted coupons.
+    if (updates.visibility !== undefined) {
+      updates.visibility = updates.visibility === "restricted" ? "restricted" : "public";
+    }
+    if (updates.allowedEmails !== undefined) {
+      const { emails } = normalizeEmailList(updates.allowedEmails);
+      updates.allowedEmails = emails;
+    }
+    // If switching (back) to public, clear the allow-list to avoid stale data.
+    if (updates.visibility === "public") {
+      updates.allowedEmails = [];
+    }
 
     const coupon = await Coupon.findByIdAndUpdate(couponId, updates, { new: true, runValidators: true });
 
@@ -140,10 +211,12 @@ async function getHeroCoupons(req, res, next) {
     const coupons = await Coupon.find({
       active: true,
       showOnHero: true,
+      // Restricted coupons must never surface on the public homepage banner.
+      visibility: "public",
       validFrom: { $lte: now },
       validUntil: { $gte: now },
     })
-      .select("code title description discountType discountValue maxDiscount minOrderValue heroBannerText heroBannerColor validUntil")
+      .select("code title description discountType discountValue maxDiscount minOrderValue heroBannerText heroBannerColor heroImage validUntil")
       .sort({ createdAt: -1 })
       .limit(5)
       .lean();
@@ -177,6 +250,21 @@ async function validateCoupon(req, res, next) {
 
     if (!coupon.active) {
       return res.status(400).json({ success: false, message: "This coupon is no longer active" });
+    }
+
+    // ─── Restricted coupon: email allow-list gate ──────────────────────────
+    // A restricted coupon may only be redeemed by customers whose account
+    // email is on the allowed list. Requires an authenticated user.
+    if (coupon.visibility === "restricted") {
+      const normalizedEmail = String(userEmail || "").trim().toLowerCase();
+      const allowed = Array.isArray(coupon.allowedEmails) && normalizedEmail
+        && coupon.allowedEmails.includes(normalizedEmail);
+      if (!allowed) {
+        return res.status(403).json({
+          success: false,
+          message: "This coupon is not available for your account.",
+        });
+      }
     }
 
     if (now < coupon.validFrom) {

@@ -249,13 +249,16 @@ export const CURATED_HIGHLIGHTS: { label: string; category: string; subCategory:
 
 export type ProductAttribute = {
   /** Product field key (also the query-param / DB field name). */
-  key: "size" | "color" | "gender" | "neckType" | "pattern";
+  key: "size" | "color" | "neckType" | "pattern";
   /** Human label shown on the form. */
   label: string;
   /** Selectable options. */
   options: string[];
 };
 
+// NOTE: Gender is intentionally NOT a variant attribute. It is a product-level
+// categorization field (single-select), so it never multiplies the variant
+// matrix. Use GENDER_OPTIONS for the Add-Product gender dropdown.
 export const PRODUCT_ATTRIBUTES: ProductAttribute[] = [
   {
     key: "size",
@@ -268,11 +271,6 @@ export const PRODUCT_ATTRIBUTES: ProductAttribute[] = [
     options: ["Black", "White", "Navy", "Maroon", "Olive", "Beige"],
   },
   {
-    key: "gender",
-    label: "Gender",
-    options: ["Men", "Women", "Unisex", "Kids"],
-  },
-  {
     key: "neckType",
     label: "Neck Type",
     options: ["Round Neck", "V-Neck", "Polo", "Henley", "Hooded"],
@@ -283,6 +281,12 @@ export const PRODUCT_ATTRIBUTES: ProductAttribute[] = [
     options: ["Solid", "Graphic Printed", "Striped", "Color Block", "Typography"],
   },
 ];
+
+/**
+ * Gender categorization options for a product (single-select, product-level).
+ * This is a categorization field only — it does NOT create variants.
+ */
+export const GENDER_OPTIONS: string[] = ["Men", "Women", "Unisex", "Kids"];
 
 /** The product attribute field keys, in form order. */
 export const PRODUCT_ATTRIBUTE_KEYS = PRODUCT_ATTRIBUTES.map((attr) => attr.key);

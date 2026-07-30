@@ -1,5 +1,23 @@
 User-agent: *
-Disallow: /index.html
+Allow: /
+
+# Private / authenticated areas — keep out of search results
+Disallow: /portal/
+Disallow: /account/
+Disallow: /admin-login/
+Disallow: /superadmin-login/
+Disallow: /login/
+Disallow: /signup/
+Disallow: /checkout/
+Disallow: /cart/
+Disallow: /wishlist/
+Disallow: /complete-profile/
+Disallow: /select-address/
+Disallow: /order-status/
+Disallow: /coming-soon/
+
+# Backend API and raw entry file
 Disallow: /api/
+Disallow: /index.html
 
 Sitemap: https://antariyaofficial.com/sitemap.xml

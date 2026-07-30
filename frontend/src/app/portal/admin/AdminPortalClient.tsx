@@ -69,7 +69,7 @@ import { useInventoryAlerts } from "@/hooks/use-inventory-alerts";
 import { getApiBaseUrl } from "@/lib/api/base-url";
 import { downloadProductLabel } from "@/lib/api/barcode";
 import { formatINR, formatIndianDate, formatIndianDateTime, normalizeCatalogPriceToINR } from "@/lib/india";
-import { PRODUCT_ATTRIBUTES } from "@/lib/categories";
+import { PRODUCT_ATTRIBUTES, GENDER_OPTIONS } from "@/lib/categories";
 import { MultiSelectCreatable } from "@/components/multi-select-creatable";
 import { clearAuthSession, getPortalPathForRole, normalizeAppRole, persistAuthSession, isAuthenticated} from "@/lib/auth-session";
 import {
@@ -149,6 +149,7 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
     name: "",
     description: "",
     category: "",
+    gender: "",
     price: "",
     stock: "100",
     customizable: false,
@@ -172,10 +173,10 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
   });
 
   // Multi-select attribute values (Size/Color/Gender/Neck/Pattern) -> variant axes.
+  // NOTE: Gender is NOT here — it's a product-level categorization field, not a variant axis.
   const [attrValues, setAttrValues] = useState<Record<string, string[]>>({
     size: [],
     color: [],
-    gender: [],
     neckType: [],
     pattern: [],
   });
@@ -752,9 +753,9 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
       .slice(0, 12) || "SKU";
 
     const rows: VariantRow[] = combos.map((combo) => {
-      const key = ["size", "color", "gender", "neckType", "pattern"].map((k) => combo[k] || "").join("|");
+      const key = ["size", "color", "neckType", "pattern"].map((k) => combo[k] || "").join("|");
       const existing = existingByKey.get(key);
-      const skuSuffix = [combo.size, combo.color, combo.gender, combo.neckType, combo.pattern]
+      const skuSuffix = [combo.size, combo.color, combo.neckType, combo.pattern]
         .filter(Boolean)
         .map((part) => String(part).toUpperCase().replace(/[^A-Z0-9]+/g, "").slice(0, 4))
         .join("-");
@@ -763,7 +764,7 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
         sku: existing?.sku || (skuSuffix ? `${skuBase}-${skuSuffix}` : skuBase),
         size: combo.size || "",
         color: combo.color || "",
-        gender: combo.gender || "",
+        gender: "", // gender is product-level now, not per-variant
         neckType: combo.neckType || "",
         pattern: combo.pattern || "",
         price: existing?.price ?? (formData.price || ""),
@@ -881,12 +882,15 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
         name: formData.name,
         description: formData.description,
         category: formData.category,
+        // Gender is a product-level categorization field (single-select),
+        // not a variant axis.
+        gender: formData.gender,
         price: parseFloat(formData.price),
         image: uploadedImages[0],
         images: uploadedImages,
         sizes: attrValues.size,
         colors: attrValues.color,
-        genders: attrValues.gender,
+        genders: formData.gender ? [formData.gender] : [],
         neckTypes: attrValues.neckType,
         patterns: attrValues.pattern,
         variants: variants.map((row) => ({
@@ -929,6 +933,7 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
         name: "",
         description: "",
         category: formData.category,
+        gender: formData.gender,
         price: "",
         stock: "100",
         customizable: false,
@@ -950,7 +955,7 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
         notes: "",
       });
       setSelectedImageFiles([]);
-      setAttrValues({ size: [], color: [], gender: [], neckType: [], pattern: [] });
+      setAttrValues({ size: [], color: [], neckType: [], pattern: [] });
       setVariants([]);
 
       setTimeout(() => setSuccess(false), 5000);
@@ -1763,6 +1768,43 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
                       value={formData.stock}
                       onChange={e => setFormData({...formData, stock: e.target.value})}
                     />
+                  </div>
+                </div>
+
+                {/* Category & Gender (categorization — NOT variants) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">Category</label>
+                    <select
+                      title="Category"
+                      aria-label="Category"
+                      className="h-12 w-full rounded-xl border border-gray-200 bg-gray-50 focus:bg-white px-3 text-base"
+                      value={formData.category}
+                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    >
+                      <option value="">Select a category…</option>
+                      {marketplaceCategories.map((cat) => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">Gender</label>
+                    <select
+                      title="Gender"
+                      aria-label="Gender"
+                      className="h-12 w-full rounded-xl border border-gray-200 bg-gray-50 focus:bg-white px-3 text-base"
+                      value={formData.gender}
+                      onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                    >
+                      <option value="">Select gender…</option>
+                      {GENDER_OPTIONS.map((g) => (
+                        <option key={g} value={g}>{g}</option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-muted-foreground mt-1.5">
+                      Used for categorization &amp; storefront filtering. This does not create variants.
+                    </p>
                   </div>
                 </div>
 

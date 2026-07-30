@@ -6,9 +6,8 @@ import { Product } from "@/app/lib/mock-data";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Filter, Search, ChevronDown, RefreshCw, Sparkles, Palette, ShoppingBag, X, ArrowRight, LayoutGrid } from "lucide-react";
+import { Filter, Search, ChevronDown, RefreshCw, Sparkles, Palette, ShoppingBag, X } from "lucide-react";
 import Link from "next/link";
-import Image from "next/image";
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import {
@@ -83,7 +82,6 @@ export default function MarketplaceContent() {
   const [searchQuery, setSearchQuery] = useState(searchParams.get("search") || "");
   const [activeSearch, setActiveSearch] = useState(searchParams.get("search") || "");
   const [activeGender, setActiveGender] = useState(searchParams.get("gender") || "");
-  const [genderCovers, setGenderCovers] = useState<Record<string, string>>({});
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -168,37 +166,6 @@ export default function MarketplaceContent() {
     setActiveGender(searchParams.get("gender") || "");
     setActiveSearch(searchParams.get("search") || "");
   }, [searchParams]);
-
-  // Fetch a representative product image for each gender category card
-  // (and a general cover for the "All Products" card).
-  useEffect(() => {
-    if (!roleResolved || role === "superadmin") return;
-    let cancelled = false;
-
-    async function loadCovers() {
-      try {
-        const covers: Record<string, string> = {};
-        await Promise.all(
-          GENDER_CATEGORIES.map(async (cat) => {
-            const { products: sample } = await getProductsFromBackend({
-              gender: cat.value || undefined,
-              limit: 1,
-            });
-            const cover = sample.find((p) => p.image)?.image;
-            if (cover) covers[cat.value] = cover;
-          })
-        );
-        if (!cancelled) setGenderCovers(covers);
-      } catch (error) {
-        console.error("Failed to load category covers", error);
-      }
-    }
-
-    loadCovers();
-    return () => {
-      cancelled = true;
-    };
-  }, [role, roleResolved]);
 
   useEffect(() => {
     if (!roleResolved || role === "superadmin") {
@@ -331,60 +298,31 @@ export default function MarketplaceContent() {
         <div className="flex flex-col gap-10">
           {/* Global gender categories — the top-level "shop by audience" entry points. */}
           {role !== "superadmin" && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-2xl font-bold font-headline tracking-tight">Shop by Category</h2>
-                  <p className="text-sm text-muted-foreground font-medium">Pick who you&apos;re shopping for</p>
-                </div>
-                {activeGender && (
-                  <Button
-                    variant="ghost"
-                    className="rounded-full text-sm font-semibold text-primary hover:bg-primary/5"
-                    onClick={() => selectGender("")}
-                  >
-                    <X className="mr-1 h-4 w-4" /> Clear filter
-                  </Button>
-                )}
+            <div className="space-y-5">
+              <div className="text-center">
+                <h2 className="text-2xl sm:text-3xl font-bold font-headline tracking-tight">Shop by Category</h2>
+                <p className="text-sm text-muted-foreground font-medium mt-1">Who are you shopping for?</p>
               </div>
 
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+              {/* Minimal segmented pill selector — clean, instant, never repetitive. */}
+              <div className="flex flex-wrap items-center justify-center gap-2.5">
                 {GENDER_CATEGORIES.map((cat) => {
                   const isActive = activeGender === cat.value;
-                  const cover = genderCovers[cat.value] || cat.fallbackImage;
                   return (
                     <button
                       key={cat.value}
                       type="button"
                       onClick={() => selectGender(cat.value)}
-                      className={`group relative aspect-square w-full max-w-[260px] mx-auto overflow-hidden rounded-2xl border text-left transition-all hover:shadow-xl ${
-                        isActive ? "border-primary ring-2 ring-primary shadow-lg" : "border-border/50 hover:border-primary/40"
+                      className={`group inline-flex items-center gap-2 rounded-full border px-5 py-2.5 text-sm font-semibold transition-all duration-200 ${
+                        isActive
+                          ? "border-primary bg-primary text-primary-foreground shadow-md shadow-primary/20 scale-[1.03]"
+                          : "border-border/60 bg-card text-foreground/80 hover:border-primary/50 hover:text-primary hover:bg-primary/[0.04]"
                       }`}
                     >
-                      {/* Product image background */}
-                      {cover ? (
-                        <Image
-                          src={cover}
-                          alt={cat.label}
-                          fill
-                          className="object-cover transition-transform duration-500 group-hover:scale-105"
-                          sizes="(max-width: 1024px) 50vw, 25vw"
-                        />
-                      ) : (
-                        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-muted via-background to-muted text-primary">
-                          <LayoutGrid className="h-10 w-10 opacity-40" />
-                        </div>
+                      {cat.label}
+                      {isActive && cat.value && (
+                        <X className="h-3.5 w-3.5 opacity-80" />
                       )}
-                      {/* Dark gradient so the label is always readable */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent" />
-                      {/* Label */}
-                      <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white">
-                        <h3 className="text-lg font-bold drop-shadow">{cat.label}</h3>
-                        <p className="text-xs text-white/85 drop-shadow">{cat.description}</p>
-                        <span className="mt-2 inline-flex items-center gap-1 text-sm font-semibold">
-                          Shop now <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                        </span>
-                      </div>
                     </button>
                   );
                 })}

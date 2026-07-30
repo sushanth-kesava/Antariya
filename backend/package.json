@@ -13,6 +13,8 @@
     "db:reassign-owners": "node scripts/reassign-product-owners.js",
     "db:inspect-products": "node scripts/inspect-products.js",
     "db:migrate-inventory": "node scripts/migrate-inventory.js",
+    "db:migrate-categories": "node scripts/migrate-categories.js",
+    "db:backfill-profiles": "node scripts/backfill-customer-profiles.js",
     "db:generate-barcodes": "node scripts/generate-barcodes.js"
   },
   "dependencies": {

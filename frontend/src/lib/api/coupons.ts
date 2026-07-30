@@ -6,6 +6,8 @@ const API_BASE_URL = getApiBaseUrl();
 
 export type CouponDiscountType = "percentage" | "flat" | "free_shipping";
 
+export type CouponVisibility = "public" | "restricted";
+
 export type Coupon = {
   _id: string;
   code: string;
@@ -23,8 +25,11 @@ export type Coupon = {
   showOnHero: boolean;
   heroBannerText: string;
   heroBannerColor: string;
+  heroImage: string;
   applicableCategories: string[];
   freeDelivery: boolean;
+  visibility: CouponVisibility;
+  allowedEmails: string[];
   active: boolean;
   isValid: boolean;
   createdBy: string;
@@ -34,7 +39,7 @@ export type Coupon = {
 
 export type HeroCoupon = Pick<
   Coupon,
-  "code" | "title" | "description" | "discountType" | "discountValue" | "maxDiscount" | "minOrderValue" | "heroBannerText" | "heroBannerColor" | "validUntil"
+  "code" | "title" | "description" | "discountType" | "discountValue" | "maxDiscount" | "minOrderValue" | "heroBannerText" | "heroBannerColor" | "heroImage" | "validUntil"
 >;
 
 export type CouponValidationResult = {
@@ -61,8 +66,11 @@ export type CreateCouponPayload = {
   showOnHero?: boolean;
   heroBannerText?: string;
   heroBannerColor?: string;
+  heroImage?: string;
   applicableCategories?: string[];
   freeDelivery?: boolean;
+  visibility?: CouponVisibility;
+  allowedEmails?: string[] | string;
 };
 
 // ─── Public: Get hero coupons for homepage ───────────────────────────────────

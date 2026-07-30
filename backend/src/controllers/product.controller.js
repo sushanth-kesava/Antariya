@@ -106,6 +106,8 @@ function normalizeProduct(doc) {
     price: doc.price,
     category: doc.category,
     subCategory: doc.subCategory || "",
+    categoryId: doc.categoryId ? doc.categoryId.toString() : null,
+    subCategoryId: doc.subCategoryId ? doc.subCategoryId.toString() : null,
     size: doc.size || "",
     color: doc.color || "",
     gender: doc.gender || "",
@@ -759,12 +761,40 @@ async function createProduct(req, res, next) {
 
     const primaryImage = normalizedGallery[0];
 
+    // ─── Resolve category references ────────────────────────────────
+    // Prefer explicit categoryId/subCategoryId from the client; otherwise
+    // match the string category/subCategory to the Category tree so the new
+    // relational fields stay populated. Non-fatal if the Category model has
+    // no match yet (keeps backward compatibility with the string fields).
+    let resolvedCategoryId = null;
+    let resolvedSubCategoryId = null;
+    try {
+      const Category = require("../models/Category");
+      const { categoryId, subCategoryId } = req.body;
+      if (categoryId && mongoose.Types.ObjectId.isValid(categoryId)) {
+        resolvedCategoryId = categoryId;
+      } else if (category) {
+        const match = await Category.findOne({ slug: Category.slugify(category) });
+        resolvedCategoryId = match ? match._id : null;
+      }
+      if (subCategoryId && mongoose.Types.ObjectId.isValid(subCategoryId)) {
+        resolvedSubCategoryId = subCategoryId;
+      } else if (subCategory) {
+        const submatch = await Category.findOne({ slug: Category.slugify(subCategory) });
+        resolvedSubCategoryId = submatch ? submatch._id : null;
+      }
+    } catch (catErr) {
+      console.warn("[Category] Resolution skipped:", catErr.message);
+    }
+
     const product = await Product.create({
       name,
       description,
       price: Number(price),
       category: category || "",
       subCategory: subCategory || "",
+      categoryId: resolvedCategoryId,
+      subCategoryId: resolvedSubCategoryId,
       size: size || "",
       color: color || "",
       gender: gender || "",
@@ -851,7 +881,47 @@ async function deleteProduct(req, res, next) {
       });
     }
 
-    await Product.findByIdAndDelete(req.params.id);
+    // ─── ATOMIC PRODUCT + BARCODE DELETION ──────────────────────────
+    // Pseudo-flow: Delete Barcode → Delete Barcode File → Delete Product.
+    // Wrapped in a transaction so we never leave orphan barcode records.
+    // Falls back to sequential deletes on standalone MongoDB (no replica
+    // set / transaction support).
+    const BarcodeService = require("../services/barcode.service");
+    let session = null;
+
+    try {
+      session = await mongoose.startSession();
+      session.startTransaction();
+
+      // 1 + 2. Remove barcode DB records and any stored image files.
+      await BarcodeService.deleteProductBarcodes(product._id, { session });
+
+      // 3. Remove the product itself.
+      await Product.findByIdAndDelete(req.params.id, { session });
+
+      await session.commitTransaction();
+    } catch (txnError) {
+      if (session) {
+        try { await session.abortTransaction(); } catch (_) { /* noop */ }
+      }
+
+      // Fallback for standalone Mongo (transactions unsupported): run the
+      // same steps sequentially so a single-node dev DB still works.
+      const unsupported =
+        txnError?.code === 20 ||
+        /Transaction numbers|replica set|not supported/i.test(txnError?.message || "");
+
+      if (!unsupported) {
+        throw txnError;
+      }
+
+      await BarcodeService.deleteProductBarcodes(product._id);
+      await Product.findByIdAndDelete(req.params.id);
+    } finally {
+      if (session) {
+        session.endSession();
+      }
+    }
 
     return res.status(200).json({
       success: true,

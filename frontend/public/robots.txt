@@ -1,31 +1,23 @@
-# Robots.txt for Antariya E-commerce
-
-# Allow all bots
 User-agent: *
 Allow: /
 
-# Disallow admin/private areas
+# Private / authenticated areas — keep out of search results
 Disallow: /portal/
-Disallow: /admin-login
+Disallow: /account/
 Disallow: /admin-login/
-Disallow: /superadmin-login
 Disallow: /superadmin-login/
+Disallow: /login/
+Disallow: /signup/
+Disallow: /checkout/
+Disallow: /cart/
+Disallow: /wishlist/
 Disallow: /complete-profile/
+Disallow: /select-address/
+Disallow: /order-status/
+Disallow: /coming-soon/
 
-# Sitemaps
+# Backend API and raw entry file
+Disallow: /api/
+Disallow: /index.html
+
 Sitemap: https://antariyaofficial.com/sitemap.xml
-
-# Crawl Delay (optional - set reasonable value)
-Crawl-delay: 1
-
-# Specific bot rules (optional)
-User-agent: Googlebot
-Allow: /
-Disallow: /portal/
-
-User-agent: Bingbot
-Allow: /
-Disallow: /portal/
-
-User-agent: BadBot
-Disallow: /

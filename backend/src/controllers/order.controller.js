@@ -337,7 +337,24 @@ async function createOrder(req, res, next) {
         const meetsMin = subtotalPaise >= (coupon.minOrderValue || 0);
         const meetsQty = !coupon.minQuantity || totalQuantity >= coupon.minQuantity;
 
-        if (isValid && meetsMin && meetsQty) {
+        // Restricted (private) coupon: the buyer's email MUST be on the
+        // allow-list. Re-checked here (not just at /validate) so a direct
+        // order API call can't bypass the restriction.
+        const buyerEmail = String(req.auth?.email || "").trim().toLowerCase();
+        const isAllowedForUser =
+          coupon.visibility !== "restricted" ||
+          (Array.isArray(coupon.allowedEmails) && buyerEmail && coupon.allowedEmails.includes(buyerEmail));
+
+        // Global usage cap re-check.
+        const underUsageCap = coupon.maxUses === null || coupon.maxUses === undefined || coupon.currentUses < coupon.maxUses;
+
+        // Per-user usage cap re-check.
+        const userUseCount = Array.isArray(coupon.usageLog)
+          ? coupon.usageLog.filter((log) => log.userId === req.auth?.sub || log.email === buyerEmail).length
+          : 0;
+        const underPerUserCap = !coupon.maxUsesPerUser || userUseCount < coupon.maxUsesPerUser;
+
+        if (isValid && meetsMin && meetsQty && isAllowedForUser && underUsageCap && underPerUserCap) {
           if (coupon.discountType === "percentage") {
             couponDiscount = Math.round((subtotalPaise * coupon.discountValue) / 100);
             if (coupon.maxDiscount !== null && couponDiscount > coupon.maxDiscount) {

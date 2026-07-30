@@ -7,6 +7,7 @@ const AccessRequest = require("../models/AccessRequest");
 const CustomerProfile = require("../models/CustomerProfile");
 const env = require("../config/env");
 const { sendWelcomeEmail } = require("../services/mail.service");
+const { ensureCustomerProfile } = require("../services/customerProfile.service");
 const { setAuthCookie } = require("../middleware/cookie-auth.middleware");
 
 function normalizeDisplayName(email, displayName) {
@@ -363,22 +364,11 @@ async function loginWithGoogle(req, res, next) {
       });
     }
 
-    // Create CustomerProfile for new customers
-    if (shouldSendWelcomeEmail && inferredRole === "customer") {
-      CustomerProfile.findOneAndUpdate(
-        { userId: authDocument._id },
-        {
-          $setOnInsert: {
-            userId: authDocument._id,
-            email: authDocument.email,
-            displayName: authDocument.displayName || "",
-            photoURL: authDocument.photoURL || null,
-          },
-        },
-        { upsert: true, new: true }
-      ).catch((profileError) => {
-        console.error("CustomerProfile creation failed:", profileError.message || profileError);
-      });
+    // Ensure a CustomerProfile exists for EVERY customer on every login — not
+    // just brand-new ones — so the User and CustomerProfile collections never
+    // drift apart. Idempotent + fire-and-forget (never blocks auth).
+    if (inferredRole === "customer") {
+      ensureCustomerProfile(authDocument);
     }
 
     return res.status(200).json(issueAuthResponse(authDocument, inferredRole, res));
@@ -467,21 +457,8 @@ async function signupWithCredentials(req, res, next) {
 
     const savedUser = await userDocument.save();
 
-    // Create CustomerProfile for new credentials customer
-    CustomerProfile.findOneAndUpdate(
-      { userId: savedUser._id },
-      {
-        $setOnInsert: {
-          userId: savedUser._id,
-          email: savedUser.email,
-          displayName: savedUser.displayName || "",
-          photoURL: null,
-        },
-      },
-      { upsert: true, new: true }
-    ).catch((profileError) => {
-      console.error("CustomerProfile creation failed:", profileError.message || profileError);
-    });
+    // Ensure the CustomerProfile exists (idempotent, fire-and-forget).
+    ensureCustomerProfile(savedUser);
 
     sendWelcomeEmail({
       to: savedUser.email,
@@ -588,6 +565,10 @@ async function loginWithCredentials(req, res, next) {
       lastLoginAt: new Date(),
     };
     await user.save();
+
+    // Self-heal: ensure a CustomerProfile exists for returning customers who
+    // signed up before profile creation was reliable (idempotent).
+    ensureCustomerProfile(user);
 
     return res.status(200).json(issueAuthResponse(user, user.role || "customer", res));
   } catch (error) {

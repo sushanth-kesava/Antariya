@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   Mail,
   Ticket,
+  FolderTree,
   ScrollText,
   KeyRound,
   LogOut,
@@ -38,6 +39,7 @@ import { FinanceModule } from "./modules/FinanceModule";
 import { FinanceModuleV2 } from "./modules/FinanceModuleV2";
 import { CommsModule } from "./modules/CommsModule";
 import { CouponsModule } from "./modules/CouponsModule";
+import { CategoriesModule } from "./modules/CategoriesModule";
 import { BarcodeModule } from "./modules/BarcodeModule";
 import { QCModule } from "./modules/QCModule";
 import { SupportModule } from "./modules/SupportModule";
@@ -72,6 +74,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: "finance", label: "Finance & Reports", icon: Wallet, anyOf: ["finance.view"] },
   { key: "comms", label: "Communications", icon: Mail, anyOf: ["comms.campaigns.view", "comms.templates.view", "comms.subscribers.view", "comms.logs.view"] },
   { key: "coupons", label: "Coupons & Offers", icon: Ticket },
+  { key: "categories", label: "Categories", icon: FolderTree },
   { key: "support", label: "Customer Support", icon: Headphones },
   { key: "forecast", label: "AI Forecasting", icon: Brain },
   { key: "governance", label: "Governance", icon: ShieldCheck, anyOf: ["governance.roles.view", "governance.audit.view", "governance.settings.manage"] },
@@ -126,6 +129,8 @@ export function ErpShell({
         return <CommsModule token={token} has={has} />;
       case "coupons":
         return <CouponsModule token={token} has={has} />;
+      case "categories":
+        return <CategoriesModule token={token} has={has} />;
       case "support":
         return <SupportModule token={token} has={has} />;
       case "forecast":
