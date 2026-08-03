@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
@@ -16,8 +17,23 @@ import {
   Phone,
   MessageCircle
 } from "lucide-react";
+import { getAboutPageContentFromBackend, AboutPageContent } from "@/lib/api/site-content";
 
 export default function About() {
+  const [content, setContent] = useState<AboutPageContent | null>(null);
+
+  useEffect(() => {
+    getAboutPageContentFromBackend()
+      .then((data) => setContent(data))
+      .catch(() => setContent(null));
+  }, []);
+
+  const teamMembers = content?.teamMembers?.length ? content.teamMembers : [
+    { name: "Sushanth Kesava", role: "CEO & Founder", email: "", phone: "", bio: "Leading Antariya’s growth strategy, product vision, and brand experience across India.", imageUrl: "" },
+    { name: "Asha Rao", role: "Head of Operations", email: "", phone: "", bio: "Driving fulfillment quality, vendor relationships, and day-to-day execution.", imageUrl: "" },
+    { name: "Rahul Verma", role: "Product & Design Lead", email: "", phone: "", bio: "Shaping the platform experience and customer-facing product storytelling.", imageUrl: "" },
+  ];
+
   return (
     <div className="flex flex-col min-h-screen">
       <Navbar />
@@ -173,6 +189,42 @@ export default function About() {
                   </div>
                   <h3 className="text-xl font-bold">{item.title}</h3>
                   <p className="text-muted-foreground leading-relaxed">{item.description}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Team Section */}
+        <section className="py-20 lg:py-32">
+          <div className="w-full max-w-[1760px] mx-auto px-3 sm:px-4 lg:px-6">
+            <div className="text-center mb-16">
+              <Badge className="rounded-full bg-primary/10 text-primary border-primary/30 mx-auto mb-4">
+                Meet the Team
+              </Badge>
+              <h2 className="text-4xl font-bold font-theseasons">The People Behind Antariya</h2>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto mt-4">
+                Our leadership and core team drive the vision, operations, and customer experience that power the brand.
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-8 max-w-6xl mx-auto">
+              {teamMembers.map((member, index) => (
+                <div key={`${member.name}-${index}`} className="rounded-3xl border border-border bg-card p-6 shadow-sm">
+                  <div className="mb-5 h-32 w-32 overflow-hidden rounded-3xl bg-primary/10 text-2xl font-bold text-primary flex items-center justify-center">
+                    {member.imageUrl ? (
+                      <img src={member.imageUrl} alt={member.name} className="h-full w-full object-cover" />
+                    ) : (
+                      <span>{member.name.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase()}</span>
+                    )}
+                  </div>
+                  <h3 className="text-xl font-bold">{member.name}</h3>
+                  <p className="mt-1 text-sm font-semibold uppercase tracking-[0.2em] text-primary">{member.role}</p>
+                  {member.bio ? <p className="mt-4 text-sm text-muted-foreground leading-relaxed">{member.bio}</p> : null}
+                  <div className="mt-5 space-y-2 text-sm text-muted-foreground">
+                    {member.email ? <a href={`mailto:${member.email}`} className="flex items-center gap-2 hover:text-primary"><Mail className="h-4 w-4" />{member.email}</a> : null}
+                    {member.phone ? <a href={`tel:${member.phone}`} className="flex items-center gap-2 hover:text-primary"><Phone className="h-4 w-4" />{member.phone}</a> : null}
+                  </div>
                 </div>
               ))}
             </div>

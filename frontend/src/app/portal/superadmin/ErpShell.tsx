@@ -45,6 +45,7 @@ import { QCModule } from "./modules/QCModule";
 import { SupportModule } from "./modules/SupportModule";
 import { ForecastModule } from "./modules/ForecastModule";
 import { POSModule } from "./modules/POSModule";
+import { SiteContentModule } from "./modules/SiteContentModule";
 
 type ErpUser = {
   id: string | null;
@@ -76,6 +77,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: "coupons", label: "Coupons & Offers", icon: Ticket },
   { key: "categories", label: "Categories", icon: FolderTree },
   { key: "support", label: "Customer Support", icon: Headphones },
+  { key: "site-content", label: "About / Team", icon: ScrollText },
   { key: "forecast", label: "AI Forecasting", icon: Brain },
   { key: "governance", label: "Governance", icon: ShieldCheck, anyOf: ["governance.roles.view", "governance.audit.view", "governance.settings.manage"] },
 ];
@@ -133,6 +135,8 @@ export function ErpShell({
         return <CategoriesModule token={token} has={has} />;
       case "support":
         return <SupportModule token={token} has={has} />;
+      case "site-content":
+        return <SiteContentModule token={token} />;
       case "forecast":
         return <ForecastModule token={token} has={has} />;
       default:

@@ -41,6 +41,7 @@ router.post("/upload-images", requireAuth, requireRole("admin", "superadmin"), p
 router.get("/:id/review-eligibility", requireAuth, getReviewEligibility);
 router.get("/:id/reviews", getProductReviews);
 router.post("/:id/reviews", requireAuth, createProductReview);
+router.patch("/:productId/images", requireAuth, requireRole("admin", "superadmin"), productImageUploadMiddleware, uploadProductImages);
 router.get("/:id", getProductById);
 router.post("/", requireAuth, requireRole("admin", "superadmin"), createProduct);
 router.delete("/:id", requireAuth, requireRole("admin", "superadmin"), deleteProduct);

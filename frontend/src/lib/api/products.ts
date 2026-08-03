@@ -388,6 +388,39 @@ export async function uploadProductImagesToBackend(token: string, files: File[])
   return Array.isArray(data.images) ? (data.images as string[]) : [];
 }
 
+export async function replaceProductImagesOnBackend(
+  token: string,
+  productId: string,
+  payload: { keepImages: string[]; files: File[] }
+): Promise<Product> {
+  const formData = new FormData();
+
+  for (const keep of (payload.keepImages || []).slice(0, 10)) {
+    formData.append("keepImages", keep);
+  }
+
+  for (const file of (payload.files || []).slice(0, 10)) {
+    formData.append("images", file);
+  }
+
+  const response = await fetch(`${API_BASE_URL}/products/${productId}/images`, {
+    credentials: "include",
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data?.success) {
+    throw new Error(data?.message || "Failed to update product images");
+  }
+
+  return data.product as Product;
+}
+
 export async function deleteProductOnBackend(token: string, productId: string): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/products/${productId}`, {
     credentials: "include",

@@ -645,11 +645,30 @@ async function uploadProductImages(req, res, next) {
 
     const files = Array.isArray(req.files) ? req.files : [];
 
-    if (files.length === 0) {
+    const targetProductId = String(req.params?.productId || "").trim();
+    const isProductGalleryEdit = targetProductId.length > 0;
+
+    if (!isProductGalleryEdit && files.length === 0) {
       return res.status(400).json({
         success: false,
         message: "Please upload at least one image",
       });
+    }
+
+    let product = null;
+    if (isProductGalleryEdit) {
+      if (!mongoose.Types.ObjectId.isValid(targetProductId)) {
+        return res.status(404).json({ success: false, message: "Product not found" });
+      }
+
+      product = await Product.findById(targetProductId);
+      if (!product) {
+        return res.status(404).json({ success: false, message: "Product not found" });
+      }
+
+      if (!(await canManageProduct(req, product))) {
+        return res.status(403).json({ success: false, message: "You can only manage your own products" });
+      }
     }
 
     let imageUrls = [];
@@ -675,10 +694,49 @@ async function uploadProductImages(req, res, next) {
       imageUrls = files.map(bufferToDataUrl);
     }
 
-    if (imageUrls.length === 0) {
+    if (imageUrls.length === 0 && !isProductGalleryEdit) {
       return res.status(500).json({
         success: false,
         message: "No images were uploaded",
+      });
+    }
+
+    if (isProductGalleryEdit && product) {
+      const keepRaw = req.body?.keepImages;
+      const keepImages = Array.isArray(keepRaw)
+        ? keepRaw
+        : typeof keepRaw === "string" && keepRaw.trim().length > 0
+          ? [keepRaw]
+          : [];
+
+      const currentImages = Array.isArray(product.images) && product.images.length > 0
+        ? product.images
+        : [product.image].filter(Boolean);
+
+      const keepSet = new Set(currentImages.filter((url) => keepImages.includes(url)));
+      const merged = [...keepSet, ...imageUrls]
+        .filter((item) => typeof item === "string" && item.trim().length > 0)
+        .map((item) => item.trim())
+        .filter((item, index, array) => array.indexOf(item) === index)
+        .slice(0, MAX_PRODUCT_IMAGES);
+
+      if (merged.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "At least one image must remain in the product gallery",
+        });
+      }
+
+      product.images = merged;
+      product.galleryImages = merged;
+      product.image = merged[0];
+      await product.save();
+
+      return res.status(200).json({
+        success: true,
+        message: "Product gallery updated",
+        images: merged,
+        product: normalizeProduct(product),
       });
     }
 

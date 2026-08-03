@@ -52,6 +52,7 @@ import {
   ModerationActivityItem,
   ModerationReview,
   ReviewModerationStatus,
+  replaceProductImagesOnBackend,
   uploadProductImagesToBackend,
   updateReviewModerationOnBackend,
 } from "@/lib/api/products";
@@ -128,6 +129,8 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
   const [stockEditProduct, setStockEditProduct] = useState<any | null>(null);
   const [stockEditVariantSku, setStockEditVariantSku] = useState<string>("");
   const [stockEditValue, setStockEditValue] = useState<string>("");
+  const [stockEditImages, setStockEditImages] = useState<string[]>([]);
+  const [stockEditNewFiles, setStockEditNewFiles] = useState<File[]>([]);
   const [stockEditSaving, setStockEditSaving] = useState(false);
   const [stockEditError, setStockEditError] = useState<string | null>(null);
   const [loadingDashboard, setLoadingDashboard] = useState(false);
@@ -217,6 +220,11 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
     [selectedImageFiles]
   );
 
+  const stockEditImagePreviews = useMemo(
+    () => stockEditNewFiles.map((file) => ({ file, previewUrl: URL.createObjectURL(file) })),
+    [stockEditNewFiles]
+  );
+
   useEffect(() => {
     return () => {
       selectedImagePreviews.forEach((entry) => {
@@ -224,6 +232,14 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
       });
     };
   }, [selectedImagePreviews]);
+
+  useEffect(() => {
+    return () => {
+      stockEditImagePreviews.forEach((entry) => {
+        URL.revokeObjectURL(entry.previewUrl);
+      });
+    };
+  }, [stockEditImagePreviews]);
 
   useEffect(() => {
     const validateAdminSession = async () => {
@@ -474,6 +490,8 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
     setStockEditProduct(product);
     setStockEditVariantSku(firstSku);
     setStockEditValue(String(initialStock));
+    setStockEditImages(Array.isArray(product.images) && product.images.length > 0 ? product.images : [product.image].filter(Boolean));
+    setStockEditNewFiles([]);
     setStockEditError(null);
   };
 
@@ -481,7 +499,37 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
     setStockEditProduct(null);
     setStockEditVariantSku("");
     setStockEditValue("");
+    setStockEditImages([]);
+    setStockEditNewFiles([]);
     setStockEditError(null);
+  };
+
+  const removeStockEditImage = (index: number) => {
+    setStockEditImages((current) => current.filter((_, imageIndex) => imageIndex !== index));
+  };
+
+  const handleStockEditFileSelect = (incomingFiles: FileList | File[]) => {
+    const nextFiles = Array.from(incomingFiles).filter((file) => file.type.startsWith("image/"));
+    if (nextFiles.length === 0) {
+      setStockEditError("Please choose valid image files.");
+      return;
+    }
+    setStockEditError(null);
+    setStockEditNewFiles((current) => {
+      const deduped = [...current];
+      for (const file of nextFiles) {
+        const exists = deduped.some(
+          (item) => item.name === file.name && item.size === file.size && item.lastModified === file.lastModified
+        );
+        if (!exists) deduped.push(file);
+        if (stockEditImages.length + deduped.length >= 10) break;
+      }
+      return deduped.slice(0, Math.max(0, 10 - stockEditImages.length));
+    });
+  };
+
+  const removeStockEditNewFile = (index: number) => {
+    setStockEditNewFiles((current) => current.filter((_, fileIndex) => fileIndex !== index));
   };
 
   // When switching the selected variant, reflect that variant's current stock.
@@ -506,6 +554,24 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
     try {
       setStockEditSaving(true);
       setStockEditError(null);
+
+      const finalImageCount = stockEditImages.length + stockEditNewFiles.length;
+      if (finalImageCount === 0) {
+        setStockEditError("At least one product photo is required.");
+        setStockEditSaving(false);
+        return;
+      }
+
+      let latestProduct = stockEditProduct;
+      if (stockEditNewFiles.length > 0 || stockEditImages.length !== (Array.isArray(stockEditProduct.images) ? stockEditProduct.images.length : 0)) {
+        const updated = await replaceProductImagesOnBackend(authToken, stockEditProduct.id, {
+          keepImages: stockEditImages,
+          files: stockEditNewFiles,
+        });
+        latestProduct = updated;
+        setCatalog((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      }
+
       // "set" writes the exact new stock level via the transactional service.
       const { product } = await adjustStockOnBackend(authToken, stockEditProduct.id, {
         type: "set",
@@ -514,7 +580,7 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
         reason: "Manual stock edit (catalog)",
       });
       setCatalog((current) => current.map((item) => (item.id === product.id ? product : item)));
-      setAdjustMessage({ type: "success", text: "Stock updated successfully." });
+      setAdjustMessage({ type: "success", text: latestProduct.id === product.id ? "Stock and photos updated successfully." : "Stock updated successfully." });
       void loadCatalog();
       void loadStockHistory();
       void loadInventory();
@@ -724,6 +790,7 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
   const removeSelectedImage = (index: number) => {
     setSelectedImageFiles((current) => current.filter((_, idx) => idx !== index));
   };
+
 
   // Cartesian product of the selected attribute axes -> one row per combination.
   const generateVariants = () => {
@@ -2283,7 +2350,7 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
             </div>
 
             <Dialog open={Boolean(stockEditProduct)} onOpenChange={(open) => { if (!open) closeStockEditor(); }}>
-              <DialogContent className="sm:max-w-md">
+              <DialogContent className="sm:max-w-2xl">
                 <DialogHeader>
                   <DialogTitle>Update stock</DialogTitle>
                   <DialogDescription>
@@ -2292,6 +2359,58 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
                 </DialogHeader>
 
                 <div className="space-y-4 py-2">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">Product photos</label>
+                    {stockEditImages.length > 0 ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        {stockEditImages.map((image, index) => (
+                          <div key={`${image}-${index}`} className="relative overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
+                            <img src={image} alt={`product-photo-${index + 1}`} className="h-24 w-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => removeStockEditImage(index)}
+                              className="absolute right-1.5 top-1.5 rounded-full bg-black/70 p-1 text-white"
+                              title="Delete this photo"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">No current photos. Add at least one before saving.</p>
+                    )}
+
+                    <div className="rounded-2xl border border-dashed border-gray-300 p-3">
+                      <label className="mb-2 block text-xs font-medium text-gray-700">Add new photos (up to total 10)</label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={(e) => handleStockEditFileSelect(e.target.files || [])}
+                        className="block w-full text-sm text-gray-600 file:mr-3 file:rounded-full file:border-0 file:bg-primary/10 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-primary hover:file:bg-primary/20"
+                      />
+                    </div>
+
+                    {stockEditImagePreviews.length > 0 && (
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        {stockEditImagePreviews.map((entry, index) => (
+                          <div key={`${entry.file.name}-${index}`} className="relative overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
+                            <img src={entry.previewUrl} alt={`new-photo-${index + 1}`} className="h-24 w-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => removeStockEditNewFile(index)}
+                              className="absolute right-1.5 top-1.5 rounded-full bg-black/70 p-1 text-white"
+                              title="Remove selected file"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
                   {Array.isArray(stockEditProduct?.variants) && stockEditProduct.variants.length > 0 && (
                     <div className="space-y-1.5">
                       <label className="text-sm font-medium text-gray-700">Variant</label>
@@ -2333,7 +2452,7 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
                 <DialogFooter>
                   <Button variant="ghost" onClick={closeStockEditor} disabled={stockEditSaving}>Cancel</Button>
                   <Button onClick={() => void handleStockEditSave()} disabled={stockEditSaving} className="gap-2">
-                    {stockEditSaving ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving...</> : "Save stock"}
+                    {stockEditSaving ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving...</> : "Save changes"}
                   </Button>
                 </DialogFooter>
               </DialogContent>
