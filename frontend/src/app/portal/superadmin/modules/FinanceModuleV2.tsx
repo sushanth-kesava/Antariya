@@ -14,6 +14,7 @@ import {
   ArrowDownRight,
   RefreshCw,
   Plus,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,6 +25,7 @@ import {
   getFinanceDashboard,
   getFinanceTransactions,
   getExpenses,
+  voidTransaction,
   type FinanceDashboard,
   type FinanceTransaction,
   type FinanceExpense,
@@ -180,6 +182,21 @@ function TransactionsPanel({ token }: { token: string }) {
   useEffect(() => { load(); }, [load]);
 
   const fmt = (n: number) => `₹${n.toLocaleString("en-IN")}`;
+  const [voidingId, setVoidingId] = useState<string | null>(null);
+
+  const handleVoid = async (id: string) => {
+    if (!confirm("Delete this transaction? It will be excluded from revenue and all reports.")) return;
+    setVoidingId(id);
+    try {
+      await voidTransaction(token, id);
+      // Remove from the list immediately (default list hides voided).
+      setTransactions((prev) => prev.filter((t) => t._id !== id));
+      setTotal((n) => Math.max(0, n - 1));
+    } catch {
+      // no-op; keep row on failure
+    }
+    setVoidingId(null);
+  };
 
   return (
     <div className="space-y-4">
@@ -213,6 +230,7 @@ function TransactionsPanel({ token }: { token: string }) {
               <th className="text-right py-2">Paid</th>
               <th className="text-right py-2">Balance</th>
               <th className="text-left py-2">Status</th>
+              <th className="text-right py-2">Action</th>
             </tr></thead>
             <tbody>
               {transactions.map(t => (
@@ -225,6 +243,16 @@ function TransactionsPanel({ token }: { token: string }) {
                   <td className="py-2 text-right font-mono text-green-600">{fmt(t.paidAmount)}</td>
                   <td className="py-2 text-right font-mono text-red-600">{t.balanceAmount > 0 ? fmt(t.balanceAmount) : '—'}</td>
                   <td className="py-2"><PaymentBadge status={t.paymentStatus} /></td>
+                  <td className="py-2 text-right">
+                    <button
+                      onClick={() => handleVoid(t._id)}
+                      disabled={voidingId === t._id}
+                      title="Delete transaction (excludes it from revenue & reports)"
+                      className="inline-flex items-center justify-center rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-50"
+                    >
+                      {voidingId === t._id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>

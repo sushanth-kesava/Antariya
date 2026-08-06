@@ -11,10 +11,11 @@ exports.createTransaction = async (req, res) => {
 
 exports.getTransactions = async (req, res) => {
   try {
-    const { type, category, paymentStatus, startDate, endDate, page, limit } = req.query;
+    const { type, category, paymentStatus, startDate, endDate, page, limit, includeVoided } = req.query;
     const result = await FinanceService.getTransactions({
       type, category, paymentStatus, startDate, endDate,
-      page: parseInt(page) || 1, limit: parseInt(limit) || 20
+      page: parseInt(page) || 1, limit: parseInt(limit) || 20,
+      includeVoided: includeVoided === 'true' || includeVoided === '1'
     });
     res.json({ success: true, data: result });
   } catch (err) {
@@ -32,6 +33,19 @@ exports.recordPayment = async (req, res) => {
     res.json({ success: true, data: txn });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// Soft-delete (void) a transaction so it's excluded from revenue & reports.
+exports.voidTransaction = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body || {};
+    const txn = await FinanceService.voidTransaction({ transactionId: id, reason, userId: req.auth.sub });
+    res.json({ success: true, data: txn });
+  } catch (err) {
+    const code = err.message === 'Transaction not found' ? 404 : 500;
+    res.status(code).json({ success: false, message: err.message });
   }
 };
 

@@ -85,6 +85,13 @@ export async function recordPayment(token: string, transactionId: string, amount
   });
 }
 
+export async function voidTransaction(token: string, transactionId: string, reason?: string) {
+  return apiFetch<FinanceTransaction>(`/finance/transactions/${transactionId}`, token, {
+    method: "DELETE",
+    body: JSON.stringify({ reason: reason || "" }),
+  });
+}
+
 export async function createExpense(token: string, data: { category: string; description: string; amount: number; paymentMethod?: string; paidTo?: string; expenseDate: string }) {
   return apiFetch<FinanceExpense>("/finance/expenses", token, { method: "POST", body: JSON.stringify(data) });
 }

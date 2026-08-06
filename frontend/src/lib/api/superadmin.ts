@@ -11,6 +11,11 @@ export type SuperAdminDashboardSummary = {
   totalSuperAdmins: number;
   totalOrders: number;
   totalRevenue: number;
+  // Combined live snapshot breakdown (Online marketplace + Offline POS)
+  onlineOrders?: number;
+  offlineOrders?: number;
+  onlineRevenue?: number;
+  offlineRevenue?: number;
   pendingRequests: number;
   lowStockProducts: number;
   pendingReviews: number;
@@ -239,6 +244,37 @@ export async function updateUserRoleOnBackend(
 
   if (!response.ok || !data?.success) {
     throw new Error(data?.message || "Failed to update user role");
+  }
+
+  return data.account as SuperAdminManagedAccount;
+}
+
+/**
+ * Directly add a new team member (admin) by email — no need to find an
+ * existing customer first.
+ */
+export async function createTeamMemberOnBackend(
+  token: string,
+  payload: {
+    email: string;
+    displayName?: string;
+    role?: "admin" | "superadmin";
+  }
+): Promise<SuperAdminManagedAccount> {
+  const response = await fetch(`${API_BASE_URL}/superadmin/team-members`, {
+    credentials: "include",
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data?.success) {
+    throw new Error(data?.message || "Failed to add team member");
   }
 
   return data.account as SuperAdminManagedAccount;

@@ -232,6 +232,10 @@ class POSService {
     invoice.status = 'partially_returned';
     await invoice.save();
 
+    // Keep finance in sync: reduce (or void) the linked revenue transaction by
+    // the refunded amount so reports never over-count returned sales.
+    await POSService._reverseFinanceForInvoice(invoice._id, refundAmount, reason);
+
     // Add stock back
     const defaultWarehouse = await Warehouse.findOne({ code: "DEFAULT" }) || await Warehouse.findOne({});
     if (defaultWarehouse) {
@@ -308,5 +312,73 @@ class POSService {
     return Product.find(filter).select('name price sku variants images stock category').limit(10);
   }
 }
+
+/**
+ * Reduce the finance transaction linked to a POS invoice by `refundAmount`.
+ * If the whole sale is refunded (balance hits 0 or below), the transaction is
+ * voided (status 'cancelled') so it drops out of all revenue/reports. Keeps
+ * the Finance page reconciled with live POS invoices.
+ */
+POSService._reverseFinanceForInvoice = async function (invoiceId, refundAmount, reason) {
+  try {
+    const txn = await FinanceTransaction.findOne({
+      referenceType: 'order',
+      referenceId: invoiceId,
+      type: 'payment_received',
+    });
+    if (!txn) return;
+
+    const amt = Number(refundAmount) || 0;
+    txn.netAmount = Math.max(0, Number(txn.netAmount || 0) - amt);
+    txn.amount = Math.max(0, Number(txn.amount || 0) - amt);
+    txn.paidAmount = Math.max(0, Number(txn.paidAmount || 0) - amt);
+    txn.balanceAmount = Math.max(0, Number(txn.netAmount) - Number(txn.paidAmount));
+
+    const note = `[Return] ${reason || ''} (-${amt})`.trim();
+    txn.notes = txn.notes ? `${txn.notes}\n${note}` : note;
+
+    // Fully refunded → void it entirely so it no longer counts as revenue.
+    if (txn.netAmount <= 0) {
+      txn.status = 'cancelled';
+      txn.paymentStatus = 'cancelled';
+    }
+    await txn.save();
+  } catch (err) {
+    console.warn('[POS] Finance reversal failed:', err.message);
+  }
+};
+
+/**
+ * Cancel an entire POS invoice: marks it cancelled and voids the linked
+ * finance transaction so revenue reconciles. Returns the updated invoice.
+ */
+POSService.cancelInvoice = async function ({ invoiceId, reason, userId }) {
+  const invoice = await POSInvoice.findById(invoiceId);
+  if (!invoice) throw new Error('Invoice not found');
+  if (invoice.status === 'cancelled') return invoice; // idempotent
+
+  invoice.status = 'cancelled';
+  await invoice.save();
+
+  // Void the linked finance transaction entirely.
+  try {
+    const txn = await FinanceTransaction.findOne({
+      referenceType: 'order',
+      referenceId: invoice._id,
+      type: 'payment_received',
+    });
+    if (txn && txn.status !== 'cancelled') {
+      txn.status = 'cancelled';
+      txn.paymentStatus = 'cancelled';
+      const note = `[Cancelled] ${reason || ''}`.trim();
+      txn.notes = txn.notes ? `${txn.notes}\n${note}` : note;
+      await txn.save();
+    }
+  } catch (err) {
+    console.warn('[POS] Finance void on cancel failed:', err.message);
+  }
+
+  return invoice;
+};
 
 module.exports = POSService;

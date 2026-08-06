@@ -10,6 +10,8 @@ import {
   X,
   SlidersHorizontal,
   Search,
+  UserPlus,
+  Mail,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +22,7 @@ import {
   getSuperAdminDashboardFromBackend,
   reviewAccessRequestOnBackend,
   updateUserRoleOnBackend,
+  createTeamMemberOnBackend,
   SuperAdminDashboardPayload,
 } from "@/lib/api/superadmin";
 import {
@@ -115,6 +118,113 @@ function TabButton({
 
 /* ────────────────────────── Staff Panel ────────────────────────── */
 
+/* Add Team Member — a smooth, direct way to add an admin by email
+   (no need to find an existing customer and promote). */
+function AddTeamMemberCard({ token, onAdded }: { token: string; onAdded: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [email, setEmail] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [role, setRole] = useState<"admin" | "superadmin">("admin");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+
+  const submit = async () => {
+    setError(null);
+    setSuccess(null);
+    if (!emailValid) {
+      setError("Enter a valid email address.");
+      return;
+    }
+    try {
+      setBusy(true);
+      const account = await createTeamMemberOnBackend(token, {
+        email: email.trim().toLowerCase(),
+        displayName: displayName.trim() || undefined,
+        role,
+      });
+      setSuccess(`${account.email} added as ${account.role}.`);
+      setEmail("");
+      setDisplayName("");
+      setRole("admin");
+      onAdded();
+      // Auto-close shortly after success for a smooth feel.
+      setTimeout(() => { setOpen(false); setSuccess(null); }, 1500);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to add team member");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!open) {
+    return (
+      <Button onClick={() => setOpen(true)} className="gap-2">
+        <UserPlus className="h-4 w-4" /> Add Team Member
+      </Button>
+    );
+  }
+
+  return (
+    <Card className="border-primary/30">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <UserPlus className="h-4 w-4" /> Add Team Member
+        </CardTitle>
+        <CardDescription>Grant portal access instantly by email — they can sign in with Google using this address.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {error && <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2.5 text-sm text-destructive">{error}</div>}
+        {success && <div className="rounded-md border border-green-500/40 bg-green-500/10 p-2.5 text-sm text-green-700">{success}</div>}
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">Email <span className="text-destructive">*</span></label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="email"
+                placeholder="person@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="pl-9"
+                onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
+              />
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">Display name (optional)</label>
+            <Input
+              placeholder="e.g. Priya Sharma"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
+            />
+          </div>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">Role</label>
+          <select
+            value={role}
+            onChange={(e) => setRole(e.target.value as "admin" | "superadmin")}
+            className="h-10 w-full rounded-md border bg-background px-3 text-sm sm:max-w-[220px]"
+          >
+            <option value="admin">Admin</option>
+            <option value="superadmin">Superadmin</option>
+          </select>
+        </div>
+        <div className="flex gap-2 pt-1">
+          <Button onClick={submit} disabled={busy || !emailValid} className="gap-1">
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Add Member
+          </Button>
+          <Button variant="outline" onClick={() => { setOpen(false); setError(null); setSuccess(null); }}>Cancel</Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function StaffPanel({
   token,
   dashboard,
@@ -169,6 +279,8 @@ function StaffPanel({
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input placeholder="Search by email…" value={query} onChange={(e) => setQuery(e.target.value)} className="pl-9" />
       </div>
+
+      {canManage && <AddTeamMemberCard token={token} onAdded={onChanged} />}
 
       <Card>
         <CardHeader>

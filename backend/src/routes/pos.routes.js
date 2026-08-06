@@ -10,4 +10,5 @@ router.get('/invoices', requireRole('admin', 'superadmin', 'manager'), c.getInvo
 router.get('/invoices/:id', requireRole('admin', 'superadmin', 'manager'), c.getInvoiceById);
 router.get('/invoices/:id/pdf', requireRole('admin', 'superadmin', 'manager'), c.downloadInvoicePdf);
 router.post('/invoices/:id/return', requireRole('admin', 'superadmin', 'manager'), c.processReturn);
+router.post('/invoices/:id/cancel', requireRole('admin', 'superadmin'), c.cancelInvoice);
 module.exports = router;

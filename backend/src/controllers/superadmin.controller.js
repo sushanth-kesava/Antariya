@@ -5,6 +5,7 @@ const Order = require("../models/Order");
 const Product = require("../models/Product");
 const Review = require("../models/Review");
 const WishlistItem = require("../models/WishlistItem");
+const POSInvoice = require("../models/POSInvoice");
 const env = require("../config/env");
 
 function normalizeEmail(value) {
@@ -303,6 +304,8 @@ async function getSuperAdminDashboard(req, res, next) {
     const [
       totalOrders,
       totalRevenueStats,
+      posOrders,
+      posRevenueStats,
       pendingRequests,
       adminProfiles,
       customerProfiles,
@@ -311,8 +314,20 @@ async function getSuperAdminDashboard(req, res, next) {
       pendingReviews,
       wishlistItems,
     ] = await Promise.all([
-      Order.countDocuments({}),
-      Order.aggregate([{ $group: { _id: null, totalRevenue: { $sum: "$total" } } }]),
+      // Online (marketplace) orders — exclude cancelled from counts & revenue.
+      // Non-revenue statuses (cancelled/returned/refunded/expired) are excluded
+      // so the snapshot reflects real, realized business.
+      Order.countDocuments({ status: { $nin: ["Cancelled", "Returned", "Refunded", "Expired"] } }),
+      Order.aggregate([
+        { $match: { status: { $nin: ["Cancelled", "Returned", "Refunded", "Expired"] } } },
+        { $group: { _id: null, totalRevenue: { $sum: "$total" } } },
+      ]),
+      // Offline (POS) invoices — exclude cancelled.
+      POSInvoice.countDocuments({ status: { $ne: "cancelled" } }),
+      POSInvoice.aggregate([
+        { $match: { status: { $ne: "cancelled" } } },
+        { $group: { _id: null, totalRevenue: { $sum: "$totalAmount" } } },
+      ]),
       AccessRequest.countDocuments({ status: "pending" }),
       AdminProfile.find({}).sort({ createdAt: -1 }).limit(100),
       User.find({}).sort({ createdAt: -1 }).limit(100),
@@ -322,7 +337,13 @@ async function getSuperAdminDashboard(req, res, next) {
       WishlistItem.countDocuments({}),
     ]);
 
-    const totalRevenue = Number(totalRevenueStats?.[0]?.totalRevenue || 0);
+    // Combined live business snapshot: Online (marketplace) + Offline (POS).
+    const onlineRevenue = Number(totalRevenueStats?.[0]?.totalRevenue || 0);
+    const offlineRevenue = Number(posRevenueStats?.[0]?.totalRevenue || 0);
+    const totalRevenue = onlineRevenue + offlineRevenue;
+    const onlineOrders = Number(totalOrders || 0);
+    const offlineOrders = Number(posOrders || 0);
+    const combinedOrders = onlineOrders + offlineOrders;
     const normalizedAdminProfiles = adminProfiles.map(normalizeAdminProfile);
     const normalizedCustomerProfiles = customerProfiles.map(normalizeCustomerProfile);
     const portalClassificationAudit = buildPortalClassificationAudit(normalizedAdminProfiles, normalizedCustomerProfiles);
@@ -334,8 +355,13 @@ async function getSuperAdminDashboard(req, res, next) {
         totalCustomers: portalSummaryCounts.totalCustomers,
         totalAdmins: portalSummaryCounts.totalAdmins,
         totalSuperAdmins: portalSummaryCounts.totalSuperAdmins,
-        totalOrders,
+        // Combined live snapshot (Online + Offline/POS)
+        totalOrders: combinedOrders,
         totalRevenue,
+        onlineOrders,
+        offlineOrders,
+        onlineRevenue,
+        offlineRevenue,
         pendingRequests,
         lowStockProducts,
         pendingReviews,
@@ -663,6 +689,80 @@ async function updateUserRole(req, res, next) {
   }
 }
 
+/**
+ * Directly add a team member (admin) by email — a smoother flow than
+ * "find an existing customer, then promote". Creates or reactivates an
+ * AdminProfile, optionally sets displayName, and (if they had a customer
+ * User record) migrates them to admin. Idempotent & superadmin-only.
+ */
+async function createTeamMember(req, res, next) {
+  try {
+    if (!ensureSuperAdmin(req, res)) {
+      return;
+    }
+
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    const displayName = String(req.body?.displayName || "").trim();
+    const requestedRole = String(req.body?.role || "admin").trim().toLowerCase();
+    const role = requestedRole === "superadmin" ? "superadmin" : "admin";
+
+    // Basic email validation.
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ success: false, message: "A valid email is required" });
+    }
+
+    const existingAdmin = await AdminProfile.findOne({ email });
+
+    // Already an active admin/superadmin → report as duplicate.
+    if (existingAdmin && existingAdmin.active) {
+      return res.status(409).json({
+        success: false,
+        message: `${email} is already a ${existingAdmin.role}.`,
+      });
+    }
+
+    const existingUser = await User.findOne({ email });
+    const resolvedName =
+      displayName || existingAdmin?.displayName || existingUser?.displayName || email.split("@")[0];
+
+    const adminDocument = existingAdmin || new AdminProfile({ email });
+    adminDocument.displayName = resolvedName;
+    adminDocument.googleId = adminDocument.googleId || existingUser?.googleId || null;
+    adminDocument.photoURL = adminDocument.photoURL || existingUser?.photoURL || null;
+    adminDocument.provider = adminDocument.provider || "google";
+    adminDocument.role = role;
+    adminDocument.active = true;
+    await adminDocument.save();
+
+    // If they previously existed as a customer User, remove that record so the
+    // account resolves cleanly to the admin profile.
+    if (existingUser) {
+      await User.deleteOne({ email });
+    }
+
+    // Fire-and-forget welcome email (never blocks the response).
+    try {
+      const { sendWelcomeEmail } = require("../services/mail.service");
+      sendWelcomeEmail({ to: email, displayName: resolvedName }).catch(() => {});
+    } catch (_) {
+      /* mail service optional */
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: `${resolvedName} added as ${role}.`,
+      account: normalizeManagedAccount({
+        email,
+        role,
+        source: "admin_profile",
+        active: true,
+      }),
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
 module.exports = {
   getSuperAdminDashboard,
   submitPublicAdminApplication,
@@ -670,4 +770,5 @@ module.exports = {
   listAccessRequests,
   reviewAccessRequest,
   updateUserRole,
+  createTeamMember,
 };

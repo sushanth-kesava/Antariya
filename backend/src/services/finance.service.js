@@ -4,6 +4,13 @@ const Order = require('../models/Order');
 
 class FinanceService {
 
+  // Statuses that represent a "deleted"/voided transaction. These must be
+  // excluded from every revenue/expense/report calculation AND hidden from the
+  // default transactions list, so voided entries never inflate the numbers.
+  static VOID_STATUSES = ['cancelled', 'rejected'];
+  // Reusable match fragment for aggregations: only "live" transactions.
+  static get ACTIVE_MATCH() { return { status: { $nin: FinanceService.VOID_STATUSES } }; }
+
   // ─── TRANSACTIONS ──────────────────────────────────────────────
 
   static async createTransaction(data) {
@@ -15,11 +22,15 @@ class FinanceService {
     return FinanceTransaction.create(data);
   }
 
-  static async getTransactions({ type, category, paymentStatus, startDate, endDate, page = 1, limit = 20 }) {
+  static async getTransactions({ type, category, paymentStatus, startDate, endDate, page = 1, limit = 20, includeVoided = false }) {
     const filter = {};
     if (type) filter.type = type;
     if (category) filter.category = category;
     if (paymentStatus) filter.paymentStatus = paymentStatus;
+    // Hide voided/deleted transactions unless explicitly requested.
+    if (!includeVoided) {
+      filter.status = { $nin: FinanceService.VOID_STATUSES };
+    }
     if (startDate || endDate) {
       filter.createdAt = {};
       if (startDate) filter.createdAt.$gte = new Date(startDate);
@@ -56,6 +67,25 @@ class FinanceService {
       txn.paymentStatus = 'partial';
     }
 
+    await txn.save();
+    return txn;
+  }
+
+  /**
+   * "Delete" a transaction by voiding it (soft delete). We never hard-delete
+   * financial records — they are marked `cancelled` so there is always an audit
+   * trail, but they are then excluded from all revenue/expense/reports and the
+   * default transactions list.
+   */
+  static async voidTransaction({ transactionId, reason, userId }) {
+    const txn = await FinanceTransaction.findById(transactionId);
+    if (!txn) throw new Error('Transaction not found');
+    if (FinanceService.VOID_STATUSES.includes(txn.status)) {
+      return txn; // already voided — idempotent
+    }
+    txn.status = 'cancelled';
+    txn.paymentStatus = 'cancelled';
+    if (reason) txn.notes = txn.notes ? `${txn.notes}\n[Voided] ${reason}` : `[Voided] ${reason}`;
     await txn.save();
     return txn;
   }
@@ -121,34 +151,35 @@ class FinanceService {
   static async getDashboardStats({ startDate, endDate } = {}) {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const dateFilter = startDate ? { $gte: new Date(startDate), ...(endDate ? { $lte: new Date(endDate) } : {}) } : { $gte: thirtyDaysAgo };
+    const active = FinanceService.ACTIVE_MATCH;
 
     // Revenue (from sales transactions)
     const revenueAgg = await FinanceTransaction.aggregate([
-      { $match: { type: { $in: ['invoice', 'payment_received'] }, createdAt: dateFilter } },
+      { $match: { ...active, type: { $in: ['invoice', 'payment_received'] }, createdAt: dateFilter } },
       { $group: { _id: null, total: { $sum: '$netAmount' }, paid: { $sum: '$paidAmount' } } }
     ]);
 
     // Expenses
     const expenseAgg = await FinanceTransaction.aggregate([
-      { $match: { type: 'expense', createdAt: dateFilter } },
+      { $match: { ...active, type: 'expense', createdAt: dateFilter } },
       { $group: { _id: null, total: { $sum: '$netAmount' } } }
     ]);
 
     // Outstanding receivables
     const receivablesAgg = await FinanceTransaction.aggregate([
-      { $match: { type: { $in: ['invoice'] }, paymentStatus: { $in: ['pending', 'partial', 'overdue'] } } },
+      { $match: { ...active, type: { $in: ['invoice'] }, paymentStatus: { $in: ['pending', 'partial', 'overdue'] } } },
       { $group: { _id: null, total: { $sum: '$balanceAmount' } } }
     ]);
 
     // Outstanding payables
     const payablesAgg = await FinanceTransaction.aggregate([
-      { $match: { type: { $in: ['purchase_bill', 'vendor_payment'] }, paymentStatus: { $in: ['pending', 'partial', 'overdue'] } } },
+      { $match: { ...active, type: { $in: ['purchase_bill', 'vendor_payment'] }, paymentStatus: { $in: ['pending', 'partial', 'overdue'] } } },
       { $group: { _id: null, total: { $sum: '$balanceAmount' } } }
     ]);
 
     // GST payable
     const gstAgg = await FinanceTransaction.aggregate([
-      { $match: { createdAt: dateFilter } },
+      { $match: { ...active, createdAt: dateFilter } },
       { $group: {
         _id: null,
         outputGst: { $sum: { $cond: [{ $in: ['$type', ['invoice', 'payment_received']] }, { $add: ['$gst.cgst', '$gst.sgst', '$gst.igst'] }, 0] } },
@@ -159,13 +190,13 @@ class FinanceService {
     // Monthly breakdown (last 6 months)
     const sixMonthsAgo = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000);
     const monthlyRevenue = await FinanceTransaction.aggregate([
-      { $match: { type: { $in: ['invoice', 'payment_received'] }, createdAt: { $gte: sixMonthsAgo } } },
-      { $group: { _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } }, total: { $sum: '$netAmount' } } },
+      { $match: { ...active, type: { $in: ['invoice', 'payment_received'] }, createdAt: { $gte: sixMonthsAgo } } },
+      { $group: { _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } }, total: { $sum: '$paidAmount' } } },
       { $sort: { _id: 1 } }
     ]);
 
     const monthlyExpenses = await FinanceTransaction.aggregate([
-      { $match: { type: 'expense', createdAt: { $gte: sixMonthsAgo } } },
+      { $match: { ...active, type: 'expense', createdAt: { $gte: sixMonthsAgo } } },
       { $group: { _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } }, total: { $sum: '$netAmount' } } },
       { $sort: { _id: 1 } }
     ]);
@@ -178,12 +209,15 @@ class FinanceService {
     ]);
 
     // Recent transactions
-    const recentTransactions = await FinanceTransaction.find()
+    const recentTransactions = await FinanceTransaction.find(active)
       .sort({ createdAt: -1 })
       .limit(10)
       .populate('createdBy', 'displayName');
 
-    const revenue = revenueAgg[0]?.total || 0;
+    // Realized revenue = cash actually collected (paidAmount), NOT the full
+    // invoice value. The unpaid balance of partial/pending invoices is tracked
+    // separately under receivables so revenue is never overstated.
+    const revenue = revenueAgg[0]?.paid || 0;
     const expenses = expenseAgg[0]?.total || 0;
     const profit = revenue - expenses;
     const gstData = gstAgg[0] || { outputGst: 0, inputGst: 0 };
@@ -211,11 +245,13 @@ class FinanceService {
     const dateFilter = {};
     if (startDate) dateFilter.$gte = new Date(startDate);
     if (endDate) dateFilter.$lte = new Date(endDate);
-    const matchFilter = Object.keys(dateFilter).length > 0 ? { createdAt: dateFilter } : {};
+    // Always exclude voided transactions from P&L; add date range when provided.
+    const matchFilter = { ...FinanceService.ACTIVE_MATCH, ...(Object.keys(dateFilter).length > 0 ? { createdAt: dateFilter } : {}) };
 
     const income = await FinanceTransaction.aggregate([
       { $match: { ...matchFilter, type: { $in: ['invoice', 'payment_received'] } } },
-      { $group: { _id: '$category', total: { $sum: '$netAmount' } } }
+      // Realized income = cash collected (paidAmount), consistent with the dashboard.
+      { $group: { _id: '$category', total: { $sum: '$paidAmount' } } }
     ]);
 
     const expenses = await FinanceTransaction.aggregate([

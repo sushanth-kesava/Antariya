@@ -69,9 +69,12 @@ export default function RootLayout({
   return (
     <html lang="en-IN">
       <head>
-        <link rel="icon" href={BRAND_ICON_URL} />
-        <link rel="shortcut icon" href={BRAND_ICON_URL} />
-        <link rel="apple-touch-icon" href={BRAND_ICON_URL} />
+        {/* Favicon — Antariya "A" emblem. Multiple sizes for crisp rendering. */}
+        <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon_emblem_32.png" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon_emblem_16.png" />
+        <link rel="icon" type="image/png" sizes="192x192" href="/favicon_emblem_192.png" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/favicon_emblem_180.png" />
         <script src="/runtime-config.js" />
       </head>
       <body className={`${inter.variable} ${literata.variable} ${cormorant.variable} font-body antialiased selection:bg-primary selection:text-white`}>

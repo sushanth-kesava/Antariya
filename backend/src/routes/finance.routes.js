@@ -15,6 +15,8 @@ router.get('/profit-loss', requireRole('admin', 'superadmin', 'manager'), financ
 router.post('/transactions', requireRole('admin', 'superadmin'), financeController.createTransaction);
 router.get('/transactions', requireRole('admin', 'superadmin', 'manager'), financeController.getTransactions);
 router.post('/transactions/payment', requireRole('admin', 'superadmin'), financeController.recordPayment);
+// Void (soft-delete) a transaction — excluded from revenue & reports afterward.
+router.delete('/transactions/:id', requireRole('admin', 'superadmin'), financeController.voidTransaction);
 
 // Expenses
 router.post('/expenses', requireRole('admin', 'superadmin', 'manager'), financeController.createExpense);

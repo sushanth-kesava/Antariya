@@ -23,7 +23,7 @@ const CARDS: {
   money?: boolean;
 }[] = [
   { key: "totalRevenue", label: "Total Revenue", icon: Wallet, money: true },
-  { key: "totalOrders", label: "Orders", icon: ShoppingCart },
+  { key: "totalOrders", label: "Total Orders", icon: ShoppingCart },
   { key: "totalCustomers", label: "Customers", icon: Users },
   { key: "totalAdmins", label: "Admins", icon: UserCog },
   { key: "pendingRequests", label: "Pending Requests", icon: Clock3 },
@@ -95,6 +95,50 @@ export function DashboardModule({
           );
         })}
       </div>
+
+      {/* Live business snapshot — Online + Offline (POS) breakdown */}
+      {summary && (summary.onlineRevenue !== undefined || summary.offlineRevenue !== undefined) && (
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Revenue Breakdown</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="flex items-center gap-2"><ShoppingCart className="h-4 w-4 text-primary" /> Online (Marketplace)</span>
+                <span className="font-semibold">{formatINR(Number(summary.onlineRevenue || 0))}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="flex items-center gap-2"><Wallet className="h-4 w-4 text-emerald-600" /> Offline (POS)</span>
+                <span className="font-semibold">{formatINR(Number(summary.offlineRevenue || 0))}</span>
+              </div>
+              <div className="mt-2 flex items-center justify-between border-t pt-2 text-sm">
+                <span className="font-medium">Total</span>
+                <span className="font-bold">{formatINR(Number(summary.totalRevenue || 0))}</span>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Orders Breakdown</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="flex items-center gap-2"><ShoppingCart className="h-4 w-4 text-primary" /> Online (Marketplace)</span>
+                <span className="font-semibold">{Number(summary.onlineOrders || 0).toLocaleString("en-IN")}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="flex items-center gap-2"><Wallet className="h-4 w-4 text-emerald-600" /> Offline (POS)</span>
+                <span className="font-semibold">{Number(summary.offlineOrders || 0).toLocaleString("en-IN")}</span>
+              </div>
+              <div className="mt-2 flex items-center justify-between border-t pt-2 text-sm">
+                <span className="font-medium">Total</span>
+                <span className="font-bold">{Number(summary.totalOrders || 0).toLocaleString("en-IN")}</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2">
         <QuickAction
