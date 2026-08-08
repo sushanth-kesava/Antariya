@@ -8,6 +8,7 @@ const {
   updateCoupon,
   deleteCoupon,
   getHeroCoupons,
+  getAvailableCoupons,
   validateCoupon,
 } = require("../controllers/coupon.controller");
 
@@ -20,6 +21,9 @@ router.get("/hero", getHeroCoupons);
 // ─── Authenticated customer routes ───────────────────────────────────────────
 // Validate & calculate discount for a coupon code at checkout
 router.post("/validate", requireAuth, validate(validateCouponSchema), validateCoupon);
+
+// List coupons the authenticated customer is eligible to see (public + their restricted)
+router.get("/available", requireAuth, getAvailableCoupons);
 
 // ─── Superadmin routes ───────────────────────────────────────────────────────
 router.get("/", requireAuth, requireRole("superadmin"), listCoupons);

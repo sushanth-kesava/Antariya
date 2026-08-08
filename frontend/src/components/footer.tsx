@@ -51,8 +51,8 @@ const FOOTER_COPY: Record<FooterVariant, { title: string; description: string; l
     description: "Empowering India's embroidery industry with premium digital assets, physical supplies, and machine solutions.",
     links: [
       { label: "All Policies", href: "/legal/policies" },
-      { label: "Privacy Policy", href: "/legal/privacy" },
-      { label: "Terms of Service", href: "/legal/terms" },
+      { label: "Privacy Policy", href: "/legal/policies" },
+      { label: "Terms of Service", href: "/legal/policies" },
       { label: "Contact", href: "#" },
     ],
     note: `© ${COPYRIGHT_YEAR} Antariya India. All rights reserved.`,

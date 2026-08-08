@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Package, Heart, Download, Settings, Star, LayoutDashboard, Sparkles, ShoppingBag, ArrowRight, ChevronDown, Mail, Phone, MessageCircle, MessageSquare, User as UserIcon, Headphones, Send, Loader2 as Spinner } from "lucide-react";
+import { Package, Heart, Download, Settings, Star, LayoutDashboard, Sparkles, ShoppingBag, ArrowRight, ChevronDown, Mail, Phone, MessageCircle, MessageSquare, User as UserIcon, Headphones, Send, Loader2 as Spinner, Ticket } from "lucide-react";
 import { XCircle, AlertTriangle, Truck } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +20,7 @@ import {
 import { type Product } from "@/app/lib/mock-data";
 import { getMyOrdersFromBackend, cancelMyOrderOnBackend } from "@/lib/api/orders";
 import { getWishlistFromBackend, WishlistItem } from "@/lib/api/wishlist";
+import { getAvailableCoupons, HeroCoupon } from "@/lib/api/coupons";
 import { useInventoryUpdates } from "@/hooks/use-inventory-updates";
 import { getProductsFromBackend } from "@/lib/api/products";
 import { formatINR, formatIndianDate, normalizeCatalogPriceToINR } from "@/lib/india";
@@ -116,6 +117,7 @@ export default function CustomerDashboardClient() {
   const [orders, setOrders] = useState<any[]>([]);
   const [wishlist, setWishlist] = useState<WishlistItem[]>([]);
   const [recommendations, setRecommendations] = useState<RecommendationCard[]>([]);
+  const [availableCoupons, setAvailableCoupons] = useState<HeroCoupon[]>([]);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [supportOpen, setSupportOpen] = useState(false);
@@ -203,6 +205,8 @@ export default function CustomerDashboardClient() {
           .catch(() => null),
       ]);
       setOrders(backendOrders);
+      // Load coupons this customer is eligible for (public + their restricted offers).
+      getAvailableCoupons(token).then(setAvailableCoupons).catch(() => {});
       try {
         const wishlistItems = await getWishlistFromBackend(token);
         setWishlist(wishlistItems);
@@ -391,6 +395,54 @@ export default function CustomerDashboardClient() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Your Coupons - public + restricted offers assigned to this customer */}
+            {availableCoupons.length > 0 && (
+              <section id="coupons" className="space-y-4 scroll-mt-24">
+                <div className="flex items-center gap-2">
+                  <Ticket className="h-5 w-5 text-primary" />
+                  <h2 className="text-2xl font-bold tracking-tight">Your Coupons</h2>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {availableCoupons.map((coupon) => {
+                    const offer =
+                      coupon.discountType === "percentage"
+                        ? `${coupon.discountValue}% OFF`
+                        : coupon.discountType === "flat"
+                        ? `\u20b9${coupon.discountValue / 100} OFF`
+                        : "FREE SHIPPING";
+                    return (
+                      <Card
+                        key={coupon.code}
+                        className="overflow-hidden border-primary/20 bg-primary/5 shadow-sm"
+                      >
+                        <CardContent className="p-5 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xl font-bold text-primary">{offer}</span>
+                            <span className="inline-flex items-center rounded-md border border-primary/30 bg-white px-2.5 py-0.5 font-mono text-xs font-bold tracking-widest text-primary">
+                              {coupon.code}
+                            </span>
+                          </div>
+                          <p className="text-sm font-semibold text-foreground">{coupon.title}</p>
+                          {coupon.description && (
+                            <p className="text-xs text-muted-foreground leading-relaxed">{coupon.description}</p>
+                          )}
+                          <div className="flex flex-wrap gap-x-3 gap-y-1 pt-1 text-xs text-muted-foreground">
+                            {coupon.minOrderValue > 0 && <span>Min order \u20b9{coupon.minOrderValue / 100}</span>}
+                            {coupon.validUntil && (
+                              <span>Valid till {formatIndianDate(coupon.validUntil)}</span>
+                            )}
+                          </div>
+                          <Button asChild size="sm" className="w-full mt-2 rounded-full font-bold">
+                            <Link href="/cart">Shop &amp; Apply</Link>
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
 
             <section id="orders" className="space-y-4 scroll-mt-24">
               <div className="flex items-center justify-between">

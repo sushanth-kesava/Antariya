@@ -20,7 +20,7 @@ import {
   normalizeCatalogPriceToINR,
 } from "@/lib/india";
 import { checkStockAvailability, StockCheckResult } from "@/lib/api/stock";
-import { getHeroCoupons, validateCouponCode, HeroCoupon, CouponValidationResult } from "@/lib/api/coupons";
+import { getHeroCoupons, getAvailableCoupons, validateCouponCode, HeroCoupon, CouponValidationResult } from "@/lib/api/coupons";
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -119,9 +119,16 @@ export default function CheckoutPage() {
   const effectiveShipping = appliedCoupon?.freeShipping ? 0 : shipping;
   const total = Math.max(0, subtotal + effectiveShipping + tax - couponDiscount);
 
-  // Fetch available coupons on mount
+  // Fetch available coupons on mount. Logged-in customers get their eligible
+  // set (public + any restricted coupon assigned to their email, e.g.
+  // "Antariya's Waitlisted Insiders"); guests fall back to public hero offers.
   useEffect(() => {
-    getHeroCoupons().then(setAvailableCoupons).catch(() => {});
+    const token = localStorage.getItem("app_auth_token");
+    if (token) {
+      getAvailableCoupons(token).then(setAvailableCoupons).catch(() => {});
+    } else {
+      getHeroCoupons().then(setAvailableCoupons).catch(() => {});
+    }
   }, []);
 
   const handleApplyCoupon = async (code: string) => {
@@ -148,6 +155,19 @@ export default function CheckoutPage() {
     }
     setCouponLoading(null);
   };
+
+  // If the customer tapped a coupon chip in the cart, auto-apply it here once
+  // the cart subtotal is known. Runs once, then clears the pending flag so it
+  // doesn't re-fire on re-renders or a manual removal.
+  useEffect(() => {
+    const pending = localStorage.getItem("antariya_pending_coupon");
+    if (!pending) return;
+    if (appliedCoupon || subtotal <= 0) return;
+    localStorage.removeItem("antariya_pending_coupon");
+    setCouponInput(pending);
+    void handleApplyCoupon(pending);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subtotal]);
 
   const handleRemoveCoupon = () => {
     setAppliedCoupon(null);

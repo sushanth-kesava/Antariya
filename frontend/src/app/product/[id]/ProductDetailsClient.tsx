@@ -367,31 +367,6 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
 
     return isApparelProduct ? "2-7 business days" : "3-6 business days";
   }, [deliveryResult, isApparelProduct]);
-  const structuredData = product
-    ? {
-        "@context": "https://schema.org",
-        "@type": "Product",
-        name: product.name,
-        description: product.description,
-        image: galleryImages,
-        sku: product.id,
-        brand: { "@type": "Brand", name: "Antariya" },
-        offers: {
-          "@type": "Offer",
-          url: `${typeof window !== "undefined" ? window.location.origin : ""}/product/${product.id}`,
-          priceCurrency: "INR",
-          price: product.price,
-          availability: product.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
-        },
-        aggregateRating: product.rating
-          ? {
-              "@type": "AggregateRating",
-              ratingValue: reviewSummary.reviewCount > 0 ? reviewSummary.averageRating : product.rating,
-              reviewCount: reviewSummary.reviewCount || product.reviewCount || 1,
-            }
-          : undefined,
-      }
-    : null;
   const sellerName = product?.dealerName || "Admin";
   const sellerEmail = product?.dealerEmail || "Not provided";
   const displayRating = reviewSummary.reviewCount > 0 ? reviewSummary.averageRating : product?.reviewAverage ?? product?.rating ?? 0;
@@ -930,12 +905,6 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
 
   return (
     <div className="min-h-screen bg-background">
-      {structuredData ? (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
-        />
-      ) : null}
       <Navbar />
       
       <main className="w-full max-w-[1760px] mx-auto px-3 sm:px-4 lg:px-6 py-12">

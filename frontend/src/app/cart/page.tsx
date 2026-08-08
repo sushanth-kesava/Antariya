@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Trash2, Plus, Minus, ArrowRight, ShoppingBag, ShieldCheck, AlertCircle, CheckCircle2, Clock } from "lucide-react";
+import { Trash2, Plus, Minus, ArrowRight, ShoppingBag, ShieldCheck, AlertCircle, CheckCircle2, Clock, Ticket } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -19,6 +19,7 @@ import {
   normalizeCatalogPriceToINR,
 } from "@/lib/india";
 import { checkStockAvailability, StockCheckResult } from "@/lib/api/stock";
+import { getAvailableCoupons, HeroCoupon } from "@/lib/api/coupons";
 
 export default function CartPage() {
   const router = useRouter();
@@ -26,6 +27,7 @@ export default function CartPage() {
   const [stockStatus, setStockStatus] = useState<Map<string, StockCheckResult>>(new Map());
   const [checkingStock, setCheckingStock] = useState(false);
   const [stockError, setStockError] = useState<string | null>(null);
+  const [availableCoupons, setAvailableCoupons] = useState<HeroCoupon[]>([]);
 
   const checkStockStatus = async (cartItems: CartItem[]) => {
     try {
@@ -63,6 +65,14 @@ export default function CartPage() {
   useEffect(() => {
     const cartItems = getCartItems();
     setItems(cartItems);
+
+    // Load coupons this customer is eligible for (public + their restricted
+    // offers, e.g. "Antariya's Waitlisted Insiders"), shown as a teaser here
+    // and applied at checkout.
+    const token = localStorage.getItem("app_auth_token");
+    if (token) {
+      getAvailableCoupons(token).then(setAvailableCoupons).catch(() => {});
+    }
     
     // Check stock availability for all items
     if (cartItems.length > 0) {
@@ -108,6 +118,14 @@ export default function CartPage() {
     
     if (hasStockIssues) return;
     router.push("/select-address");
+  };
+
+  // Stash a coupon the customer tapped in the cart so checkout can auto-apply
+  // it after the address step, then proceed through the normal checkout flow
+  // (which enforces auth + stock checks).
+  const applyCouponAndCheckout = (code: string) => {
+    localStorage.setItem("antariya_pending_coupon", code);
+    handleCheckout();
   };
 
   if (items.length === 0) {
@@ -295,6 +313,42 @@ export default function CartPage() {
                 </div>
                 {shipping > 0 && (
                   <p className="text-xs text-muted-foreground text-right mt-1">Free shipping on orders above {formatINR(INDIA_FREE_SHIPPING_THRESHOLD)}</p>
+                )}
+
+                {availableCoupons.length > 0 && (
+                  <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 space-y-2">
+                    <div className="flex items-center gap-2 text-primary">
+                      <Ticket className="h-4 w-4" />
+                      <span className="text-sm font-semibold">
+                        {availableCoupons.length === 1
+                          ? "You have an offer available"
+                          : `You have ${availableCoupons.length} offers available`}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {availableCoupons.slice(0, 4).map((coupon) => {
+                        const label =
+                          coupon.discountType === "percentage"
+                            ? `${coupon.discountValue}% OFF`
+                            : coupon.discountType === "flat"
+                            ? `\u20b9${coupon.discountValue / 100} OFF`
+                            : "FREE SHIPPING";
+                        return (
+                          <button
+                            key={coupon.code}
+                            type="button"
+                            title={`${coupon.title} — tap to apply at checkout`}
+                            onClick={() => applyCouponAndCheckout(coupon.code)}
+                            className="inline-flex items-center gap-1 rounded-md border border-primary/30 bg-white px-2 py-0.5 text-xs font-medium text-primary hover:bg-primary hover:text-white transition-colors cursor-pointer"
+                          >
+                            <span className="font-mono font-bold tracking-wide">{coupon.code}</span>
+                            <span className="opacity-80">· {label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Tap an offer to apply it at checkout.</p>
+                  </div>
                 )}
 
                 <Separator className="my-4" />

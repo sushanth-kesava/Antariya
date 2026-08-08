@@ -367,12 +367,55 @@ async function recordCouponUsage({ code, userId, email, orderId }) {
   }
 }
 
+
+// --- Customer: List coupons the logged-in user is eligible to see -----------
+// Returns all currently-valid PUBLIC coupons PLUS any RESTRICTED coupons whose
+// allowedEmails list contains the authenticated user's email. This is what the
+// checkout / dashboard "available coupons" UI should call so restricted offers
+// (e.g. "Antariya's Waitlisted Insiders") surface to the exact customers they
+// were created for -- without ever leaking onto the public homepage hero banner
+// (which stays on getHeroCoupons).
+async function getAvailableCoupons(req, res, next) {
+  try {
+    const now = new Date();
+    const userEmail = String(req.auth?.email || "").trim().toLowerCase();
+
+    const coupons = await Coupon.find({
+      active: true,
+      validFrom: { $lte: now },
+      validUntil: { $gte: now },
+      $or: [
+        { visibility: "public" },
+        ...(userEmail
+          ? [{ visibility: "restricted", allowedEmails: userEmail }]
+          : []),
+      ],
+    })
+      .select(
+        "code title description discountType discountValue maxDiscount minOrderValue minQuantity heroBannerText heroBannerColor heroImage validUntil visibility freeDelivery maxUses currentUses"
+      )
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Hide coupons that have already hit their global usage cap so we never
+    // advertise something the customer can't actually redeem.
+    const redeemable = coupons.filter(
+      (c) => c.maxUses == null || (c.currentUses || 0) < c.maxUses
+    );
+
+    return res.status(200).json({ success: true, coupons: redeemable });
+  } catch (error) {
+    return next(error);
+  }
+}
+
 module.exports = {
   createCoupon,
   listCoupons,
   updateCoupon,
   deleteCoupon,
   getHeroCoupons,
+  getAvailableCoupons,
   validateCoupon,
   recordCouponUsage,
 };

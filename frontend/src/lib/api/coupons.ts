@@ -87,6 +87,23 @@ export async function getHeroCoupons(): Promise<HeroCoupon[]> {
   }
 }
 
+// ─── Customer: List coupons available to the logged-in user ─────────────────
+// Includes public coupons + any restricted coupon whose allow-list contains
+// this customer's email (e.g. "Antariya's Waitlisted Insiders"). Requires auth.
+
+export async function getAvailableCoupons(token: string): Promise<HeroCoupon[]> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/coupons/available`, {
+      credentials: "include",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await response.json();
+    return data.success ? data.coupons : [];
+  } catch {
+    return [];
+  }
+}
+
 // ─── Customer: Validate coupon at checkout ───────────────────────────────────
 
 export async function validateCouponCode(
