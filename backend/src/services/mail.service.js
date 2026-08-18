@@ -393,49 +393,235 @@ async function sendAdminOrderNotificationEmail({ order, customerEmail, customerN
   const subject = `🛒 New Order Received${sourceLabel} - INV-${shortId}`;
 
   const formatINR = (v) => `₹${Number(v || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
+  const orderDate = order.createdAt
+    ? new Date(order.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+    : "N/A";
+  const orderNo = (order.id || "N/A").slice(-8).toUpperCase();
+  const statusText = order.status || (order.paymentStatus === "paid" ? "Confirmed" : "Pending");
+  const couponCode = order.coupon?.code ? escapeHtml(order.coupon.code) : "";
   const itemRows = (order.items || [])
-    .map(
-      (item) =>
-        `<tr>
-          <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:14px;">${escapeHtml(item.name)}${item.variantSku ? ` <span style="color:#6b7280;font-size:12px;">(${escapeHtml(item.variantSku)})</span>` : ""}</td>
-          <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:14px;text-align:center;">${item.quantity}</td>
-          <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:14px;text-align:right;">${formatINR(item.price * item.quantity)}</td>
-        </tr>`
-    )
+    .map((item) => {
+      const baseName = escapeHtml(item.name || "Product");
+      const sku = item.variantSku ? ` <span style="color:#7A7460;font-size:12px;">(${escapeHtml(item.variantSku)})</span>` : "";
+      const qty = Number(item.quantity || 0);
+      const price = Number(item.price || 0);
+      return `
+        <tr>
+          <td style="padding:12px 0 12px 0;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td valign="top" style="font-family:'Cormorant Garamond', Georgia, serif; font-size:22px; color:#1E1B17; font-weight:600; line-height:26px;">
+                  ${baseName}${sku}
+                </td>
+                <td width="90" valign="top" align="right" style="font-family:'Inter', Arial, sans-serif; font-size:15px; color:#1E1B17; font-weight:600; white-space:nowrap;">
+                  ${formatINR(price * qty)}
+                </td>
+              </tr>
+              <tr>
+                <td colspan="2" style="font-family:'Inter', Arial, sans-serif; font-size:13px; color:#7A7460; line-height:20px; padding-top:4px;">
+                  ${escapeHtml(item.category || "Premium product")} &nbsp;·&nbsp; ${escapeHtml(item.fabric || "Premium fabric")} &nbsp;·&nbsp; ${escapeHtml(item.description || "Everyday essentials")}
+                </td>
+              </tr>
+              <tr>
+                <td colspan="2" style="font-family:'Inter', Arial, sans-serif; font-size:11px; color:#A39C84; letter-spacing:0.5px; padding-top:6px;">
+                  ${item.variantSku ? `SKU ${escapeHtml(item.variantSku)} &nbsp;·&nbsp;` : ""} QTY ${qty}
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      `;
+    })
     .join("");
 
   const discountRow = Number(order.discount) > 0
-    ? `<tr><td colspan="2" style="padding:4px 12px;font-size:14px;color:#059669;">Discount${order.coupon?.code ? ` (${escapeHtml(order.coupon.code)})` : ""}</td><td style="padding:4px 12px;font-size:14px;text-align:right;color:#059669;">- ${formatINR(order.discount)}</td></tr>`
+    ? `<tr>
+        <td style="padding:6px 0; color:#6E2A2A;">Discount${couponCode ? ` <span style="color:#A39C84;">(${couponCode})</span>` : ""}</td>
+        <td align="right" style="padding:6px 0; color:#6E2A2A; font-weight:600;">−${formatINR(order.discount)}</td>
+      </tr>`
     : "";
 
-  const bodyHtml = `
-    <h2 style="margin:0 0 8px;font-size:20px;color:#1f2937;">New Order Placed!</h2>
-    <p style="margin:0 0 16px;font-size:15px;color:#4b5563;">
-      <strong>${escapeHtml(customerName || "Customer")}</strong> (${escapeHtml(customerEmail || "unknown")}) just placed an order.
-    </p>
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;">
-      <tr style="background:#f9fafb;">
-        <td style="padding:6px 12px;font-size:12px;font-weight:700;text-transform:uppercase;color:#6b7280;">Item</td>
-        <td style="padding:6px 12px;font-size:12px;font-weight:700;text-transform:uppercase;color:#6b7280;text-align:center;">Qty</td>
-        <td style="padding:6px 12px;font-size:12px;font-weight:700;text-transform:uppercase;color:#6b7280;text-align:right;">Amount</td>
+  const html = `<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <title>New Order — Antariya</title>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500;600;700&display=swap');
+      body, table, td { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+      table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+      img { -ms-interpolation-mode: bicubic; border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }
+      body { margin: 0; padding: 0; width: 100% !important; height: 100% !important; background-color: #E9E4D8; }
+      @media screen and (max-width: 600px) {
+        .email-container { width: 100% !important; }
+        .fluid-pad { padding-left: 24px !important; padding-right: 24px !important; }
+        .stack { display: block !important; width: 100% !important; text-align: left !important; padding-bottom: 10px !important; }
+        .masthead-cell { display:block !important; width:100% !important; border-right: none !important; border-bottom: 1px solid #C9C0AA !important; padding: 14px 0 !important; text-align:left !important; }
+        .masthead-cell:last-child { border-bottom: none !important; }
+        .h1 { font-size: 30px !important; }
+      }
+    </style>
+  </head>
+  <body style="margin:0; padding:0; background-color:#E9E4D8;">
+    <div style="display:none; max-height:0; overflow:hidden; mso-hide:all;">
+      Order No. ${escapeHtml(orderNo)} — Antariya ${escapeHtml((order.items || [])[0]?.name || "Order")} — ${formatINR(order.total)}&nbsp;&nbsp;&nbsp;&nbsp;
+    </div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#E9E4D8;">
+      <tr>
+        <td align="center" style="padding: 44px 16px;">
+          <table role="presentation" class="email-container" width="600" cellpadding="0" cellspacing="0" style="width:600px; max-width:600px; background-color:#FAF7F0;">
+            <tr>
+              <td align="center" style="padding: 44px 40px 0 40px;" class="fluid-pad">
+                <div style="font-family:'Inter', Arial, sans-serif; font-size:11px; letter-spacing:4px; color:#5C6E5A; text-transform:uppercase;">The Order Journal</div>
+                <div style="font-family:'Cormorant Garamond', Georgia, serif; font-weight:600; font-size:44px; color:#1E1B17; padding-top:10px; letter-spacing:0.5px;" class="h1">Antariya</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 22px 40px 0 40px;" class="fluid-pad">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                  <tr><td style="border-top:3px solid #1E1B17; font-size:0; line-height:0;">&nbsp;</td></tr>
+                  <tr><td style="border-top:1px solid #1E1B17; font-size:0; line-height:1px; padding-top:3px;">&nbsp;</td></tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 14px 40px 0 40px;" class="fluid-pad">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td class="masthead-cell" width="34%" style="border-right:1px solid #C9C0AA; padding: 4px 16px 4px 0; font-family:'Inter', Arial, sans-serif;">
+                      <div style="font-size:9.5px; letter-spacing:1.5px; color:#8C8368; text-transform:uppercase;">Order No.</div>
+                      <div style="font-size:14px; color:#1E1B17; font-weight:600; padding-top:3px;">${escapeHtml(orderNo)}</div>
+                    </td>
+                    <td class="masthead-cell" width="33%" style="border-right:1px solid #C9C0AA; padding: 4px 16px; font-family:'Inter', Arial, sans-serif;">
+                      <div style="font-size:9.5px; letter-spacing:1.5px; color:#8C8368; text-transform:uppercase;">Dated</div>
+                      <div style="font-size:14px; color:#1E1B17; font-weight:600; padding-top:3px;">${escapeHtml(orderDate)}</div>
+                    </td>
+                    <td class="masthead-cell" width="33%" align="right" style="padding: 4px 0 4px 16px; font-family:'Inter', Arial, sans-serif;">
+                      <div style="font-size:9.5px; letter-spacing:1.5px; color:#8C8368; text-transform:uppercase;">Status</div>
+                      <div style="font-size:14px; color:#3F6B47; font-weight:600; padding-top:3px;">${escapeHtml(statusText)}</div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 26px 40px 0 40px; font-family:'Cormorant Garamond', Georgia, serif; font-style:italic; font-size:19px; line-height:28px; color:#3A362F;" class="fluid-pad">
+                An order was placed by <strong style="font-style:normal;">${escapeHtml(customerName || "Customer")}</strong> and has been received for fulfilment.
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 30px 40px 0 40px;" class="fluid-pad">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #1E1B17;">
+                  <tr>
+                    <td colspan="3" style="padding-top:10px; font-family:'Inter', Arial, sans-serif; font-size:9.5px; letter-spacing:1.5px; color:#8C8368; text-transform:uppercase;">
+                      Item on order
+                    </td>
+                  </tr>
+                </table>
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-bottom:1px solid #C9C0AA; padding-bottom:18px;">
+                  <tr>
+                    <td style="padding: 12px 0 20px 0;">
+                      <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                        ${itemRows}
+                      </table>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 22px 40px 0 40px;" class="fluid-pad">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-family:'Inter', Arial, sans-serif; font-size:14px;">
+                  <tr>
+                    <td style="padding:6px 0; color:#7A7460;">Subtotal</td>
+                    <td align="right" style="padding:6px 0; color:#1E1B17;">${formatINR(order.subtotal)}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:6px 0; color:#7A7460;">Shipping</td>
+                    <td align="right" style="padding:6px 0; color:#1E1B17;">${Number(order.shipping) > 0 ? formatINR(order.shipping) : "Free"}</td>
+                  </tr>
+                  ${discountRow}
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 40px 0 40px;" class="fluid-pad">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:3px solid #1E1B17;">
+                  <tr>
+                    <td style="padding: 18px 0 26px 0;">
+                      <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                        <tr>
+                          <td valign="bottom" style="font-family:'Inter', Arial, sans-serif; font-size:11px; letter-spacing:2px; color:#8C8368; text-transform:uppercase;">Total due</td>
+                          <td align="right" valign="bottom" style="font-family:'Cormorant Garamond', Georgia, serif; font-size:38px; font-weight:600; color:#1E1B17;">${formatINR(order.total)}</td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 0 40px 0 40px;" class="fluid-pad">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #C9C0AA;">
+                  <tr>
+                    <td style="padding: 18px 22px;" class="fluid-pad">
+                      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-family:'Inter', Arial, sans-serif; font-size:12.5px; line-height:22px;">
+                        <tr>
+                          <td class="stack" width="50%" style="color:#8C8368; vertical-align:top;">Order ID</td>
+                          <td class="stack" width="50%" align="right" style="color:#1E1B17; vertical-align:top;">${escapeHtml(order.id || "N/A")}</td>
+                        </tr>
+                        <tr>
+                          <td class="stack" width="50%" style="color:#8C8368; vertical-align:top;">Payment</td>
+                          <td class="stack" width="50%" align="right" style="color:#1E1B17; vertical-align:top;">
+                            ${(order.paymentMethod === "upi" ? "Online (UPI/Card/NetBanking)" : order.paymentMethod || "Online (UPI/Card/NetBanking)")}&nbsp;
+                            <span style="color:#3F6B47; font-weight:600;">&#10003; Paid</span>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td class="stack" width="50%" style="color:#8C8368; vertical-align:top;">Razorpay ID</td>
+                          <td class="stack" width="50%" align="right" style="color:#1E1B17; vertical-align:top;">${escapeHtml(order.razorpayPaymentId || "—")}</td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td align="center" style="padding: 32px 40px 44px 40px;" class="fluid-pad">
+                <table role="presentation" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="background-color:#1E1B17;">
+                      <a href="${escapeHtml(env.frontendUrl || "https://antariyaofficial.com")}" style="display:inline-block; padding:15px 38px; font-family:'Inter', Arial, sans-serif; font-size:12.5px; letter-spacing:2px; text-transform:uppercase; color:#FAF7F0; text-decoration:none;">View Order</a>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td align="center" style="background-color:#1E3A2B; padding: 26px 40px;" class="fluid-pad">
+                <table role="presentation" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td align="center" style="font-family:'Inter', Arial, sans-serif; font-size:12px; color:#CBD9CE; padding-bottom:8px;">
+                      Visit us at <a href="https://antariyaofficial.com" style="color:#FAF7F0; text-decoration:underline;">antariyaofficial.com</a>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td align="center" style="font-family:'Inter', Arial, sans-serif; font-size:11px; color:#8FA694;">
+                      © 2026 Antariya. All rights reserved.
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </td>
       </tr>
-      ${itemRows}
     </table>
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:2px solid #e5e7eb;padding-top:8px;">
-      <tr><td colspan="2" style="padding:4px 12px;font-size:14px;color:#6b7280;">Subtotal</td><td style="padding:4px 12px;font-size:14px;text-align:right;">${formatINR(order.subtotal)}</td></tr>
-      <tr><td colspan="2" style="padding:4px 12px;font-size:14px;color:#6b7280;">Shipping</td><td style="padding:4px 12px;font-size:14px;text-align:right;">${Number(order.shipping) > 0 ? formatINR(order.shipping) : "Free"}</td></tr>
-      ${discountRow}
-      <tr><td colspan="2" style="padding:8px 12px;font-size:16px;font-weight:700;color:#1f2937;">Total</td><td style="padding:8px 12px;font-size:16px;font-weight:700;text-align:right;color:#1f2937;">${formatINR(order.total)}</td></tr>
-    </table>
-    <p style="margin:16px 0 4px;font-size:13px;color:#6b7280;">
-      <strong>Order ID:</strong> ${escapeHtml(order.id || "N/A")}<br/>
-      <strong>Payment:</strong> ${order.paymentMethod === "upi" ? "Online (UPI/Card/NetBanking)" : order.paymentMethod || "—"} · ${order.paymentStatus === "paid" ? "✅ Paid" : order.paymentStatus || "Pending"}<br/>
-      <strong>Razorpay ID:</strong> ${escapeHtml(order.razorpayPaymentId || "—")}
-    </p>
-  `;
-
-  const html = wrapBrandedEmail({ title: `New Order - INV-${shortId}`, bodyHtml });
+  </body>
+</html>`;
 
   const results = [];
   for (const adminEmail of adminEmails) {
