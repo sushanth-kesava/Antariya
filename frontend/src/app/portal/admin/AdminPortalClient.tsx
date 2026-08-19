@@ -2732,14 +2732,14 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
               {/* Customer Info */}
               <div className="rounded-xl border bg-muted/30 p-4">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2">Customer</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                   <div>
                     <span className="text-muted-foreground">Name:</span>{" "}
                     <span className="font-medium">{orderDetail.customer?.name || orderDetail.customerName || "—"}</span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Email:</span>{" "}
-                    <span className="font-medium">{orderDetail.customer?.email || orderDetail.userEmail || orderDetail.customerEmail || "—"}</span>
+                    <span className="font-medium break-all">{orderDetail.customer?.email || orderDetail.userEmail || orderDetail.customerEmail || "—"}</span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Phone:</span>{" "}
@@ -2752,6 +2752,22 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
                       {orderDetail.paymentStatus || "pending"}
                     </span>
                   </div>
+                  {/* Delivery Address */}
+                  {orderDetail.customer?.address && (
+                    <div className="sm:col-span-2 pt-1 border-t mt-1">
+                      <span className="text-muted-foreground">Delivery Address:</span>{" "}
+                      <span className="font-medium">
+                        {[
+                          orderDetail.customer.address.line1,
+                          orderDetail.customer.address.line2,
+                          orderDetail.customer.address.city,
+                          orderDetail.customer.address.state,
+                          orderDetail.customer.address.pincode,
+                          orderDetail.customer.address.country,
+                        ].filter(Boolean).join(", ")}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -2786,12 +2802,12 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
 
               {/* Totals */}
               <div className="rounded-xl border bg-muted/30 p-4">
-                <div className="space-y-1 text-sm">
-                  <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span>{formatINR(Number(orderDetail.subtotal || 0))}</span></div>
-                  {Number(orderDetail.shipping || 0) > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Shipping</span><span>{formatINR(Number(orderDetail.shipping))}</span></div>}
-                  {Number(orderDetail.discount || orderDetail.discountAmount || 0) > 0 && <div className="flex justify-between text-green-700"><span>Discount</span><span>-{formatINR(Number(orderDetail.discount || orderDetail.discountAmount))}</span></div>}
-                  {Number(orderDetail.tax || 0) > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Tax</span><span>{formatINR(Number(orderDetail.tax))}</span></div>}
-                  <div className="flex justify-between font-bold text-base pt-2 border-t">
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span className="font-medium">{formatINR(Number(orderDetail.subtotal || 0))}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Shipping</span><span className="font-medium">{Number(orderDetail.shipping || 0) > 0 ? formatINR(Number(orderDetail.shipping)) : "Free"}</span></div>
+                  {Number(orderDetail.discount || orderDetail.discountAmount || 0) > 0 && <div className="flex justify-between text-green-700"><span>Discount</span><span className="font-medium">-{formatINR(Number(orderDetail.discount || orderDetail.discountAmount))}</span></div>}
+                  {Number(orderDetail.tax || 0) > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Tax (GST)</span><span className="font-medium">{formatINR(Number(orderDetail.tax))}</span></div>}
+                  <div className="flex justify-between font-bold text-base pt-2 border-t mt-1">
                     <span>Total</span>
                     <span>{formatINR(Number(orderDetail.total || orderDetail.totalAmount || 0))}</span>
                   </div>

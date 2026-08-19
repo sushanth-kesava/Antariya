@@ -82,34 +82,23 @@ async function getUnifiedOperationsStats(req, res, next) {
       Order.countDocuments({ ...orderFilter, createdAt: { $gte: monthStart } }),
       // Total revenue
       Order.aggregate([
-        ...(isSuperAdmin ? [] : [{ $match: { "items.dealerId": dealerId } }]),
-        { $unwind: "$items" },
-        ...(isSuperAdmin ? [] : [{ $match: { "items.dealerId": dealerId } }]),
-        { $group: { _id: null, total: { $sum: { $multiply: ["$items.price", "$items.quantity"] } } } },
+        { $match: { ...orderFilter, status: { $nin: ["Cancelled", "Returned", "Refunded", "Expired"] } } },
+        { $group: { _id: null, total: { $sum: "$total" } } },
       ]),
       // Today's revenue
       Order.aggregate([
-        { $match: { ...orderFilter, createdAt: { $gte: todayStart } } },
-        ...(isSuperAdmin ? [] : [{ $unwind: "$items" }, { $match: { "items.dealerId": dealerId } }]),
-        ...(isSuperAdmin
-          ? [{ $group: { _id: null, total: { $sum: "$total" } } }]
-          : [{ $group: { _id: null, total: { $sum: { $multiply: ["$items.price", "$items.quantity"] } } } }]),
+        { $match: { ...orderFilter, createdAt: { $gte: todayStart }, status: { $nin: ["Cancelled", "Returned", "Refunded", "Expired"] } } },
+        { $group: { _id: null, total: { $sum: "$total" } } },
       ]),
       // Week revenue
       Order.aggregate([
-        { $match: { ...orderFilter, createdAt: { $gte: weekStart } } },
-        ...(isSuperAdmin ? [] : [{ $unwind: "$items" }, { $match: { "items.dealerId": dealerId } }]),
-        ...(isSuperAdmin
-          ? [{ $group: { _id: null, total: { $sum: "$total" } } }]
-          : [{ $group: { _id: null, total: { $sum: { $multiply: ["$items.price", "$items.quantity"] } } } }]),
+        { $match: { ...orderFilter, createdAt: { $gte: weekStart }, status: { $nin: ["Cancelled", "Returned", "Refunded", "Expired"] } } },
+        { $group: { _id: null, total: { $sum: "$total" } } },
       ]),
       // Month revenue
       Order.aggregate([
-        { $match: { ...orderFilter, createdAt: { $gte: monthStart } } },
-        ...(isSuperAdmin ? [] : [{ $unwind: "$items" }, { $match: { "items.dealerId": dealerId } }]),
-        ...(isSuperAdmin
-          ? [{ $group: { _id: null, total: { $sum: "$total" } } }]
-          : [{ $group: { _id: null, total: { $sum: { $multiply: ["$items.price", "$items.quantity"] } } } }]),
+        { $match: { ...orderFilter, createdAt: { $gte: monthStart }, status: { $nin: ["Cancelled", "Returned", "Refunded", "Expired"] } } },
+        { $group: { _id: null, total: { $sum: "$total" } } },
       ]),
       // Status breakdown
       Order.aggregate([
@@ -129,14 +118,11 @@ async function getUnifiedOperationsStats(req, res, next) {
       ]),
       // Revenue trend (last 7 days)
       Order.aggregate([
-        { $match: { ...orderFilter, createdAt: { $gte: weekStart } } },
-        ...(isSuperAdmin ? [] : [{ $unwind: "$items" }, { $match: { "items.dealerId": dealerId } }]),
+        { $match: { ...orderFilter, createdAt: { $gte: weekStart }, status: { $nin: ["Cancelled", "Returned", "Refunded", "Expired"] } } },
         {
           $group: {
             _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
-            revenue: isSuperAdmin
-              ? { $sum: "$total" }
-              : { $sum: { $multiply: ["$items.price", "$items.quantity"] } },
+            revenue: { $sum: "$total" },
             orders: { $sum: 1 },
           },
         },

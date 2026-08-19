@@ -614,29 +614,8 @@ async function getAdminDashboard(req, res, next) {
       }),
       WishlistItem.countDocuments(isSuperAdmin ? {} : { productId: { $in: ownedProductIds } }),
       Order.aggregate([
-        ...(isSuperAdmin
-          ? []
-          : [
-              {
-                $match: { "items.dealerId": req.auth.sub },
-              },
-            ]),
-        {
-          $unwind: "$items",
-        },
-        ...(isSuperAdmin
-          ? []
-          : [
-              {
-                $match: { "items.dealerId": req.auth.sub },
-              },
-            ]),
-        {
-          $group: {
-            _id: null,
-            totalRevenue: { $sum: { $multiply: ["$items.price", "$items.quantity"] } },
-          },
-        },
+        { $match: { ...orderFilter, status: { $nin: ["Cancelled", "Returned", "Refunded", "Expired"] } } },
+        { $group: { _id: null, totalRevenue: { $sum: "$total" } } },
       ]),
       Order.find(orderFilter).sort({ createdAt: -1 }).limit(8),
       Order.aggregate([

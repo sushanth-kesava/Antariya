@@ -9,7 +9,7 @@ export function formatINR(amount: number): string {
   return new Intl.NumberFormat(INDIA_LOCALE, {
     style: "currency",
     currency: INDIA_CURRENCY,
-    maximumFractionDigits: 2,
+    maximumFractionDigits: 0,
   }).format(value);
 }
 
