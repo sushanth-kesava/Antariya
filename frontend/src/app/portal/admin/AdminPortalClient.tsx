@@ -61,7 +61,6 @@ import {
   AdminDashboardPayload,
   getAdminDashboardFromBackend,
   getAdminOrderByIdFromBackend,
-  AdminOrderDetail,
   updateAdminOrderStatusOnBackend,
 } from "@/lib/api/orders";
 import {
@@ -142,7 +141,7 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
   const [orderSearch, setOrderSearch] = useState("");
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
   const [orderDetailOpen, setOrderDetailOpen] = useState(false);
-  const [orderDetail, setOrderDetail] = useState<AdminOrderDetail | null>(null);
+  const [orderDetail, setOrderDetail] = useState<any>(null);
   const [loadingOrderDetail, setLoadingOrderDetail] = useState(false);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
