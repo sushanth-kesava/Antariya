@@ -6,6 +6,10 @@
 RewriteEngine On
 RewriteBase /
 
+# Prevent Apache from 301-redirecting /path → /path/ when a directory exists.
+# This avoids "Page with redirect" warnings in Google Search Console.
+DirectorySlash Off
+
 # ══════════════════════════════════════════════════════════════════════════════
 # 0. Force HTTPS + redirect www → non-www (canonical URL)
 # ══════════════════════════════════════════════════════════════════════════════
@@ -22,19 +26,29 @@ RewriteCond %{THE_REQUEST} \s/+(.*?)\.html[\s?] [NC]
 RewriteCond %{REQUEST_URI} !^/404\.html$
 RewriteRule ^ /%1 [R=301,L]
 
+# ══════════════════════════════════════════════════════════════════════════════
+# 0c. Legacy URL redirects — dead/ghost URLs found by crawlers
+# ══════════════════════════════════════════════════════════════════════════════
+RewriteRule ^index/?$ / [R=301,L]
+RewriteRule ^story\.html$ /about [R=301,L]
+RewriteRule ^story/?$ /about [R=301,L]
+RewriteRule ^contact\.html$ /contact-support [R=301,L]
+RewriteRule ^contactus/?$ /contact-support [R=301,L]
+RewriteRule ^contact/?$ /contact-support [R=301,L]
+RewriteRule ^appointment/?$ / [R=301,L]
+RewriteRule ^products/?$ /shop [R=301,L]
+RewriteRule ^legal/privacy/?$ /legal/policies [R=301,L]
+RewriteRule ^legal/terms/?$ /legal/policies [R=301,L]
+RewriteRule ^legal/shipping/?$ /legal/policies [R=301,L]
+RewriteRule ^legal/returns/?$ /legal/policies [R=301,L]
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 0c. Legacy URL redirects (moved from next.config.ts — doesn't work with
-#     output: "export"). These are permanent 301 redirects for SEO.
+# 0d. Serve directory index.html without trailing-slash redirect
+#     (DirectorySlash Off prevents Apache's auto 301 /path → /path/)
 # ══════════════════════════════════════════════════════════════════════════════
-RewriteRule ^products/?$ /shop/ [R=301,L]
-RewriteRule ^story/?$ /about/ [R=301,L]
-RewriteRule ^contact/?$ /contact-support/ [R=301,L]
-RewriteRule ^legal/privacy/?$ /legal/policies/ [R=301,L]
-RewriteRule ^legal/terms/?$ /legal/policies/ [R=301,L]
-RewriteRule ^legal/shipping/?$ /legal/policies/ [R=301,L]
-RewriteRule ^legal/returns/?$ /legal/policies/ [R=301,L]
-
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME}/index.html -f
+RewriteRule ^(.+?)/?$ $1/index.html [L]
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 1. Product detail pages: /product/<any-id>/ → serve product/placeholder/index.html

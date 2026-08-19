@@ -1,5 +1,6 @@
 const POSInvoice = require('../models/POSInvoice');
 const Product = require('../models/Product');
+const mongoose = require('mongoose');
 const Inventory = require('../models/Inventory');
 const FinanceTransaction = require('../models/FinanceTransaction');
 const StockMovement = require('../models/StockMovement');
@@ -140,11 +141,11 @@ class POSService {
         type: 'payment_received',
         category: 'sales',
         subCategory: 'pos_sale',
-        amount: subtotal,
+        amount: Math.round(subtotal),
         taxAmount: 0,
-        netAmount: totalAmount,
-        paidAmount: paid,
-        balanceAmount: balanceDue,
+        netAmount: Math.round(totalAmount),
+        paidAmount: Math.round(paid),
+        balanceAmount: Math.round(balanceDue),
         paymentMethod: paymentMethod || 'cash',
         paymentStatus: balanceDue > 0 ? 'partial' : 'paid',
         accountHead: 'income',
@@ -190,9 +191,10 @@ class POSService {
   /**
    * Get POS invoices with filters
    */
-  static async getInvoices({ startDate, endDate, customerPhone, status, page = 1, limit = 20 }) {
+  static async getInvoices({ startDate, endDate, customerPhone, status, page = 1, limit = 20, billedBy = null }) {
     const filter = {};
     if (status) filter.status = status;
+    if (billedBy) filter.billedBy = new mongoose.Types.ObjectId(billedBy);
     if (customerPhone) filter.customerPhone = { $regex: customerPhone, $options: 'i' };
     if (startDate || endDate) {
       filter.createdAt = {};
@@ -267,18 +269,20 @@ class POSService {
   /**
    * POS Dashboard — today's sales summary
    */
-  static async getDashboard() {
+  static async getDashboard(billedBy = null) {
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const thisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
+    const ownerFilter = billedBy ? { billedBy: new mongoose.Types.ObjectId(billedBy) } : {};
+
     const [todaySales, monthSales, todayInvoices, monthInvoices, recentInvoices, topProducts] = await Promise.all([
-      POSInvoice.aggregate([{ $match: { createdAt: { $gte: today }, status: { $ne: 'cancelled' } } }, { $group: { _id: null, total: { $sum: '$totalAmount' }, count: { $sum: 1 } } }]),
-      POSInvoice.aggregate([{ $match: { createdAt: { $gte: thisMonth }, status: { $ne: 'cancelled' } } }, { $group: { _id: null, total: { $sum: '$totalAmount' }, count: { $sum: 1 } } }]),
-      POSInvoice.countDocuments({ createdAt: { $gte: today } }),
-      POSInvoice.countDocuments({ createdAt: { $gte: thisMonth } }),
-      POSInvoice.find({ status: { $ne: 'cancelled' } }).sort({ createdAt: -1 }).limit(10).populate('billedBy', 'displayName'),
+      POSInvoice.aggregate([{ $match: { createdAt: { $gte: today }, status: { $ne: 'cancelled' }, ...ownerFilter } }, { $group: { _id: null, total: { $sum: '$totalAmount' }, count: { $sum: 1 } } }]),
+      POSInvoice.aggregate([{ $match: { createdAt: { $gte: thisMonth }, status: { $ne: 'cancelled' }, ...ownerFilter } }, { $group: { _id: null, total: { $sum: '$totalAmount' }, count: { $sum: 1 } } }]),
+      POSInvoice.countDocuments({ createdAt: { $gte: today }, ...ownerFilter }),
+      POSInvoice.countDocuments({ createdAt: { $gte: thisMonth }, ...ownerFilter }),
+      POSInvoice.find({ status: { $ne: 'cancelled' }, ...ownerFilter }).sort({ createdAt: -1 }).limit(10).populate('billedBy', 'displayName'),
       POSInvoice.aggregate([
-        { $match: { createdAt: { $gte: thisMonth }, status: { $ne: 'cancelled' } } },
+        { $match: { createdAt: { $gte: thisMonth }, status: { $ne: 'cancelled' }, ...ownerFilter } },
         { $unwind: '$items' },
         { $group: { _id: '$items.productName', totalQty: { $sum: '$items.quantity' }, totalRevenue: { $sum: '$items.lineTotal' } } },
         { $sort: { totalQty: -1 } },

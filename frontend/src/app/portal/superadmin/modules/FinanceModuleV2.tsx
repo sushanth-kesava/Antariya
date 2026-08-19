@@ -25,6 +25,7 @@ import {
   getFinanceDashboard,
   getFinanceTransactions,
   getExpenses,
+  createExpense,
   voidTransaction,
   type FinanceDashboard,
   type FinanceTransaction,
@@ -72,7 +73,7 @@ function OverviewPanel({ token }: { token: string }) {
   if (loading) return <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin" /></div>;
   if (!stats) return <p className="text-center text-muted-foreground">Failed to load</p>;
 
-  const fmt = (n: number) => `₹${n.toLocaleString("en-IN")}`;
+  const fmt = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 
   return (
     <div className="space-y-6">
@@ -181,7 +182,7 @@ function TransactionsPanel({ token }: { token: string }) {
 
   useEffect(() => { load(); }, [load]);
 
-  const fmt = (n: number) => `₹${n.toLocaleString("en-IN")}`;
+  const fmt = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
   const [voidingId, setVoidingId] = useState<string | null>(null);
 
   const handleVoid = async (id: string) => {
@@ -270,6 +271,10 @@ function ExpensesPanel({ token }: { token: string }) {
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
   const [catFilter, setCatFilter] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [form, setForm] = useState({ category: "miscellaneous", description: "", amount: "", paymentMethod: "upi", paidTo: "", expenseDate: new Date().toISOString().slice(0, 10) });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -283,7 +288,24 @@ function ExpensesPanel({ token }: { token: string }) {
 
   useEffect(() => { load(); }, [load]);
 
-  const fmt = (n: number) => `₹${n.toLocaleString("en-IN")}`;
+  const fmt = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
+
+  const handleAddExpense = async () => {
+    if (!form.description.trim() || !form.amount || Number(form.amount) <= 0) {
+      setFormError("Description and a valid amount are required");
+      return;
+    }
+    setSaving(true);
+    setFormError(null);
+    try {
+      await createExpense(token, { category: form.category, description: form.description.trim(), amount: Number(form.amount), paymentMethod: form.paymentMethod, paidTo: form.paidTo.trim(), expenseDate: form.expenseDate });
+      setForm({ category: "miscellaneous", description: "", amount: "", paymentMethod: "upi", paidTo: "", expenseDate: new Date().toISOString().slice(0, 10) });
+      setShowForm(false);
+      load();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Failed to save expense");
+    } finally { setSaving(false); }
+  };
 
   return (
     <div className="space-y-4">
@@ -302,7 +324,51 @@ function ExpensesPanel({ token }: { token: string }) {
         </select>
         <Button variant="outline" size="sm" onClick={() => load()}><RefreshCw className="h-4 w-4" /></Button>
         <Badge variant="outline">{total} total</Badge>
+        <Button size="sm" className="ml-auto gap-1.5" onClick={() => setShowForm(!showForm)}><Plus className="h-4 w-4" />{showForm ? "Cancel" : "Add Expense"}</Button>
       </div>
+
+      {showForm && (
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <p className="text-sm font-semibold">Record Expense</p>
+            {formError && <p className="text-xs text-red-600">{formError}</p>}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <select className="border rounded-md px-3 py-2 text-sm bg-background" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+                <option value="travel">Travel</option>
+                <option value="salary">Salary</option>
+                <option value="rent">Rent</option>
+                <option value="marketing">Marketing</option>
+                <option value="packaging">Packaging</option>
+                <option value="utilities">Utilities</option>
+                <option value="logistics">Logistics</option>
+                <option value="raw_materials">Raw Materials</option>
+                <option value="maintenance">Maintenance</option>
+                <option value="miscellaneous">Miscellaneous</option>
+              </select>
+              <Input placeholder="Description *" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+              <Input type="number" placeholder="Amount (₹) *" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <select className="border rounded-md px-3 py-2 text-sm bg-background" value={form.paymentMethod} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })}>
+                <option value="cash">Cash</option>
+                <option value="upi">UPI</option>
+                <option value="neft">NEFT</option>
+                <option value="card">Card</option>
+                <option value="bank_transfer">Bank Transfer</option>
+                <option value="other">Other</option>
+              </select>
+              <Input placeholder="Paid To" value={form.paidTo} onChange={(e) => setForm({ ...form, paidTo: e.target.value })} />
+              <Input type="date" value={form.expenseDate} onChange={(e) => setForm({ ...form, expenseDate: e.target.value })} />
+            </div>
+            <div className="flex justify-end">
+              <Button size="sm" onClick={handleAddExpense} disabled={saving} className="gap-1.5">
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                Save Expense
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {loading ? (
         <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin" /></div>

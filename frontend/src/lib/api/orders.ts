@@ -205,3 +205,40 @@ export async function cancelMyOrderOnBackend(token: string, orderId: string): Pr
 
   return data.order as Order;
 }
+
+export type OrderCustomerInfo = {
+  name: string;
+  email: string;
+  phone: string;
+  address: {
+    street?: string;
+    city?: string;
+    state?: string;
+    zip?: string;
+    country?: string;
+  } | null;
+};
+
+export type AdminOrderDetail = Order & {
+  customer: OrderCustomerInfo;
+};
+
+export async function getAdminOrderByIdFromBackend(
+  token: string,
+  orderId: string
+): Promise<AdminOrderDetail> {
+  const response = await fetch(`${API_BASE_URL}/orders/admin/${orderId}`, {
+    credentials: "include",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data?.success) {
+    throw new Error(data?.message || "Failed to load order details");
+  }
+
+  return data.order as AdminOrderDetail;
+}

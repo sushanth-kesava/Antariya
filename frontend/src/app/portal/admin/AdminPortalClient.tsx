@@ -8,6 +8,7 @@ import { Product } from "@/app/lib/mock-data";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
+import { generateInvoicePdf } from "@/lib/invoice";
 import {
   LayoutDashboard,
   PlusCircle,
@@ -59,6 +60,8 @@ import {
 import {
   AdminDashboardPayload,
   getAdminDashboardFromBackend,
+  getAdminOrderByIdFromBackend,
+  AdminOrderDetail,
   updateAdminOrderStatusOnBackend,
 } from "@/lib/api/orders";
 import {
@@ -138,6 +141,9 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
   const [orderStatusFilter, setOrderStatusFilter] = useState<"all" | "Processing" | "Shipped" | "Delivered" | "Cancelled">("all");
   const [orderSearch, setOrderSearch] = useState("");
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
+  const [orderDetailOpen, setOrderDetailOpen] = useState(false);
+  const [orderDetail, setOrderDetail] = useState<AdminOrderDetail | null>(null);
+  const [loadingOrderDetail, setLoadingOrderDetail] = useState(false);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -699,6 +705,45 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
       setDashboardError(err instanceof Error ? err.message : "Failed to update order status.");
     } finally {
       setUpdatingOrderId(null);
+    }
+  };
+
+  // --- Order Detail Modal ---
+  const openOrderDetail = async (orderId: string, source: "marketplace" | "pos") => {
+    if (!authToken) return;
+    setOrderDetailOpen(true);
+    setOrderDetail(null);
+    setLoadingOrderDetail(true);
+
+    try {
+      if (source === "marketplace") {
+        const detail = await getAdminOrderByIdFromBackend(authToken, orderId);
+        setOrderDetail(detail);
+      } else {
+        // For POS orders, fetch from POS endpoint
+        const res = await fetch(`${getApiBaseUrl()}/pos/invoices/${orderId}`, {
+          credentials: "include",
+          headers: { Authorization: `Bearer ${authToken}` },
+        });
+        const data = await res.json();
+        if (data?.success && data.data) {
+          // Normalize POS invoice into a display-friendly shape
+          setOrderDetail(data.data);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load order detail", err);
+    } finally {
+      setLoadingOrderDetail(false);
+    }
+  };
+
+  const handleDownloadOrderInvoice = (order: any, source: "marketplace" | "pos") => {
+    if (source === "marketplace" && order) {
+      generateInvoicePdf(order, { name: order.customer?.name || "", email: order.customer?.email || order.userEmail || "" });
+    } else if (source === "pos" && order?._id) {
+      // Download POS invoice PDF from backend
+      window.open(`${getApiBaseUrl()}/pos/invoices/${order._id}/pdf`, "_blank");
     }
   };
 
@@ -1582,7 +1627,7 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
                           })
                           .slice(0, 8)
                           .map((order) => (
-                          <div key={order.id} className="rounded-xl border border-white bg-white px-3 py-2 flex items-center justify-between gap-3">
+                          <div key={order.id} className="rounded-xl border border-white bg-white px-3 py-2 flex items-center justify-between gap-3 cursor-pointer hover:border-primary/30 hover:shadow-sm transition-all" onClick={() => openOrderDetail(order.id, order.source)}>
                             <div className="flex items-center gap-2 min-w-0">
                               {order.source === "marketplace" ? (
                                 <span className="shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-indigo-100" title="Online Order">
@@ -2664,6 +2709,126 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Order Detail Modal */}
+      <Dialog open={orderDetailOpen} onOpenChange={setOrderDetailOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              Order Details
+              {orderDetail && (
+                <span className="text-xs font-normal text-muted-foreground">
+                  {orderDetail.id ? `#${orderDetail.id.slice(-8).toUpperCase()}` : orderDetail.invoiceNumber || ""}
+                </span>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+
+          {loadingOrderDetail ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : orderDetail ? (
+            <div className="space-y-5">
+              {/* Customer Info */}
+              <div className="rounded-xl border bg-muted/30 p-4">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2">Customer</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Name:</span>{" "}
+                    <span className="font-medium">{orderDetail.customer?.name || orderDetail.customerName || "—"}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Email:</span>{" "}
+                    <span className="font-medium">{orderDetail.customer?.email || orderDetail.userEmail || orderDetail.customerEmail || "—"}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Phone:</span>{" "}
+                    <span className="font-medium">{orderDetail.customer?.phone || orderDetail.customerPhone || "—"}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Payment:</span>{" "}
+                    <span className="font-medium capitalize">{orderDetail.paymentMethod || "—"}</span>
+                    <span className={`ml-2 inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold ${orderDetail.paymentStatus === "paid" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                      {orderDetail.paymentStatus || "pending"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Items */}
+              <div>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2">Items</p>
+                <div className="space-y-2">
+                  {(orderDetail.items || []).map((item: any, idx: number) => (
+                    <div key={idx} className="flex items-center gap-3 rounded-lg border bg-white p-3">
+                      {(item.image || item.productImage) && (
+                        <img src={item.image || item.productImage} alt={item.name || item.productName} className="w-12 h-12 rounded-lg object-cover border" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold truncate">{item.name || item.productName}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {item.variant?.size || item.size ? `Size: ${item.variant?.size || item.size}` : ""}
+                          {item.variant?.color || item.color ? ` • Color: ${item.variant?.color || item.color}` : ""}
+                          {item.variantSku ? ` • SKU: ${item.variantSku}` : ""}
+                        </p>
+                        {item.customization?.symbol && (
+                          <p className="text-xs text-purple-600 mt-0.5">✨ Custom: {item.customization.symbol}</p>
+                        )}
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-sm font-bold">{formatINR(Number(item.price || item.unitPrice || 0))}</p>
+                        <p className="text-xs text-muted-foreground">× {item.quantity}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Totals */}
+              <div className="rounded-xl border bg-muted/30 p-4">
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span>{formatINR(Number(orderDetail.subtotal || 0))}</span></div>
+                  {Number(orderDetail.shipping || 0) > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Shipping</span><span>{formatINR(Number(orderDetail.shipping))}</span></div>}
+                  {Number(orderDetail.discount || orderDetail.discountAmount || 0) > 0 && <div className="flex justify-between text-green-700"><span>Discount</span><span>-{formatINR(Number(orderDetail.discount || orderDetail.discountAmount))}</span></div>}
+                  {Number(orderDetail.tax || 0) > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Tax</span><span>{formatINR(Number(orderDetail.tax))}</span></div>}
+                  <div className="flex justify-between font-bold text-base pt-2 border-t">
+                    <span>Total</span>
+                    <span>{formatINR(Number(orderDetail.total || orderDetail.totalAmount || 0))}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center gap-3 pt-2">
+                <Button
+                  variant="secondary"
+                  className="gap-2"
+                  onClick={() => {
+                    const source = orderDetail.invoiceNumber?.startsWith("POS") ? "pos" : "marketplace";
+                    handleDownloadOrderInvoice(orderDetail, source);
+                  }}
+                >
+                  <Download className="h-4 w-4" />
+                  Download Invoice
+                </Button>
+                <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+                  (orderDetail.status === "Delivered" || orderDetail.status === "completed") ? "bg-emerald-100 text-emerald-800" :
+                  orderDetail.status === "Shipped" ? "bg-blue-100 text-blue-800" :
+                  orderDetail.status === "Processing" ? "bg-yellow-100 text-yellow-800" :
+                  orderDetail.status === "Cancelled" || orderDetail.status === "cancelled" ? "bg-rose-100 text-rose-800" :
+                  "bg-gray-100 text-gray-800"
+                }`}>
+                  {orderDetail.status === "completed" ? "Delivered" : orderDetail.status}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground py-8 text-center">Could not load order details.</p>
+          )}
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }

@@ -13,22 +13,14 @@ const {
 } = require("../services/inventory.service");
 const Coupon = require("../models/Coupon");
 const { recordCouponUsage } = require("./coupon.controller");
+const FinanceTransaction = require("../models/FinanceTransaction");
 
 const INDIA_FREE_SHIPPING_THRESHOLD = 1499;
-const INDIA_STANDARD_SHIPPING = 99;
-// GST set to 0 — business is not GST-registered (no GSTIN).
+const INDIA_STANDARD_SHIPPING = 49;
 const INDIA_GST_RATE = 0;
-// TODO: Replace with a live exchange rate API or remove USD pricing entirely.
-// This hardcoded rate drifts over time and causes financial discrepancies.
-const LEGACY_USD_TO_INR_RATE = Number(process.env.USD_TO_INR_RATE) || 85;
 // Minutes an unpaid online order holds its reserved stock before the expiry
 // sweeper releases it back to available.
 const ORDER_HOLD_MINUTES = Number(process.env.ORDER_HOLD_MINUTES || 30);
-
-function normalizeCatalogPriceToINR(price) {
-  const value = Number(price || 0);
-  return value > 0 && value <= 200 ? value * LEGACY_USD_TO_INR_RATE : value;
-}
 
 function normalizeOrder(order) {
   return {
@@ -293,7 +285,7 @@ async function createOrder(req, res, next) {
       const basePrice = matchedVariant && Number(matchedVariant.price) > 0
         ? Number(matchedVariant.price)
         : product.price;
-      const unitPriceINR = normalizeCatalogPriceToINR(basePrice);
+      const unitPriceINR = Number(basePrice);
 
       orderItems.push({
         productId: product._id,
@@ -492,6 +484,40 @@ async function createOrder(req, res, next) {
         email: req.auth.email,
         orderId: order._id.toString(),
       }).catch((err) => console.error("[Order] Failed to record coupon usage:", err.message));
+    }
+
+    // Record as finance transaction so Finance & Reports module captures
+    // marketplace revenue alongside POS revenue (unified view).
+    if (paymentStatus === "paid") {
+      (async () => {
+        try {
+          const count = await FinanceTransaction.countDocuments();
+          await FinanceTransaction.create({
+            transactionNumber: `ORD-${Date.now().toString().slice(-6)}-${(count + 1).toString().padStart(4, "0")}`,
+            type: "payment_received",
+            category: "sales",
+            subCategory: "marketplace_sale",
+            amount: Math.round(order.subtotal),
+            taxAmount: Math.round(order.tax || 0),
+            netAmount: Math.round(order.total),
+            paidAmount: Math.round(order.total),
+            balanceAmount: 0,
+            paymentMethod: paymentMethod === "cod" ? "cash" : "upi",
+            paymentStatus: "paid",
+            accountHead: "income",
+            description: `Online order: ${order._id.toString().slice(-8).toUpperCase()}`,
+            partyType: "customer",
+            partyName: req.auth.email.split("@")[0],
+            partyEmail: req.auth.email,
+            referenceType: "order",
+            referenceId: order._id,
+            referenceNumber: order._id.toString(),
+            createdBy: order.items[0]?.dealerId || req.auth.sub,
+          });
+        } catch (err) {
+          console.warn("[Order] Finance transaction creation failed:", err.message);
+        }
+      })();
     }
 
     // Admin notification (fire-and-forget)
@@ -827,10 +853,69 @@ async function cancelMyOrder(req, res, next) {
   }
 }
 
+/**
+ * GET /orders/admin/:orderId — Full order details for the admin panel.
+ * Regular admins can only see orders containing their own products (dealerId match).
+ * Superadmins can see any order.
+ */
+async function getAdminOrderById(req, res, next) {
+  try {
+    const { orderId } = req.params;
+    if (!orderId) {
+      return res.status(400).json({ success: false, message: "orderId is required" });
+    }
+
+    const order = await Order.findById(orderId).lean();
+    if (!order) {
+      return res.status(404).json({ success: false, message: "Order not found" });
+    }
+
+    const isSuperAdmin = req.auth?.role === "superadmin";
+    const dealerId = req.auth?.sub;
+
+    // Access control: regular admins can only see orders that contain their items
+    if (!isSuperAdmin) {
+      const hasOwnItems = order.items.some((item) => item.dealerId === dealerId);
+      if (!hasOwnItems) {
+        return res.status(403).json({ success: false, message: "Access denied" });
+      }
+    }
+
+    // Fetch customer profile if available
+    let customerProfile = null;
+    if (order.userId) {
+      customerProfile = await CustomerProfile.findOne({ userId: order.userId }).lean();
+    }
+
+    // Get default address if available
+    const defaultAddr = customerProfile?.addresses?.find((a) => a.isDefault) || customerProfile?.addresses?.[0] || null;
+
+    return res.status(200).json({
+      success: true,
+      order: {
+        ...normalizeOrder(order),
+        customer: customerProfile
+          ? {
+              name: customerProfile.displayName || "",
+              email: customerProfile.email || order.userEmail,
+              phone: customerProfile.phone || "",
+              address: defaultAddr
+                ? { line1: defaultAddr.line1, line2: defaultAddr.line2, city: defaultAddr.city, state: defaultAddr.state, pincode: defaultAddr.pincode, country: defaultAddr.country }
+                : null,
+            }
+          : { name: "", email: order.userEmail, phone: "", address: null },
+      },
+    });
+  } catch (err) {
+    return next(err);
+  }
+}
+
 module.exports = {
   createOrder,
   getMyOrders,
   getAdminDashboard,
+  getAdminOrderById,
   updateAdminOrderStatus,
   cancelMyOrder,
 };

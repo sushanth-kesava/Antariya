@@ -217,8 +217,8 @@ class FinanceService {
     // Realized revenue = cash actually collected (paidAmount), NOT the full
     // invoice value. The unpaid balance of partial/pending invoices is tracked
     // separately under receivables so revenue is never overstated.
-    const revenue = revenueAgg[0]?.paid || 0;
-    const expenses = expenseAgg[0]?.total || 0;
+    const revenue = Math.round(revenueAgg[0]?.paid || 0);
+    const expenses = Math.round(expenseAgg[0]?.total || 0);
     const profit = revenue - expenses;
     const gstData = gstAgg[0] || { outputGst: 0, inputGst: 0 };
 
@@ -227,8 +227,8 @@ class FinanceService {
       expenses,
       profit,
       profitMargin: revenue > 0 ? ((profit / revenue) * 100).toFixed(1) : 0,
-      receivables: receivablesAgg[0]?.total || 0,
-      payables: payablesAgg[0]?.total || 0,
+      receivables: Math.round(receivablesAgg[0]?.total || 0),
+      payables: Math.round(payablesAgg[0]?.total || 0),
       gstPayable: (gstData.outputGst || 0) - (gstData.inputGst || 0),
       outputGst: gstData.outputGst || 0,
       inputGst: gstData.inputGst || 0,

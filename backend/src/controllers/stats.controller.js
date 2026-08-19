@@ -1,5 +1,6 @@
 const Product = require("../models/Product");
 const Order = require("../models/Order");
+const mongoose = require("mongoose");
 const POSInvoice = require("../models/POSInvoice");
 
 async function getPublicHomeStats(req, res, next) {
@@ -44,9 +45,11 @@ async function getUnifiedOperationsStats(req, res, next) {
     const isSuperAdmin = req.auth?.role === "superadmin";
     const dealerId = req.auth?.sub;
 
-    // Build filters based on role
+    // Build filters based on role — each admin only sees their own data
     const orderFilter = isSuperAdmin ? {} : { "items.dealerId": dealerId };
-    const posFilter = { status: { $ne: "cancelled" } };
+    const posFilter = isSuperAdmin
+      ? { status: { $ne: "cancelled" } }
+      : { status: { $ne: "cancelled" }, billedBy: new mongoose.Types.ObjectId(dealerId) };
 
     // --- Marketplace Order Stats ---
     const [
