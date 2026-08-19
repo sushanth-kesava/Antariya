@@ -18,6 +18,7 @@ build/
 .env.production.local
 backend/.env
 frontend/.env
+frontend/.env.production
 frontend/.env.local
 
 # IDE

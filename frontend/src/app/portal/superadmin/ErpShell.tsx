@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   LayoutDashboard,
   Users,
+  Briefcase,
   ShoppingCart,
   Package,
   ScanBarcode,
@@ -65,7 +66,8 @@ type NavItem = {
 
 const NAV_ITEMS: NavItem[] = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { key: "people", label: "HR / People", icon: Users, anyOf: ["hr.people.view", "hr.access_requests.view", "hr.permissions.override"] },
+  { key: "people", label: "People & Access", icon: Users, anyOf: ["hr.people.view", "hr.access_requests.view", "hr.permissions.override"] },
+  { key: "hr", label: "HR Management", icon: Briefcase, anyOf: ["hr.people.view"] },
   { key: "orders", label: "Orders & Fulfillment", icon: ShoppingCart, anyOf: ["orders.view"] },
   { key: "pos", label: "Offline Store (POS)", icon: Store },
   { key: "inventory", label: "Inventory & Warehouses", icon: Package, anyOf: ["inventory.view"] },
@@ -112,6 +114,8 @@ export function ErpShell({
       case "governance":
         return <GovernanceModule token={token} has={has} />;
       case "people":
+        return <PeopleModule token={token} has={has} />;
+      case "hr":
         return <HRModule token={token} has={has} />;
       case "orders":
         return <OrdersModule token={token} has={has} />;

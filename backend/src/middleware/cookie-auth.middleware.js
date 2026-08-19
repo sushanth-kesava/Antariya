@@ -11,12 +11,17 @@ const COOKIE_MAX_AGE_SECONDS = 7 * 24 * 60 * 60; // 7 days
 function setAuthCookie(res, token) {
   const isProduction = env.nodeEnv === "production";
 
+  // In production, set domain to share cookie across subdomains
+  // (api.antariyaofficial.com ↔ antariyaofficial.com)
+  const domainOption = isProduction ? { domain: ".antariyaofficial.com" } : {};
+
   res.cookie(COOKIE_NAME, token, {
     httpOnly: true,          // Not accessible via JS (XSS protection)
     secure: isProduction,    // HTTPS only in production
     sameSite: "lax",         // Protects against CSRF — safe since frontend/backend share antariyaofficial.com
     maxAge: COOKIE_MAX_AGE_SECONDS * 1000,
     path: "/",
+    ...domainOption,
   });
 }
 
@@ -26,11 +31,14 @@ function setAuthCookie(res, token) {
 function clearAuthCookie(res) {
   const isProduction = env.nodeEnv === "production";
 
+  const domainOption = isProduction ? { domain: ".antariyaofficial.com" } : {};
+
   res.clearCookie(COOKIE_NAME, {
     httpOnly: true,
     secure: isProduction,
     sameSite: "lax",
     path: "/",
+    ...domainOption,
   });
 }
 

@@ -6,6 +6,7 @@ const Warehouse = require("../models/Warehouse");
 const { recordAudit } = require("../services/rbac.service");
 const { refundRazorpayPayment, isRazorpayConfigured } = require("./payment.controller");
 const inventoryService = require("../services/inventory.service");
+const { escapeRegex } = require("../config/utils");
 
 function auditContext(req) {
   return {
@@ -201,7 +202,7 @@ async function listProductsForErp(req, res, next) {
     const skip = (page - 1) * limit;
     const filter = {};
     if (req.query.search) {
-      filter.name = { $regex: String(req.query.search).trim(), $options: "i" };
+      filter.name = { $regex: escapeRegex(String(req.query.search).trim()), $options: "i" };
     }
 
     const [rows, total] = await Promise.all([

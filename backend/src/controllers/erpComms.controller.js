@@ -11,6 +11,7 @@ const env = require("../config/env");
 const { recordAudit } = require("../services/rbac.service");
 const { sendBrandedEmail, hasMailConfig } = require("../services/mail.service");
 const { enqueue } = require("../services/mail.queue");
+const { escapeRegex } = require("../config/utils");
 
 function auditContext(req) {
   return {
@@ -356,7 +357,7 @@ async function listSubscribers(req, res, next) {
     const skip = (page - 1) * limit;
     const filter = {};
     if (req.query.status) filter.status = String(req.query.status);
-    if (req.query.search) filter.email = { $regex: String(req.query.search).trim(), $options: "i" };
+    if (req.query.search) filter.email = { $regex: escapeRegex(String(req.query.search).trim()), $options: "i" };
 
     const [rows, total, subscribed] = await Promise.all([
       NewsletterSubscriber.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
@@ -435,8 +436,8 @@ async function listEmailLogs(req, res, next) {
     const skip = (page - 1) * limit;
     const filter = {};
     if (req.query.status) filter.status = String(req.query.status);
-    if (req.query.type) filter.type = { $regex: String(req.query.type).trim(), $options: "i" };
-    if (req.query.to) filter.to = { $regex: String(req.query.to).trim(), $options: "i" };
+    if (req.query.type) filter.type = { $regex: escapeRegex(String(req.query.type).trim()), $options: "i" };
+    if (req.query.to) filter.to = { $regex: escapeRegex(String(req.query.to).trim()), $options: "i" };
 
     const [rows, total, failed] = await Promise.all([
       EmailLog.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),

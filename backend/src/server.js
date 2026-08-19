@@ -46,7 +46,20 @@ const allowedOrigins = Array.isArray(env.frontendUrls)
   ? env.frontendUrls
   : [env.frontendUrl].filter(Boolean);
 
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "res.cloudinary.com", "data:", "https:"],
+      connectSrc: ["'self'", ...allowedOrigins],
+      fontSrc: ["'self'", "https:", "data:"],
+      objectSrc: ["'none'"],
+      frameAncestors: ["'none'"],
+    },
+  },
+}));
 
 // ─── Block search engines from indexing the API domain ────────────────────────
 app.use((req, res, next) => {

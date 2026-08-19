@@ -21,6 +21,7 @@ const {
   invalidateRuleCache: invalidateRateLimitCache,
   getActivitySnapshot,
 } = require("../services/ratelimit.service");
+const { escapeRegex } = require("../config/utils");
 
 function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
@@ -407,7 +408,7 @@ async function listErrorLogs(req, res, next) {
     if (req.query.resolved === "true") filter.resolved = true;
     if (req.query.resolved === "false") filter.resolved = false;
     if (req.query.statusCode) filter.statusCode = parseInt(req.query.statusCode, 10);
-    if (req.query.path) filter.path = { $regex: String(req.query.path).trim(), $options: "i" };
+    if (req.query.path) filter.path = { $regex: escapeRegex(String(req.query.path).trim()), $options: "i" };
 
     const [entries, total, unresolved] = await Promise.all([
       ErrorLog.find(filter).sort({ lastSeenAt: -1 }).skip(skip).limit(limit).lean(),

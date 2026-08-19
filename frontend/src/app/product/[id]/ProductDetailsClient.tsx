@@ -53,6 +53,34 @@ import { getWishlistFromBackend, setWishlistItemOnBackend } from "@/lib/api/wish
 import { formatINR, normalizeCatalogPriceToINR } from "@/lib/india";
 import { useInventoryUpdates } from "@/hooks/use-inventory-updates";
 
+
+// --- XSS Protection: strip dangerous tags/attributes from HTML ---
+function sanitizeHtml(html: string): string {
+  if (typeof window === "undefined") return html;
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  // Remove script, iframe, object, embed, form, and event handlers
+  const dangerous = doc.querySelectorAll("script, iframe, object, embed, form, link[rel=import]");
+  dangerous.forEach((el) => el.remove());
+  // Remove all event handler attributes (onclick, onerror, onload, etc.)
+  const allElements = doc.body.querySelectorAll("*");
+  allElements.forEach((el) => {
+    for (const attr of Array.from(el.attributes)) {
+      if (attr.name.startsWith("on") || attr.value.trim().toLowerCase().startsWith("javascript:")) {
+        el.removeAttribute(attr.name);
+      }
+    }
+    // Remove dangerous href/src attributes
+    if (el.hasAttribute("src") && el.getAttribute("src")!.trim().toLowerCase().startsWith("javascript:")) {
+      el.removeAttribute("src");
+    }
+    if (el.hasAttribute("href") && el.getAttribute("href")!.trim().toLowerCase().startsWith("javascript:")) {
+      el.removeAttribute("href");
+    }
+  });
+  return doc.body.innerHTML;
+}
+
+
 const LAST_SUCCESSFUL_PINCODE_KEY = "antariya_last_successful_pincode";
 const APPAREL_CATEGORIES = new Set(["Hoodies", "Blouses"]);
 
@@ -996,9 +1024,9 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
               
               <div 
                 className="text-lg text-muted-foreground leading-relaxed product-description" 
-                dangerouslySetInnerHTML={{ __html: product.description.includes('<') 
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.description.includes('<') 
                   ? product.description 
-                  : product.description.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br/>').replace(/^/, '<p>').replace(/$/, '</p>')
+                  : product.description.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br/>').replace(/^/, '<p>').replace(/$/, '</p>'))
                 }}
               />
 

@@ -600,6 +600,9 @@ async function getCurrentUser(req, res, next) {
 
     const refreshedToken = issueJwtToken(user, currentRole);
 
+    // Refresh the HttpOnly cookie so it stays alive across sessions
+    setAuthCookie(res, refreshedToken);
+
     return res.status(200).json({
       success: true,
       token: refreshedToken,

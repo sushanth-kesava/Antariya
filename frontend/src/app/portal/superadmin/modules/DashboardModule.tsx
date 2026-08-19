@@ -74,8 +74,13 @@ export function DashboardModule({
         {CARDS.map((card) => {
           const Icon = card.icon;
           const value = summary ? summary[card.key] : undefined;
+          const isClickable = card.key === "pendingRequests" && Number(value || 0) > 0;
           return (
-            <Card key={card.key}>
+            <Card
+              key={card.key}
+              className={isClickable ? "cursor-pointer transition-colors hover:border-primary/50" : ""}
+              onClick={isClickable ? () => onNavigate("people") : undefined}
+            >
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
                   {card.label}
