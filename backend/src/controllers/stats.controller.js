@@ -45,11 +45,17 @@ async function getUnifiedOperationsStats(req, res, next) {
     const isSuperAdmin = req.auth?.role === "superadmin";
     const dealerId = req.auth?.sub;
 
-    // Build filters based on role — each admin only sees their own data
+    // Build filters based on role — each admin only sees their own data.
+    // For POS, filter by products owned by this admin (not billedBy)
+    // so admin sees revenue even if superadmin processed the sale.
     const orderFilter = isSuperAdmin ? {} : { "items.dealerId": dealerId };
-    const posFilter = isSuperAdmin
-      ? { status: { $ne: "cancelled" } }
-      : { status: { $ne: "cancelled" }, billedBy: new mongoose.Types.ObjectId(dealerId) };
+
+    let posFilter = { status: { $ne: "cancelled" } };
+    if (!isSuperAdmin) {
+      const ownedProducts = await Product.find({ dealerId }).select("_id");
+      const ownedProductIds = ownedProducts.map((p) => p._id);
+      posFilter = { status: { $ne: "cancelled" }, "items.productId": { $in: ownedProductIds } };
+    }
 
     // --- Marketplace Order Stats ---
     const [

@@ -191,10 +191,10 @@ class POSService {
   /**
    * Get POS invoices with filters
    */
-  static async getInvoices({ startDate, endDate, customerPhone, status, page = 1, limit = 20, billedBy = null }) {
+  static async getInvoices({ startDate, endDate, customerPhone, status, page = 1, limit = 20, productIds = null }) {
     const filter = {};
     if (status) filter.status = status;
-    if (billedBy) filter.billedBy = new mongoose.Types.ObjectId(billedBy);
+    if (productIds) filter["items.productId"] = { $in: productIds };
     if (customerPhone) filter.customerPhone = { $regex: customerPhone, $options: 'i' };
     if (startDate || endDate) {
       filter.createdAt = {};
@@ -269,11 +269,11 @@ class POSService {
   /**
    * POS Dashboard — today's sales summary
    */
-  static async getDashboard(billedBy = null) {
+  static async getDashboard(billedBy = null, productIds = null) {
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const thisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
-    const ownerFilter = billedBy ? { billedBy: new mongoose.Types.ObjectId(billedBy) } : {};
+    const ownerFilter = productIds ? { "items.productId": { $in: productIds } } : (billedBy ? { billedBy: new mongoose.Types.ObjectId(billedBy) } : {});
 
     const [todaySales, monthSales, todayInvoices, monthInvoices, recentInvoices, topProducts] = await Promise.all([
       POSInvoice.aggregate([{ $match: { createdAt: { $gte: today }, status: { $ne: 'cancelled' }, ...ownerFilter } }, { $group: { _id: null, total: { $sum: '$totalAmount' }, count: { $sum: 1 } } }]),
