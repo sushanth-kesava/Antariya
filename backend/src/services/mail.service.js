@@ -252,6 +252,20 @@ function buildInlineWelcomeHeroAttachment() {
 
 async function selectWelcomeProducts(email) {
   try {
+    const featuredProducts = await Product.find({
+      published: true,
+      stock: { $gt: 0 },
+      $or: [{ name: /The Sword/i }, { name: /Just Be Yourself/i }],
+    })
+      .select("name price image images galleryImages")
+      .sort({ createdAt: -1 })
+      .limit(3)
+      .lean();
+
+    if (featuredProducts.length === 3) {
+      return featuredProducts;
+    }
+
     const products = await Product.find({ published: true, stock: { $gt: 0 } })
       .select("name price image images galleryImages")
       .sort({ createdAt: -1 })
@@ -339,6 +353,12 @@ async function buildStyledWelcomeMessage({ email, displayName }) {
   const heroImageSrc = inlineHeroAttachment ? "cid:welcome-hero-card" : heroImage;
 
   message.html = message.html
+    .replace(
+      "font-family:Georgia,'Times New Roman',serif;font-style:italic;font-size:34px;color:#a9835c;margin-bottom:6px;",
+      "font-family:'Brittany Signature','Segoe Script','Brush Script MT',cursive;font-style:normal;font-size:38px;color:#a9835c;margin-bottom:6px;"
+    )
+    .replace(/(?:Georgia,'Times New Roman',serif|Arial,Helvetica,sans-serif)/g, "'Montserrat',Arial,Helvetica,sans-serif")
+    .replace(/border-bottom:1px solid #1a1a1a;/g, "")
     .replace(
       /class="email-container" width="720" cellpadding="0" cellspacing="0" border="0" style="width:720px;max-width:720px;background:#fff;"/,
       'class="email-container" width="820" cellpadding="0" cellspacing="0" border="0" style="width:820px;max-width:820px;background:#fff;"'
