@@ -54,7 +54,9 @@ const env = {
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || "7d",
   frontendUrl: resolvedFrontendOrigins[0],
   frontendUrls: resolvedFrontendOrigins,
+  backendUrl: process.env.RENDER_EXTERNAL_URL || "",
   appName: process.env.APP_NAME || "Antariya",
+  welcomeHeroImageUrl: process.env.WELCOME_HERO_IMAGE_URL || "",
   adminAllowedEmails: String(process.env.ADMIN_ALLOWED_EMAILS || "")
     .split(",")
     .map((value) => value.trim().toLowerCase())

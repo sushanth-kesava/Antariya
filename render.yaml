@@ -2,7 +2,7 @@ services:
   - type: web
     name: antariya-backend
     rootDir: backend
-    env: node
+    runtime: node
     buildCommand: npm install
     startCommand: npm start
     autoDeploy: true

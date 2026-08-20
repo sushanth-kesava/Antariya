@@ -1,7 +1,10 @@
 const nodemailer = require("nodemailer");
 const https = require("https");
+const fs = require("fs");
+const path = require("path");
 const env = require("../config/env");
 const { buildInvoicePdf } = require("./invoice.service");
+const Product = require("../models/Product");
 
 let cachedTransporter = null;
 
@@ -63,7 +66,7 @@ function getTransporter() {
 async function sendMail({ to, subject, html, text, attachments }) {
   // --- Use Resend HTTPS API if configured ---
   if (useResend()) {
-    return sendViaResend({ to, subject, html, text });
+    return sendViaResend({ to, subject, html, text, attachments });
   }
 
   // --- Fallback to SMTP ---
@@ -98,15 +101,55 @@ async function sendMail({ to, subject, html, text, attachments }) {
  * Send email via Resend HTTPS API (no SMTP port needed)
  * Docs: https://resend.com/docs/api-reference/emails/send-email
  */
-function sendViaResend({ to, subject, html, text }) {
+function sendViaResend({ to, subject, html, text, attachments }) {
   return new Promise((resolve, reject) => {
     const from = resolveFromAddress();
+    const resendAttachments = Array.isArray(attachments)
+      ? attachments
+          .map((attachment) => {
+            if (!attachment || !attachment.filename) {
+              return null;
+            }
+
+            const payload = {
+              filename: attachment.filename,
+            };
+
+            if (attachment.contentType) {
+              payload.type = attachment.contentType;
+            }
+
+            if (attachment.cid) {
+              payload.content_id = attachment.cid;
+            }
+
+            if (Buffer.isBuffer(attachment.content)) {
+              payload.content = attachment.content.toString("base64");
+              return payload;
+            }
+
+            if (typeof attachment.content === "string" && attachment.content.trim()) {
+              payload.content = attachment.content;
+              return payload;
+            }
+
+            if (attachment.path && fs.existsSync(attachment.path)) {
+              payload.content = fs.readFileSync(attachment.path).toString("base64");
+              return payload;
+            }
+
+            return null;
+          })
+          .filter(Boolean)
+      : [];
+
     const body = JSON.stringify({
       from,
       to: Array.isArray(to) ? to : [to],
       subject,
       html: html || undefined,
       text: text || undefined,
+      ...(resendAttachments.length > 0 ? { attachments: resendAttachments } : {}),
     });
 
     const options = {
@@ -172,8 +215,192 @@ function buildWelcomeMessage(displayName) {
   };
 }
 
+function welcomeProductImage(product, fallbackImage) {
+  const images = [product?.image, ...(product?.images || []), ...(product?.galleryImages || [])];
+  return images.find((image) => typeof image === "string" && image.trim()) || fallbackImage;
+}
+
+function getWelcomeHeroImage() {
+  if (env.welcomeHeroImageUrl) {
+    return env.welcomeHeroImageUrl;
+  }
+
+  const backendUrl = String(env.backendUrl || "").replace(/\/$/, "");
+  if (backendUrl) {
+    return `${backendUrl}/assets/hero_card.png`;
+  }
+
+  const frontendUrl = String(env.frontendUrl || "").replace(/\/$/, "");
+  return frontendUrl
+    ? `${frontendUrl}/assets/hero_card.png`
+    : "https://placehold.co/720x780/6b6259/ffffff?text=Antariya+Collection";
+}
+
+function buildInlineWelcomeHeroAttachment() {
+  const heroPath = path.resolve(__dirname, "../assets/hero_card.png");
+  if (!fs.existsSync(heroPath)) {
+    return null;
+  }
+
+  return {
+    filename: "hero_card.png",
+    content: fs.readFileSync(heroPath),
+    contentType: "image/png",
+    cid: "welcome-hero-card",
+  };
+}
+
+async function selectWelcomeProducts(email) {
+  try {
+    const products = await Product.find({ published: true, stock: { $gt: 0 } })
+      .select("name price image images galleryImages")
+      .sort({ createdAt: -1 })
+      .limit(30)
+      .lean();
+
+    if (products.length <= 3) {
+      return products;
+    }
+
+    let hash = 0;
+    for (const character of String(email || "")) {
+      hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
+    }
+
+    const start = hash % products.length;
+    return [0, 1, 2].map((offset) => products[(start + offset) % products.length]);
+  } catch (error) {
+    console.error("[Mail] Could not load welcome products:", error.message || error);
+    return [];
+  }
+}
+
+async function buildAntariyaWelcomeMessage({ email, displayName }) {
+  const appName = env.appName || "Antariya";
+  const websiteUrl = env.frontendUrl || "https://antariyaofficial.com";
+  const products = await selectWelcomeProducts(email);
+  const fallbackImage = env.welcomeHeroImageUrl || welcomeProductImage(products[0], "https://placehold.co/600x630/efe9e1/1a1a1a?text=Antariya");
+  const safeName = escapeHtml(displayName || "there");
+  const safeAppName = escapeHtml(appName);
+  const safeWebsiteUrl = escapeHtml(websiteUrl);
+  const safeHeroImage = escapeHtml(fallbackImage);
+  const productCards = [0, 1, 2].map((index) => {
+    const product = products[index] || {};
+    const image = escapeHtml(welcomeProductImage(product, fallbackImage));
+    const name = escapeHtml(product.name || "Explore the collection");
+    const price = Number(product.price);
+    const formattedPrice = Number.isFinite(price) ? `&#8377;${price.toLocaleString("en-IN")}` : "Discover now";
+    return `<td class="product-col" width="33.3%" valign="top" style="padding:0 5px;font-family:Arial,Helvetica,sans-serif;text-align:center;"><a href="${safeWebsiteUrl}" style="color:#1a1a1a;text-decoration:none;"><img src="${image}" width="170" alt="${name}" style="display:block;width:100%;height:170px;object-fit:cover;background:#e4ded4;margin-bottom:14px;"/><div style="font-size:12px;font-weight:bold;letter-spacing:.5px;color:#1a1a1a;text-transform:uppercase;margin-bottom:6px;">${name}</div><div style="font-size:13px;color:#333;margin-bottom:10px;">${formattedPrice}</div><span style="font-size:12px;font-weight:bold;border-bottom:1px solid #1a1a1a;">SHOP NOW &rarr;</span></a></td>`;
+  }).join("");
+
+  return {
+    subject: `Welcome to ${appName} - Your account is ready`,
+    text: `Hi ${displayName || "there"},\n\nWelcome to ${appName}. Your account is ready.\n\nExplore the latest collection: ${websiteUrl}\n\nRegards,\n${appName} Team`,
+    html: `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>Welcome to ${safeAppName}</title><style>body,table,td,a{-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}table,td{mso-table-lspace:0pt;mso-table-rspace:0pt}img{border:0;height:auto;line-height:100%;outline:none;text-decoration:none}a{text-decoration:none}@media screen and (max-width:600px){.email-container{width:100%!important}.stack-col{display:block!important;width:100%!important}.hero-img{width:100%!important;height:auto!important}.product-col{display:block!important;width:100%!important;padding:0 0 20px!important}}</style></head><body style="margin:0;padding:0;background:#f4f1ec;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f1ec;"><tr><td align="center" style="padding:24px 12px;"><table role="presentation" class="email-container" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px;background:#fff;"><tr><td align="center" style="padding:36px 20px 28px;"><div style="font-family:Georgia,'Times New Roman',serif;font-size:34px;letter-spacing:8px;color:#1a1a1a;">${safeAppName.toUpperCase()}</div><div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;letter-spacing:4px;color:#6b6b6b;margin-top:6px;">CLOTHING CO.</div></td></tr><tr><td style="background:#efe9e1;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td class="stack-col" width="52%" valign="middle" style="padding:44px 30px 44px 40px;font-family:Arial,Helvetica,sans-serif;"><div style="font-family:Georgia,'Times New Roman',serif;font-style:italic;font-size:30px;color:#a9835c;margin-bottom:6px;">Welcome to</div><div style="font-family:Georgia,'Times New Roman',serif;font-size:40px;letter-spacing:3px;color:#1a1a1a;line-height:1.1;">${safeAppName.toUpperCase()}</div><div style="width:46px;height:2px;background:#1a1a1a;margin:18px 0 20px;"></div><p style="margin:0 0 14px;font-size:15px;font-weight:bold;color:#1a1a1a;line-height:1.5;">Hi ${safeName},</p><p style="margin:0 0 14px;font-size:15px;font-weight:bold;color:#1a1a1a;line-height:1.5;">We're excited to have you with us.</p><p style="margin:0 0 26px;font-size:14px;color:#4d4d4d;line-height:1.6;">Discover thoughtfully designed clothing made to bring effortless style into your everyday wardrobe.</p><table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="background:#1a1a1a;"><a href="${safeWebsiteUrl}" style="display:block;padding:15px 28px;font-family:Arial,Helvetica,sans-serif;font-size:12px;letter-spacing:1.5px;color:#fff;font-weight:bold;">EXPLORE THE COLLECTION</a></td></tr></table></td><td class="stack-col" width="48%" valign="top" style="padding:0;"><img src="${safeHeroImage}" alt="${safeAppName} collection" class="hero-img" width="288" style="display:block;width:100%;height:auto;"/></td></tr></table></td></tr><tr><td style="padding:46px 30px 40px;font-family:Arial,Helvetica,sans-serif;text-align:center;"><div style="font-size:15px;letter-spacing:2px;font-weight:bold;color:#1a1a1a;margin-bottom:30px;">YOUR ACCOUNT IS READY</div><p style="margin:0 auto;color:#4d4d4d;font-size:14px;line-height:1.6;max-width:470px;">Your account is ready to explore collections, save favorites, track orders, and check out faster.</p></td></tr><tr><td style="background:#f7f4ef;padding:44px 30px 40px;font-family:Arial,Helvetica,sans-serif;"><div style="text-align:center;font-size:22px;letter-spacing:1.5px;font-weight:bold;color:#1a1a1a;font-family:Georgia,'Times New Roman',serif;padding-bottom:8px;">DISCOVER WHAT'S NEW</div><div style="text-align:center;padding-bottom:30px;font-size:14px;font-weight:bold;color:#1a1a1a;">New season. New energy. New style.</div><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>${productCards}</tr></table></td></tr><tr><td style="background:#efe6da;padding:30px;font-family:Arial,Helvetica,sans-serif;text-align:center;"><div style="font-size:12px;font-weight:bold;letter-spacing:.5px;color:#1a1a1a;margin-bottom:4px;">NEED HELP?</div><div style="font-size:12px;color:#4d4d4d;line-height:1.5;">Our support team is here for you at <a href="mailto:support@antariya.com" style="color:#1a1a1a;font-weight:bold;">support@antariya.com</a>.</div></td></tr><tr><td style="background:#1a1a1a;padding:36px 30px 30px;font-family:Arial,Helvetica,sans-serif;text-align:center;"><div style="font-family:Georgia,'Times New Roman',serif;font-size:20px;letter-spacing:3px;color:#fff;">${safeAppName.toUpperCase()}</div><div style="font-size:9px;letter-spacing:2px;color:#a8a8a8;margin-top:4px;">CLOTHING CO.</div><div style="border-top:1px solid #3a3a3a;margin-top:22px;padding-top:22px;font-size:11px;color:#8a8a8a;">&copy; 2026 ${safeAppName} Clothing Co. All rights reserved.</div></td></tr></table></td></tr></table></body></html>`,
+  };
+}
+
+async function buildReferenceWelcomeMessage({ email, displayName }) {
+  const appName = env.appName || "Antariya";
+  const websiteUrl = env.frontendUrl || "https://antariyaofficial.com";
+  const products = await selectWelcomeProducts(email);
+  const heroImage = env.welcomeHeroImageUrl || welcomeProductImage(products[0], "https://placehold.co/720x780/6b6259/ffffff?text=Antariya+Collection");
+  const safeName = escapeHtml(displayName || "there");
+  const safeAppName = escapeHtml(appName);
+  const safeWebsiteUrl = escapeHtml(websiteUrl);
+  const safeHeroImage = escapeHtml(heroImage);
+  const features = [
+    ["coat.png", "Explore our", "latest collections"],
+    ["like--v1.png", "Save your", "favorite pieces"],
+    ["shopping-bag--v1.png", "Track your", "orders"],
+    ["user--v1.png", "Manage your", "personal details"],
+    ["lock--v1.png", "Faster &amp; secure", "checkout"],
+  ].map(([icon, firstLine, secondLine]) => `<td class="icon-cell" width="20%" align="center" valign="top" style="font-family:Arial,Helvetica,sans-serif;text-align:center;padding:0 4px;"><table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"><tr><td align="center" style="width:56px;height:56px;background:#f3ece1;border-radius:50%;" width="56" height="56"><img src="https://img.icons8.com/ios/50/${icon}" width="24" height="24" alt="" style="display:block;margin:16px auto;"/></td></tr></table><div style="font-size:12px;color:#1a1a1a;line-height:1.4;margin-top:10px;">${firstLine}<br/>${secondLine}</div></td>`).join("");
+  const productCards = [0, 1, 2].map((index) => {
+    const product = products[index] || {};
+    const image = escapeHtml(welcomeProductImage(product, heroImage));
+    const name = escapeHtml(product.name || "Explore the collection");
+    const price = Number(product.price);
+    const formattedPrice = Number.isFinite(price) ? `&#8377;${price.toLocaleString("en-IN")}` : "Discover now";
+    return `<td class="product-col" width="33.3%" valign="top" style="padding:0 9px;font-family:Arial,Helvetica,sans-serif;text-align:center;"><a href="${safeWebsiteUrl}" style="color:#1a1a1a;text-decoration:none;"><img src="${image}" width="210" alt="${name}" style="display:block;width:100%;height:190px;object-fit:cover;background:#e4ded4;margin-bottom:14px;"/><div style="font-size:12px;font-weight:bold;letter-spacing:.5px;color:#1a1a1a;text-transform:uppercase;margin-bottom:6px;">${name}</div><div style="font-size:13px;color:#333;margin-bottom:10px;">${formattedPrice}</div><span style="font-size:12px;font-weight:bold;border-bottom:1px solid #1a1a1a;">SHOP NOW &rarr;</span></a></td>`;
+  }).join("");
+
+  return {
+    subject: `Welcome to ${appName} - Your account is ready`,
+    text: `Hi ${displayName || "there"},\n\nWelcome to ${appName}. Your account is ready.\n\nExplore the latest collection: ${websiteUrl}\n\nRegards,\n${appName} Team`,
+    html: `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>Welcome to ${safeAppName}</title><style>body,table,td,a{-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}table,td{mso-table-lspace:0pt;mso-table-rspace:0pt}img{border:0;height:auto;line-height:100%;outline:none;text-decoration:none}@media screen and (max-width:720px){.email-container{width:100%!important}.stack-col{display:block!important;width:100%!important}.hero-img{width:100%!important;height:auto!important}.icon-cell{width:33.3%!important;display:inline-block!important;padding-bottom:20px!important}.product-col{display:block!important;width:100%!important;padding:0 0 24px!important}.footer-link{display:block!important;padding:6px 0!important}}</style></head><body style="margin:0;padding:0;background:#f4f1ec;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f1ec;"><tr><td align="center" style="padding:24px 12px;"><table role="presentation" class="email-container" width="720" cellpadding="0" cellspacing="0" border="0" style="width:720px;max-width:720px;background:#fff;"><tr><td align="center" style="padding:36px 20px 28px;background:#fff;"><div style="font-family:Georgia,'Times New Roman',serif;font-size:38px;letter-spacing:9px;color:#1a1a1a;font-weight:400;">${safeAppName.toUpperCase()}</div><div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;letter-spacing:4px;color:#6b6b6b;margin-top:6px;">CLOTHING CO.</div></td></tr><tr><td style="background:#efe9e1;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td class="stack-col" width="52%" valign="middle" style="padding:48px 36px 48px 48px;font-family:Arial,Helvetica,sans-serif;"><div style="font-family:Georgia,'Times New Roman',serif;font-style:italic;font-size:34px;color:#a9835c;margin-bottom:6px;">Welcome to</div><div style="font-family:Georgia,'Times New Roman',serif;font-size:48px;letter-spacing:4px;color:#1a1a1a;font-weight:400;line-height:1.1;">${safeAppName.toUpperCase()}</div><div style="width:48px;height:2px;background:#1a1a1a;margin:18px 0 20px;"></div><p style="margin:0 0 14px;font-size:16px;font-weight:bold;color:#1a1a1a;line-height:1.5;">Hi ${safeName},</p><p style="margin:0 0 14px;font-size:16px;font-weight:bold;color:#1a1a1a;line-height:1.5;">We're excited to have you with us.</p><p style="margin:0 0 28px;font-size:15px;color:#4d4d4d;line-height:1.6;">Discover thoughtfully designed clothing made to bring effortless style into your everyday wardrobe.</p><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td style="background:#1a1a1a;"><a href="${safeWebsiteUrl}" style="display:block;padding:16px 30px;font-family:Arial,Helvetica,sans-serif;font-size:13px;letter-spacing:1.5px;color:#fff;font-weight:bold;">EXPLORE THE COLLECTION</a></td></tr></table></td><td class="stack-col" width="48%" valign="top" style="padding:0;"><img src="${safeHeroImage}" alt="${safeAppName} collection" class="hero-img" width="346" style="display:block;width:100%;height:auto;"/></td></tr></table></td></tr><tr><td style="background:#fff;padding:48px 38px 42px;font-family:Arial,Helvetica,sans-serif;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td align="center" style="padding-bottom:34px;"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td style="border-top:1px solid #d8cfc2;width:72px;"></td><td style="padding:0 18px;font-size:18px;letter-spacing:2px;font-weight:bold;color:#1a1a1a;white-space:nowrap;">YOUR ACCOUNT IS READY</td><td style="border-top:1px solid #d8cfc2;width:72px;"></td></tr></table></td></tr><tr><td align="center"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>${features}</tr></table></td></tr></table></td></tr><tr><td style="background:#f7f4ef;padding:48px 38px 44px;font-family:Arial,Helvetica,sans-serif;"><div style="text-align:center;padding-bottom:8px;font-size:25px;letter-spacing:1.5px;font-weight:bold;color:#1a1a1a;font-family:Georgia,'Times New Roman',serif;">DISCOVER WHAT'S NEW</div><div style="text-align:center;padding-bottom:32px;font-size:15px;font-weight:bold;color:#1a1a1a;">New season. New energy. New style.</div><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>${productCards}</tr></table></td></tr><tr><td style="background:#efe6da;padding:30px 42px;font-family:Arial,Helvetica,sans-serif;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td class="stack-col" width="50%" valign="middle" style="padding-right:20px;"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td valign="middle" style="padding-right:16px;"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td align="center" style="width:48px;height:48px;background:#fff;border-radius:50%;" width="48" height="48"><img src="https://img.icons8.com/ios/50/headset.png" width="23" height="23" alt="Support" style="display:block;margin:13px auto;"/></td></tr></table></td><td valign="middle"><div style="font-size:12px;font-weight:bold;letter-spacing:.5px;color:#1a1a1a;margin-bottom:4px;">NEED HELP?</div><div style="font-size:12px;color:#4d4d4d;line-height:1.5;">Our support team is always<br/>here for you.</div></td></tr></table></td><td class="stack-col" width="50%" valign="middle" style="border-left:1px solid #d8cfc2;padding-left:32px;"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td valign="middle" style="padding-right:16px;"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td align="center" style="width:48px;height:48px;background:#fff;border-radius:50%;" width="48" height="48"><img src="https://img.icons8.com/ios/50/new-post.png" width="23" height="23" alt="Email" style="display:block;margin:13px auto;"/></td></tr></table></td><td valign="middle"><div style="font-size:12px;color:#4d4d4d;margin-bottom:4px;">Email us at</div><a href="mailto:support@antariya.com" style="font-size:12px;font-weight:bold;color:#1a1a1a;">support@antariya.com</a></td></tr></table></td></tr></table></td></tr><tr><td style="background:#1a1a1a;padding:38px 42px 30px;font-family:Arial,Helvetica,sans-serif;color:#fff;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td class="stack-col" width="35%" valign="top" style="padding-bottom:20px;"><div style="font-family:Georgia,'Times New Roman',serif;font-size:22px;letter-spacing:3px;color:#fff;">${safeAppName.toUpperCase()}</div><div style="font-family:Arial,Helvetica,sans-serif;font-size:9px;letter-spacing:2px;color:#a8a8a8;margin-top:4px;">CLOTHING CO.</div></td><td class="stack-col" width="65%" valign="top" align="right" style="padding-bottom:20px;"><a class="footer-link" href="${safeWebsiteUrl}" style="font-size:12px;color:#fff;letter-spacing:.5px;margin-left:24px;">SHOP</a><a class="footer-link" href="${safeWebsiteUrl}" style="font-size:12px;color:#fff;letter-spacing:.5px;margin-left:24px;">COLLECTIONS</a><a class="footer-link" href="${safeWebsiteUrl}" style="font-size:12px;color:#fff;letter-spacing:.5px;margin-left:24px;">ABOUT US</a><a class="footer-link" href="mailto:support@antariya.com" style="font-size:12px;color:#fff;letter-spacing:.5px;margin-left:24px;">CONTACT</a></td></tr><tr><td colspan="2" style="border-top:1px solid #3a3a3a;padding-top:22px;" align="center"><div style="font-size:11px;letter-spacing:2px;color:#a8a8a8;margin-bottom:14px;">FOLLOW US</div><table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"><tr><td style="padding:0 8px;"><a href="${safeWebsiteUrl}"><img src="https://img.icons8.com/ios-filled/50/ffffff/instagram-new.png" width="18" height="18" alt="Instagram"/></a></td><td style="padding:0 8px;"><a href="${safeWebsiteUrl}"><img src="https://img.icons8.com/ios-filled/50/ffffff/facebook-new.png" width="18" height="18" alt="Facebook"/></a></td><td style="padding:0 8px;"><a href="${safeWebsiteUrl}"><img src="https://img.icons8.com/ios-filled/50/ffffff/pinterest.png" width="18" height="18" alt="Pinterest"/></a></td></tr></table><div style="font-size:11px;color:#8a8a8a;margin-top:22px;">&copy; 2026 ${safeAppName} Clothing Co. All rights reserved.</div></td></tr></table></td></tr></table></td></tr></table></td></tr></table></body></html>`,
+  };
+}
+
+async function buildStyledWelcomeMessage({ email, displayName }) {
+  const message = await buildReferenceWelcomeMessage({ email, displayName });
+  const heroImage = escapeHtml(getWelcomeHeroImage());
+  const inlineHeroAttachment = buildInlineWelcomeHeroAttachment();
+  const heroImageSrc = inlineHeroAttachment ? "cid:welcome-hero-card" : heroImage;
+
+  message.html = message.html
+    .replace(
+      /class="email-container" width="720" cellpadding="0" cellspacing="0" border="0" style="width:720px;max-width:720px;background:#fff;"/,
+      'class="email-container" width="820" cellpadding="0" cellspacing="0" border="0" style="width:820px;max-width:820px;background:#fff;"'
+    )
+    .replace(
+      /<td class="stack-col" width="52%" valign="middle" style="padding:48px 36px 48px 48px;font-family:Arial,Helvetica,sans-serif;">/,
+      '<td class="stack-col" width="45%" valign="middle" style="padding:44px 30px 44px 42px;font-family:Arial,Helvetica,sans-serif;">'
+    )
+    .replace(
+      /<td class="stack-col" width="(?:48|50)%" valign="top" style="padding:0;"><img src="[^"]+" alt="[^"]+" class="hero-img" width="\d+" style="display:block;width:100%;height:auto;"\/><\/td>/,
+      `<td class="stack-col" width="55%" valign="top" style="padding:0;"><img src="${heroImageSrc}" alt="${escapeHtml(
+        env.appName || "Antariya"
+      )} collection" class="hero-img" width="451" style="display:block;width:100%;height:460px;object-fit:cover;object-position:center top;"/></td>`
+    )
+    .replace(
+      /<img src="https:\/\/img\.icons8\.com\/ios\/50\/(headset|new-post)\.png" width="23" height="23" alt="(Support|Email)" style="display:block;margin:13px auto;"\/>/g,
+      '<img src="https://img.icons8.com/ios/ffffff/$1.png" width="23" height="23" alt="$2" style="display:block;margin:13px auto;"/>'
+    )
+    .replace(/background:#fff;border-radius:50%;/g, 'background:#1a1a1a;border-radius:50%;')
+    .replace(/width="48" height="48"><img src="https:\/\/img\.icons8\.com\/ios\/ffffff\/(headset|new-post)\.png"/g, 'width="48" height="48" style="background:#1a1a1a;border-radius:50%;"><img src="https://img.icons8.com/ios/ffffff/$1.png"')
+    .replace(/style="background:#1a1a1a;padding:38px 42px 30px;/, 'style="background:#111;padding:34px 42px 28px;')
+    .replace(/font-size:22px;letter-spacing:3px;color:#fff;/, 'font-size:22px;letter-spacing:4px;color:#fff;')
+    .replace(/font-size:11px;letter-spacing:2px;color:#a8a8a8;margin-bottom:14px;/, 'font-size:12px;letter-spacing:2px;color:#fff;margin-bottom:14px;')
+    .replace(
+      /<tr><td class="stack-col" width="35%"[\s\S]*?<tr><td colspan="2" style="border-top:1px solid #3a3a3a;padding-top:22px;" align="center">/,
+      '<tr><td colspan="2" align="center" style="padding:0 0 12px;">'
+    )
+    .replace(
+      /<div style="font-size:12px;letter-spacing:2px;color:#fff;margin-bottom:14px;">FOLLOW US<\/div>/,
+      '<span style="display:inline-block;font-size:12px;letter-spacing:2px;color:#fff;margin:0 22px 0 0;vertical-align:middle;">FOLLOW US</span>'
+    )
+    .replace(
+      /<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"><tr><td style="padding:0 8px;">/,
+      '<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="display:inline-block;vertical-align:middle;"><tr><td style="padding:0 8px;">'
+    )
+    .replace(/ios-filled\/50\/ffffff\/instagram-new\.png/g, 'ios/ffffff/instagram-new.png')
+    .replace(/width="18" height="18" alt="(Instagram|Facebook|Pinterest)"/g, 'width="26" height="26" alt="$1"')
+    .replace(
+      /<div style="font-size:11px;color:#8a8a8a;margin-top:22px;">&copy; 2026 \${safeAppName} Clothing Co\. All rights reserved\.<\/div>/,
+      '<div style="font-size:14px;color:#fff;margin-top:20px;">&copy; 2026 ${safeAppName} Clothing Co. All rights reserved.</div>'
+    )
+    .replace(
+      /<td style="background:#fff;padding:48px 38px 42px;font-family:Arial,Helvetica,sans-serif;">/,
+      '<td style="background:#fff;padding:34px 38px 46px;font-family:Arial,Helvetica,sans-serif;">'
+    )
+    .replace(/border-top:1px solid #d8cfc2;width:72px;/g, 'border-top:1px solid #d8cfc2;width:120px;')
+    .replace(
+      /padding:0 18px;font-size:18px;letter-spacing:2px;font-weight:bold;color:#1a1a1a;white-space:nowrap;/,
+      'padding:0 22px;font-size:19px;letter-spacing:2px;font-weight:bold;color:#1a1a1a;white-space:nowrap;'
+    )
+    .replace(/width="210" alt=/g, 'width="220" alt=')
+    .replace(/height:190px;object-fit:cover/g, 'height:220px;object-fit:cover');
+
+  if (inlineHeroAttachment) {
+    message.attachments = [...(message.attachments || []), inlineHeroAttachment];
+  }
+
+  return message;
+}
+
 async function sendWelcomeEmail({ to, displayName }) {
-  const message = buildWelcomeMessage(displayName);
+  const message = await buildStyledWelcomeMessage({ email: to, displayName });
   return sendMail({ to, ...message });
 }
 

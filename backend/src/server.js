@@ -1,4 +1,5 @@
 const express = require("express");
+const path = require("path");
 const cors = require("cors");
 const mongoose = require("mongoose");
 const helmet = require("helmet");
@@ -87,6 +88,7 @@ app.use(express.json({ limit: "2mb" }));
 app.use(cookieParser());
 app.use(extractCookieToken);
 app.use(morgan("tiny"));
+app.use("/assets", express.static(path.resolve(__dirname, "assets")));
 
 app.get("/", (req, res) => {
   res.status(200).json({
