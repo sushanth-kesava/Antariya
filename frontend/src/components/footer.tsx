@@ -12,60 +12,62 @@ const COPYRIGHT_YEAR = 2026;
 
 const PUBLIC_SECTIONS = [
   {
-    title: "Marketplace",
+    title: "Shop",
     links: [
-      { label: "Embroidery Designs", href: "/coming-soon" },
-      { label: "Premium Threads", href: "/coming-soon" },
-      { label: "Industrial Fabrics", href: "/coming-soon" },
-      { label: "Machine Parts", href: "/coming-soon" },
+      { label: "New Arrivals", href: "/marketplace" },
+      { label: "Bestsellers", href: "/shop" },
+      { label: "Collections", href: "/marketplace" },
+      { label: "Custom Studio", href: "/customize" },
     ],
   },
   {
     title: "Company",
     links: [
       { label: "About Us", href: "/about" },
-      { label: "Dealer Program", href: "/portal/admin" },
+      { label: "Our Craft", href: "/about" },
       { label: "Careers", href: "/coming-soon" },
+      { label: "Contact", href: "/contact-support" },
     ],
   },
   {
-    title: "Support",
+    title: "Help",
     links: [
-      { label: "Tracking Orders", href: "/track-order" },
-      { label: "Policies Hub", href: "/legal/policies" },
-      { label: "Contact Support", href: "/contact-support" },
+      { label: "Track Order", href: "/track-order" },
+      { label: "Shipping & Returns", href: "/legal/policies" },
+      { label: "Size Guide", href: "/coming-soon" },
+      { label: "Support", href: "/contact-support" },
     ],
   },
 ];
 
 const SOCIAL_LINKS = [
-  { label: "Facebook", href: "https://www.facebook.com/" },
   { label: "Instagram", href: "https://www.instagram.com/antariya.official/?__pwa=1" },
-  { label: "LinkedIn", href: "https://www.linkedin.com/feed/" },
+  { label: "Facebook", href: "https://www.facebook.com/" },
   { label: "Twitter", href: "https://x.com/" },
+  { label: "LinkedIn", href: "https://www.linkedin.com/feed/" },
 ];
 
 const FOOTER_COPY: Record<FooterVariant, { title: string; description: string; links: Array<{ label: string; href: string }>; note: string }> = {
   public: {
     title: "Antariya",
-    description: "Empowering India's embroidery industry with premium digital assets, physical supplies, and machine solutions.",
+    description: "Premium embroidered streetwear. Crafted with precision. Designed for individuality.",
     links: [
       { label: "All Policies", href: "/legal/policies" },
       { label: "Privacy Policy", href: "/legal/policies" },
       { label: "Terms of Service", href: "/legal/policies" },
-      { label: "Contact", href: "#" },
+      { label: "Contact", href: "/contact-support" },
     ],
-    note: `© ${COPYRIGHT_YEAR} Antariya India. All rights reserved.`,
+    note: `© ${COPYRIGHT_YEAR} Antariya. All rights reserved.`,
   },
   customer: {
     title: "Customer Portal",
     description: "Browse finished apparel, customize products, and keep track of your orders and saved items.",
     links: [
       { label: "Shop", href: "/shop" },
-      { label: "Marketplace", href: "/marketplace" },
+      { label: "Collections", href: "/marketplace" },
       { label: "Customer Dashboard", href: "/portal/customer" },
     ],
-    note: "Customer access for Antariya shoppers and creators.",
+    note: "Customer access for Antariya shoppers.",
   },
   admin: {
     title: "Admin Portal",
@@ -75,7 +77,7 @@ const FOOTER_COPY: Record<FooterVariant, { title: string; description: string; l
       { label: "Catalog", href: "/portal/admin/my-company-catalog" },
       { label: "Reviews", href: "/portal/admin/review-moderation" },
     ],
-    note: "Admin workspace for dealer and catalog management.",
+    note: "Admin workspace for catalog management.",
   },
   superadmin: {
     title: "Superadmin Portal",
@@ -94,29 +96,23 @@ export function Footer({ variant = "public" }: FooterProps) {
 
   return (
     <footer className="relative overflow-hidden border-t bg-card pt-20 pb-10">
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
-      <div className="absolute inset-x-0 -top-24 h-48 bg-gradient-to-b from-primary/8 to-transparent blur-3xl" />
-      <div className="w-full max-w-[1760px] mx-auto px-3 sm:px-4 lg:px-6 relative">
-        <div className={variant === "public" ? "grid grid-cols-1 md:grid-cols-4 gap-12 mb-16" : "grid grid-cols-1 md:grid-cols-[1.4fr_1fr] gap-10 items-start mb-12"}>
-          <div className="space-y-6 max-w-md">
-            <Link href="/" className="flex items-center gap-4">
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
+      <div className="w-full max-w-[1760px] mx-auto px-4 sm:px-6 lg:px-8 relative">
+        <div className={variant === "public" ? "grid grid-cols-1 md:grid-cols-5 gap-12 mb-16" : "grid grid-cols-1 md:grid-cols-[1.4fr_1fr] gap-10 items-start mb-12"}>
+          <div className="md:col-span-2 space-y-6 max-w-sm">
+            <Link href="/" className="flex items-center gap-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={BRAND_LOGO_URL} alt="Antariya logo" className="h-24 w-24 rounded-2xl object-cover shadow-sm" />
+              <img src={BRAND_LOGO_URL} alt="Antariya logo" className="h-16 w-16 rounded-xl object-cover" />
               <div>
-                <h3 className="font-theseasons text-5xl font-bold tracking-tight text-foreground leading-[1.05]">Antariya</h3>
-                <p className="text-xs uppercase tracking-[0.28em] text-muted-foreground">Premium embroidery marketplace</p>
+                <h3 className="font-theseasons text-4xl font-bold tracking-tight text-foreground leading-[1.05]">Antariya</h3>
+                <p className="text-[11px] uppercase tracking-[0.25em] text-muted-foreground">Premium Embroidered Streetwear</p>
               </div>
             </Link>
             <p className="text-sm leading-relaxed text-muted-foreground">
               {variant === "public"
-                ? "Empowering India's embroidery industry with premium digital assets, physical supplies, and machine solutions for growing businesses."
+                ? "Crafted with precision. Designed for individuality. Premium streetwear that blends modern Indian artistry with bold, everyday confidence."
                 : copy.description}
             </p>
-            {variant === "public" && (
-              <p className="inline-flex items-center rounded-full border border-border bg-background/60 px-4 py-2 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur">
-                {copy.note}
-              </p>
-            )}
             {variant === "public" && (
               <div className="max-w-sm pt-2">
                 <NewsletterSignup source="footer" />
@@ -127,11 +123,11 @@ export function Footer({ variant = "public" }: FooterProps) {
           {variant === "public" ? (
             PUBLIC_SECTIONS.map((section) => (
               <div key={section.title}>
-                <h4 className="font-bold mb-6 text-foreground">{section.title}</h4>
+                <h4 className="font-bold text-sm uppercase tracking-wider mb-6 text-foreground">{section.title}</h4>
                 <ul className="space-y-4 text-sm text-muted-foreground">
                   {section.links.map((link) => (
                     <li key={link.label}>
-                      <Link href={link.href} className="hover:text-primary transition-colors">
+                      <Link href={link.href} className="hover:text-foreground transition-colors">
                         {link.label}
                       </Link>
                     </li>
@@ -163,7 +159,7 @@ export function Footer({ variant = "public" }: FooterProps) {
           {variant === "public" ? (
             <div className="flex flex-wrap items-center gap-6 text-xs font-medium text-muted-foreground">
               {SOCIAL_LINKS.map((link) => (
-                <Link key={link.label} href={link.href} className="hover:text-primary transition-colors">
+                <Link key={link.label} href={link.href} className="hover:text-foreground transition-colors">
                   {link.label}
                 </Link>
               ))}

@@ -1,13 +1,11 @@
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import type { Product } from "@/app/lib/mock-data";
 import { LiveProductScroller } from "@/components/live-product-scroller";
 
 type HeroMetrics = {
   products: number;
-  dealers: number;
-  orders: number;
 };
 
 type HeroProps = {
@@ -15,67 +13,48 @@ type HeroProps = {
   featuredProduct: Product | null;
 };
 
-function formatMetric(value: number) {
-  return new Intl.NumberFormat("en-IN").format(value);
-}
-
-export function Hero({ metrics, featuredProduct }: HeroProps) {
+export function Hero({ metrics: _metrics, featuredProduct }: HeroProps) {
   return (
-    <div id="hero" className="relative overflow-hidden bg-background pt-16 pb-24 lg:pt-32 lg:pb-40">
-      <div className="absolute inset-0 z-0 indian-motif-bg opacity-10" />
-      
-      <div className="w-full max-w-[1760px] relative z-10 mx-auto px-3 sm:px-4 lg:px-6">
-        <div className="flex flex-col lg:flex-row items-center gap-12">
-          <div className="flex-1 space-y-8 animate-fade-in">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium border border-primary/20">
-              <Sparkles className="h-4 w-4" />
-              <span>India's Largest Embroidery Marketplace</span>
-            </div>
+    <section id="hero" className="relative overflow-hidden bg-background">
+      {/* Full-width hero with split layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 min-h-[85vh]">
+        {/* Left — Brand Statement */}
+        <div className="flex flex-col justify-center px-6 sm:px-10 lg:px-16 xl:px-24 py-20 lg:py-32">
+          <div className="max-w-xl space-y-8 animate-fade-in">
+            <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground font-medium">
+              Premium Embroidered Streetwear
+            </p>
             
-            <h1 className="text-4xl sm:text-5xl lg:text-7xl font-bold tracking-tight text-foreground leading-[1.1]">
-              Every Stitch Tells a <span className="text-primary italic font-headline">Story</span>
+            <h1 className="text-5xl sm:text-6xl lg:text-7xl xl:text-8xl font-bold tracking-tight text-foreground leading-[0.95] font-headline">
+              Wear the
+              <br />
+              <span className="text-primary italic font-theseasons">Craft.</span>
             </h1>
             
-            <p className="text-xl text-muted-foreground max-w-xl leading-relaxed">
-              Discover premium streetwear crafted for those who value quality, comfort, and individuality. From bold graphic prints to timeless essentials, Antariya delivers apparel that blends modern style with everyday confidence.
+            <p className="text-lg sm:text-xl text-muted-foreground leading-relaxed max-w-md">
+              Crafted with precision. Designed for individuality. Premium streetwear that blends modern Indian artistry with bold, everyday confidence.
             </p>
             
             <div className="flex flex-wrap gap-4 pt-4">
-              <Button size="lg" className="rounded-full px-8 shadow-lg shadow-primary/20 hover:shadow-xl transition-all" asChild>
+              <Button size="lg" className="rounded-full px-10 h-14 text-base shadow-lg shadow-primary/15 hover:shadow-xl transition-all" asChild>
+                <Link href="/shop">
+                  Shop Now <ArrowRight className="ml-2 h-5 w-5" />
+                </Link>
+              </Button>
+              <Button variant="outline" size="lg" className="rounded-full px-10 h-14 text-base border-foreground/20 hover:bg-foreground/5" asChild>
                 <Link href="/marketplace">
-                  Explore Marketplace <ArrowRight className="ml-2 h-5 w-5" />
-                </Link>
-              </Button>
-              <Button variant="outline" size="lg" className="rounded-full px-8 border-primary text-primary hover:bg-primary/5" asChild>
-                <Link href="/admin-login/apply">
-                  Join as Dealer
+                  Explore Collections
                 </Link>
               </Button>
             </div>
-
-            <div className="flex flex-wrap items-center gap-x-8 gap-y-4 pt-8">
-              <div className="space-y-1">
-                <p className="text-2xl font-bold">{formatMetric(metrics.products)}</p>
-                <p className="text-sm text-muted-foreground">Products</p>
-              </div>
-              <div className="w-px h-8 bg-border" />
-              <div className="space-y-1">
-                <p className="text-2xl font-bold">{formatMetric(metrics.dealers)}</p>
-                <p className="text-sm text-muted-foreground">Dealers</p>
-              </div>
-              <div className="w-px h-8 bg-border" />
-              <div className="space-y-1">
-                <p className="text-2xl font-bold">{formatMetric(metrics.orders)}</p>
-                <p className="text-sm text-muted-foreground">Orders</p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="flex-1 relative w-full aspect-[4/3] rounded-2xl overflow-hidden shadow-2xl border border-border/50 animate-fade-in [animation-delay:200ms]">
-            <LiveProductScroller initialProducts={featuredProduct ? [featuredProduct] : []} />
           </div>
         </div>
+
+        {/* Right — Featured Product Visual */}
+        <div className="relative w-full min-h-[50vh] lg:min-h-full animate-fade-in [animation-delay:200ms]">
+          <LiveProductScroller initialProducts={featuredProduct ? [featuredProduct] : []} />
+        </div>
       </div>
-    </div>
+    </section>
   );
 }

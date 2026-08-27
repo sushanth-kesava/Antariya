@@ -70,7 +70,6 @@
   }
   html {
     font-size: 100%;
-    /* Prevent any stray wide element from causing horizontal scroll on mobile. */
     -webkit-font-smoothing: antialiased;
     overflow-x: hidden;
   }
@@ -78,7 +77,6 @@
     @apply bg-background text-foreground font-body;
     background-image: radial-gradient(rgba(139, 58, 42, 0.03) 1px, transparent 1px);
     background-size: 40px 40px;
-    /* Avoid horizontal overflow on small screens. */
     max-width: 100%;
     min-height: 100vh;
     display: flex;
@@ -92,9 +90,6 @@
   @media (max-width: 640px) {
     html { font-size: 14px; }
   }
-  /* The 0.9 zoom tightens the desktop layout (which looks good there), but on
-     phones it shrinks/mis-scales content and breaks the fit. Apply it only on
-     medium screens and up so mobile renders at natural scale. */
   @media (min-width: 768px) {
     body {
       zoom: 0.9;
@@ -119,6 +114,27 @@
 
 .font-theseasons {
   font-family: var(--font-cormorant), "Literata", serif;
+}
+
+/* Hide scrollbar for style chips */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Mobile bottom nav safe area */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Add padding at bottom of pages on mobile to not overlap with bottom nav */
+@media (max-width: 767px) {
+  main {
+    padding-bottom: 3.5rem;
+  }
 }
 
 /* Product description rich text styling */
@@ -159,7 +175,7 @@
   margin: 1rem 0 0.5rem;
 }
 
-/* Rich text editor area — ensure visibility of all formatted content */
+/* Rich text editor area */
 .product-description[contenteditable] {
   color: #1f2937;
   caret-color: hsl(var(--primary));

@@ -129,17 +129,14 @@ export function LiveProductScroller({ initialProducts = [] }: { initialProducts?
               </div>
 
               {/* Floating product card overlaid on the bottom-left of the image */}
-              <div className="absolute bottom-6 left-6 right-6 z-10 flex max-w-sm items-center gap-4 rounded-2xl border border-border/50 bg-card/90 p-4 shadow-lg backdrop-blur-sm">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
-                  <Sparkles className="h-6 w-6" />
-                </div>
+              <div className="absolute bottom-6 left-6 right-6 z-10 max-w-sm rounded-2xl border border-white/10 bg-black/60 p-5 shadow-lg backdrop-blur-md">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-bold text-card-foreground">{product.name}</p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {product.dealerName ? `· ${product.dealerName}` : product.category}
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-white/50 mb-1">
+                    {product.category}
                   </p>
-                  <p className="mt-0.5 text-sm font-semibold text-primary">{formatINR(price)}</p>
-                </div>
+                  <p className="truncate text-base font-bold text-white">{product.name}</p>
+                  <p className="mt-1 text-sm font-semibold text-white/80">{formatINR(price)}</p>
+              </div>
               </div>
             </Link>
           );

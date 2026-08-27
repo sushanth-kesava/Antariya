@@ -24,8 +24,8 @@ const cormorant = Cormorant_Garamond({
 });
 
 export const metadata: Metadata = {
-  title: 'Antariya | Premium Embroidery Marketplace',
-  description: 'The ultimate marketplace for embroidery designs, threads, fabrics, and machine accessories.',
+  title: 'Antariya | Premium Embroidered Streetwear',
+  description: 'Crafted with precision. Designed for individuality. Premium streetwear that blends modern Indian artistry with bold, everyday confidence.',
   metadataBase: new URL(siteUrl),
   icons: {
     icon: [{ url: BRAND_ICON_URL, href: BRAND_ICON_URL }],
@@ -33,8 +33,8 @@ export const metadata: Metadata = {
     apple: [BRAND_ICON_URL],
   },
   openGraph: {
-    title: 'Antariya | Premium Embroidery Marketplace',
-    description: 'The ultimate marketplace for embroidery designs, threads, fabrics, and machine accessories.',
+    title: 'Antariya | Premium Embroidered Streetwear',
+    description: 'Crafted with precision. Designed for individuality. Premium streetwear that blends modern Indian artistry with bold, everyday confidence.',
     url: siteUrl,
     siteName: 'Antariya',
     type: 'website',
@@ -42,8 +42,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Antariya | Premium Embroidery Marketplace',
-    description: 'The ultimate marketplace for embroidery designs, threads, fabrics, and machine accessories.',
+    title: 'Antariya | Premium Embroidered Streetwear',
+    description: 'Crafted with precision. Designed for individuality. Premium streetwear that blends modern Indian artistry with bold, everyday confidence.',
     images: [BRAND_LOGO_URL],
   },
 };

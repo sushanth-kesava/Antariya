@@ -208,10 +208,6 @@ export function ProductCard({ product }: ProductCardProps) {
           </div>
         </div>
 
-        <p className="text-xs text-muted-foreground">
-          Added by {product.dealerName || "Admin"}
-        </p>
-        
         <Link href={`/product/${product.id}`}>
           <h3 className="font-semibold text-lg line-clamp-1 group-hover:text-primary transition-colors">{product.name}</h3>
         </Link>
