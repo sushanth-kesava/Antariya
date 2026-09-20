@@ -16,7 +16,8 @@
     "db:migrate-categories": "node scripts/migrate-categories.js",
     "db:backfill-profiles": "node scripts/backfill-customer-profiles.js",
     "db:reconcile-finance": "node scripts/reconcile-finance-pos.js",
-    "db:generate-barcodes": "node scripts/generate-barcodes.js"
+    "db:generate-barcodes": "node scripts/generate-barcodes.js",
+    "export:merchant-feed": "node scripts/export-merchant-feed.js"
   },
   "dependencies": {
     "axios": "^1.7.4",
