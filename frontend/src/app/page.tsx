@@ -268,14 +268,14 @@ export default function Home() {
                   <Truck className="h-6 w-6" />
                 </div>
                 <h3 className="font-bold text-sm sm:text-base">Pan-India Delivery</h3>
-                <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">Free shipping on orders above ₹999. Delivered to your doorstep.</p>
+                <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">Free shipping on orders above ₹1499. Delivered to your doorstep.</p>
               </div>
               <div className="text-center space-y-4">
                 <div className="w-14 h-14 rounded-full bg-primary/5 border border-primary/10 flex items-center justify-center mx-auto text-primary">
                   <RotateCcw className="h-6 w-6" />
                 </div>
                 <h3 className="font-bold text-sm sm:text-base">Easy Returns</h3>
-                <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">7-day hassle-free returns on all physical products.</p>
+                <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">3-day hassle-free returns on all damaged products. *Proof must be submitted.</p>
               </div>
               <div className="text-center space-y-4">
                 <div className="w-14 h-14 rounded-full bg-primary/5 border border-primary/10 flex items-center justify-center mx-auto text-primary">

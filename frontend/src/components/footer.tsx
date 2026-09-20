@@ -42,9 +42,8 @@ const PUBLIC_SECTIONS = [
 
 const SOCIAL_LINKS = [
   { label: "Instagram", href: "https://www.instagram.com/antariya.official/?__pwa=1" },
-  { label: "Facebook", href: "https://www.facebook.com/" },
-  { label: "Twitter", href: "https://x.com/" },
-  { label: "LinkedIn", href: "https://www.linkedin.com/feed/" },
+  { label: "Facebook", href: "https://www.facebook.com/profile.php?id=61591453252541" },
+  { label: "LinkedIn", href: "https://www.linkedin.com/company/antariya" },
 ];
 
 const FOOTER_COPY: Record<FooterVariant, { title: string; description: string; links: Array<{ label: string; href: string }>; note: string }> = {
@@ -159,7 +158,7 @@ export function Footer({ variant = "public" }: FooterProps) {
           {variant === "public" ? (
             <div className="flex flex-wrap items-center gap-6 text-xs font-medium text-muted-foreground">
               {SOCIAL_LINKS.map((link) => (
-                <Link key={link.label} href={link.href} className="hover:text-foreground transition-colors">
+                <Link key={link.label} href={link.href} target="_blank" rel="noopener noreferrer" aria-label={`${link.label} (opens in a new tab)`} className="hover:text-foreground transition-colors">
                   {link.label}
                 </Link>
               ))}
