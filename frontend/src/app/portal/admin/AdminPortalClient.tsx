@@ -159,6 +159,7 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
     category: "",
     gender: "",
     price: "",
+    mrp: "",
     stock: "100",
     customizable: false,
     rating: "0",
@@ -997,6 +998,7 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
         // not a variant axis.
         gender: formData.gender,
         price: parseFloat(formData.price),
+        mrp: formData.mrp ? parseFloat(formData.mrp) : 0,
         image: uploadedImages[0],
         images: uploadedImages,
         sizes: attrValues.size,
@@ -1046,6 +1048,7 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
         category: formData.category,
         gender: formData.gender,
         price: "",
+        mrp: "",
         stock: "100",
         customizable: false,
         rating: "0",
@@ -1854,7 +1857,7 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
                 </div>
 
                 {/* Pricing & Stock */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
                   <div>
                     <label className="block text-sm font-bold text-gray-700 mb-2">Price (in INR) <span className="text-red-500">*</span></label>
                     <div className="relative">
@@ -1869,6 +1872,27 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
                         onChange={e => setFormData({...formData, price: e.target.value})}
                       />
                     </div>
+                    <p className="mt-1.5 text-xs text-gray-500">Selling price shown to customers.</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">MRP / Original Price <span className="text-gray-400 font-normal">(optional)</span></label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        className="pl-8 h-12 rounded-xl border-gray-200 bg-gray-50 focus:bg-white text-lg font-bold"
+                        placeholder="0.00"
+                        value={formData.mrp}
+                        onChange={e => setFormData({...formData, mrp: e.target.value})}
+                      />
+                    </div>
+                    <p className="mt-1.5 text-xs text-gray-500">
+                      {formData.mrp && formData.price && parseFloat(formData.mrp) > parseFloat(formData.price)
+                        ? `Shows as struck-through with ${Math.round((1 - parseFloat(formData.price) / parseFloat(formData.mrp)) * 100)}% OFF.`
+                        : "Leave blank for no discount. Must be higher than price to show a discount."}
+                    </p>
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-gray-700 mb-2">Initial Stock <span className="text-red-500">*</span></label>

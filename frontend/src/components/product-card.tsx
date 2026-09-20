@@ -212,8 +212,22 @@ export function ProductCard({ product }: ProductCardProps) {
           <h3 className="font-semibold text-lg line-clamp-1 group-hover:text-primary transition-colors">{product.name}</h3>
         </Link>
         
-        <div className="flex items-baseline gap-2">
+        <div className="flex items-baseline flex-wrap gap-x-2 gap-y-1">
           <span className="text-xl font-bold text-primary">{formatINR(normalizeCatalogPriceToINR(Number(product.price || 0)))}</span>
+          {(() => {
+            const sp = normalizeCatalogPriceToINR(Number(product.price || 0));
+            const mrp = normalizeCatalogPriceToINR(Number(product.mrp || 0));
+            if (mrp > sp && sp > 0) {
+              const off = Math.round((1 - sp / mrp) * 100);
+              return (
+                <>
+                  <span className="text-sm text-muted-foreground line-through">{formatINR(mrp)}</span>
+                  <span className="text-xs font-bold text-green-700">{off}% OFF</span>
+                </>
+              );
+            }
+            return null;
+          })()}
           {isDesign && <span className="text-xs text-muted-foreground">Unlimited License</span>}
         </div>
       </CardContent>

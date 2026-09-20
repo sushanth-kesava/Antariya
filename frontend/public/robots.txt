@@ -16,6 +16,12 @@ Disallow: /select-address/
 Disallow: /order-status/
 Disallow: /coming-soon/
 
+# Per-product review submission pages are personal, gated actions — not for indexing
+Disallow: /*/review/
+
+# Block query-string URLs (marketplace filters/sorts) to avoid duplicate-content crawling
+Disallow: /*?
+
 # Backend API and raw entry file
 Disallow: /api/
 Disallow: /index.html

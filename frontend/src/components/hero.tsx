@@ -26,9 +26,9 @@ export function Hero({ metrics: _metrics, featuredProduct }: HeroProps) {
             </p>
             
             <h1 className="text-5xl sm:text-6xl lg:text-7xl xl:text-8xl font-bold tracking-tight text-foreground leading-[0.95] font-headline">
-              Wear the
+              Every Stitch Tells a
               <br />
-              <span className="text-primary italic font-theseasons">Craft.</span>
+              <span className="text-primary italic font-theseasons">Story.</span>
             </h1>
             
             <p className="text-lg sm:text-xl text-muted-foreground leading-relaxed max-w-md">
@@ -51,7 +51,7 @@ export function Hero({ metrics: _metrics, featuredProduct }: HeroProps) {
         </div>
 
         {/* Right — Featured Product Visual */}
-        <div className="relative w-full min-h-[50vh] lg:min-h-full animate-fade-in [animation-delay:200ms]">
+        <div className="relative w-full min-h-[50vh] lg:min-h-full animate-fade-in [animation-delay:200ms] pt-6 lg:pt-10">
           <LiveProductScroller initialProducts={featuredProduct ? [featuredProduct] : []} />
         </div>
       </div>

@@ -102,6 +102,7 @@ export async function generateMetadata({
 function buildProductJsonLd(product: NonNullable<Awaited<ReturnType<typeof getProductByIdFromBackend>>>) {
   const canonical = `${siteUrl}/product/${product.id}/`;
   const priceInr = normalizeCatalogPriceToINR(Number(product.price) || 0);
+  const mrpInr = normalizeCatalogPriceToINR(Number(product.mrp) || 0);
   const images = [product.image, ...(product.images || []), ...(product.galleryImages || [])]
     .filter((src): src is string => typeof src === "string" && src.length > 0);
   const description = String(product.description || "")
@@ -122,6 +123,7 @@ function buildProductJsonLd(product: NonNullable<Awaited<ReturnType<typeof getPr
       url: canonical,
       priceCurrency: "INR",
       price: priceInr.toFixed(2),
+      ...(mrpInr > priceInr ? { priceSpecification: { "@type": "PriceSpecification", price: mrpInr.toFixed(2), priceCurrency: "INR" } } : {}),
       availability:
         (product.stock || 0) > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
       seller: { "@type": "Organization", name: "Antariya" },

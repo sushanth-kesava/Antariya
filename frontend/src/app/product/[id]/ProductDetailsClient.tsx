@@ -25,7 +25,12 @@ import {
   ChevronLeft,
   ChevronRight,
   CalendarDays,
-  RotateCcw
+  RotateCcw,
+  ZoomIn,
+  Share2,
+  Check,
+  PackageCheck,
+  CreditCard
 } from "lucide-react";
 import Image from "next/image";
 import { useRef, useState, useEffect, useMemo } from "react";
@@ -35,6 +40,7 @@ import { useRouter, usePathname } from "next/navigation";
 import {
   addProductReviewOnBackend,
   getProductByIdFromBackend,
+  getProductsFromBackend,
   getProductReviewsFromBackend,
   getReviewEligibilityFromBackend,
   ProductReview,
@@ -52,6 +58,7 @@ import { useToast } from "@/hooks/use-toast";
 import { getWishlistFromBackend, setWishlistItemOnBackend } from "@/lib/api/wishlist";
 import { formatINR, normalizeCatalogPriceToINR } from "@/lib/india";
 import { useInventoryUpdates } from "@/hooks/use-inventory-updates";
+import { ProductCard } from "@/components/product-card";
 
 
 // --- XSS Protection: strip dangerous tags/attributes from HTML ---
@@ -336,6 +343,13 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
   });
   const [openSizeGuide, setOpenSizeGuide] = useState(false);
   const [openFullscreenGallery, setOpenFullscreenGallery] = useState(false);
+  const [isZoomed, setIsZoomed] = useState(false);
+  const [zoomOrigin, setZoomOrigin] = useState({ x: 50, y: 50 });
+  const [hoverZoomEnabled, setHoverZoomEnabled] = useState(true);
+  const fullscreenHoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
+  const [showStickyBar, setShowStickyBar] = useState(false);
+  const [cartAnnouncement, setCartAnnouncement] = useState("");
   const [selectedGalleryImage, setSelectedGalleryImage] = useState<string | null>(null);
   const [wishlistLoading, setWishlistLoading] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
@@ -399,6 +413,12 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
   const sellerEmail = product?.dealerEmail || "Not provided";
   const displayRating = reviewSummary.reviewCount > 0 ? reviewSummary.averageRating : product?.reviewAverage ?? product?.rating ?? 0;
   const displayReviewCount = reviewSummary.reviewCount > 0 ? reviewSummary.reviewCount : product?.reviewCount ?? reviews.length;
+
+  // ─── Pricing (real MRP-driven discount, never fabricated) ──────────────────
+  const sellingPrice = normalizeCatalogPriceToINR(Number(product?.price || 0));
+  const mrpValue = normalizeCatalogPriceToINR(Number(product?.mrp || 0));
+  const hasDiscount = mrpValue > sellingPrice && sellingPrice > 0;
+  const discountPercent = hasDiscount ? Math.round((1 - sellingPrice / mrpValue) * 100) : 0;
   const canWriteReview = reviewEligibility ? reviewEligibility.canReview : true;
 
   useEffect(() => {
@@ -406,6 +426,63 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
       setSelectedGalleryImage(galleryImages[0]);
     }
   }, [galleryImages]);
+
+  // ─── Related products (same category, excludes current) ────────────────────
+  useEffect(() => {
+    if (!product) return;
+    let active = true;
+
+    const loadRelated = async () => {
+      try {
+        const { products } = await getProductsFromBackend({
+          category: product.category || undefined,
+          limit: 10,
+        });
+        if (!active) return;
+        const others = (products || []).filter((p) => p.id !== product.id).slice(0, 8);
+        setRelatedProducts(others);
+      } catch {
+        // Non-fatal — the related strip just stays empty.
+      }
+    };
+
+    loadRelated();
+    return () => {
+      active = false;
+    };
+  }, [product]);
+
+  // ─── Sticky buy bar: show after the primary CTA scrolls out of view ────────
+  useEffect(() => {
+    const onScroll = () => setShowStickyBar(window.scrollY > 640);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // ─── Accessibility: disable hover-zoom / hover-fullscreen when the user
+  // prefers reduced motion or is on a touch (coarse-pointer) device. Those
+  // users get click/tap-to-open instead, which is the accessible default. ────
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const coarse = window.matchMedia("(pointer: coarse)");
+    const update = () => setHoverZoomEnabled(!reduce.matches && !coarse.matches);
+    update();
+    reduce.addEventListener?.("change", update);
+    coarse.addEventListener?.("change", update);
+    return () => {
+      reduce.removeEventListener?.("change", update);
+      coarse.removeEventListener?.("change", update);
+    };
+  }, []);
+
+  // Clean up any pending hover-to-fullscreen timer on unmount.
+  useEffect(() => {
+    return () => {
+      if (fullscreenHoverTimer.current) clearTimeout(fullscreenHoverTimer.current);
+    };
+  }, []);
 
   const filteredReviews = useMemo(() => {
     return reviews.filter((review) => {
@@ -571,6 +648,7 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
     setQuantity(1);
     setReferencePreview(null);
     setReferenceFileName(null);
+    setCartAnnouncement(`Customized ${product.name} added to your cart.`);
     toast({
       title: "Customized item added",
       description: `${product.name} was added to your cart with selected options.`,
@@ -586,6 +664,7 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
     if (!requireVariantSelected()) return;
 
     addProductToCart(product, 1, undefined, resolveSelectedVariant());
+    setCartAnnouncement(`${product.name} added to your cart.`);
     toast({
       title: "Added to cart",
       description: `${product.name} has been added.`,
@@ -635,7 +714,30 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
     if (!requireVariantSelected()) return;
 
     addProductToCart(product, 1, undefined, resolveSelectedVariant());
+    setCartAnnouncement(`${product.name} added to your cart. Proceeding to checkout.`);
     router.push("/cart");
+  };
+
+  const handleShare = async () => {
+    if (!product) return;
+    const url = typeof window !== "undefined" ? window.location.href : "";
+    const shareData = {
+      title: product.name,
+      text: `Check out ${product.name} on Antariya`,
+      url,
+    };
+    try {
+      if (typeof navigator !== "undefined" && navigator.share) {
+        await navigator.share(shareData);
+        return;
+      }
+      if (typeof navigator !== "undefined" && navigator.clipboard) {
+        await navigator.clipboard.writeText(url);
+        toast({ title: "Link copied", description: "Product link copied to clipboard." });
+      }
+    } catch {
+      // User dismissed the share sheet — no action needed.
+    }
   };
 
   const handleTagToggle = (tag: ProductReviewTag) => {
@@ -900,7 +1002,7 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex flex-col">
-        <Navbar />
+        <Navbar sticky />
         <div className="flex-1 flex flex-col items-center justify-center gap-4">
           <RefreshCw className="h-12 w-12 text-primary animate-spin" />
           <p className="text-muted-foreground font-medium">Fetching product details...</p>
@@ -912,7 +1014,7 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
   if (error || !product) {
     return (
       <div className="min-h-screen bg-background flex flex-col">
-        <Navbar />
+        <Navbar sticky />
         <div className="flex-1 flex flex-col items-center justify-center text-center p-8 gap-6">
           <div className="w-20 h-20 bg-destructive/10 text-destructive rounded-full flex items-center justify-center">
             <AlertCircle className="h-10 w-10" />
@@ -933,31 +1035,92 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
+      <a
+        href="#product-main"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-bold focus:text-primary-foreground focus:shadow-lg"
+      >
+        Skip to product details
+      </a>
+      {/* Screen-reader announcements for cart actions */}
+      <div className="sr-only" role="status" aria-live="assertive" aria-atomic="true">
+        {cartAnnouncement}
+      </div>
+      <Navbar sticky />
       
-      <main className="w-full max-w-[1760px] mx-auto px-3 sm:px-4 lg:px-6 py-12">
+      <main id="product-main" aria-label={`${product.name} product details`} className="w-full max-w-[1760px] mx-auto px-3 sm:px-4 lg:px-6 py-12">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
           {/* Image Display */}
           <div className="relative mx-auto w-full max-w-xl space-y-4">
             <div className="relative aspect-square rounded-3xl overflow-hidden bg-muted border shadow-xl">
-              <button
-                type="button"
-                aria-label="Open fullscreen gallery"
-                title="Open fullscreen gallery"
-                onClick={() => setOpenFullscreenGallery(true)}
-                className="absolute right-4 top-4 z-20 rounded-full bg-black/50 p-2 text-white backdrop-blur hover:bg-black/65 transition-colors"
-              >
-                <Maximize2 className="h-4 w-4" />
-              </button>
+              <div className="absolute right-4 top-4 z-20 flex gap-2">
+                <button
+                  type="button"
+                  aria-label="Share product"
+                  title="Share product"
+                  onClick={handleShare}
+                  className="rounded-full bg-black/50 p-2 text-white backdrop-blur hover:bg-black/65 transition-colors"
+                >
+                  <Share2 className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Open fullscreen gallery"
+                  title="Open fullscreen gallery"
+                  onClick={() => setOpenFullscreenGallery(true)}
+                  className="rounded-full bg-black/50 p-2 text-white backdrop-blur hover:bg-black/65 transition-colors"
+                >
+                  <Maximize2 className="h-4 w-4" />
+                </button>
+              </div>
               <div
-                className="relative h-full w-full"
+                role="button"
+                tabIndex={0}
+                aria-label={`${product.name} — enlarge image. Hover or press Enter to open the fullscreen viewer.`}
+                className="relative h-full w-full cursor-zoom-in overflow-hidden focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/40"
+                onMouseEnter={() => {
+                  if (!hoverZoomEnabled) return;
+                  setIsZoomed(true);
+                  // Hover-intent: open fullscreen only if the cursor rests here.
+                  if (fullscreenHoverTimer.current) clearTimeout(fullscreenHoverTimer.current);
+                  fullscreenHoverTimer.current = setTimeout(() => setOpenFullscreenGallery(true), 600);
+                }}
+                onMouseLeave={() => {
+                  setIsZoomed(false);
+                  if (fullscreenHoverTimer.current) {
+                    clearTimeout(fullscreenHoverTimer.current);
+                    fullscreenHoverTimer.current = null;
+                  }
+                }}
+                onMouseMove={(e) => {
+                  if (!hoverZoomEnabled) return;
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const x = ((e.clientX - rect.left) / rect.width) * 100;
+                  const y = ((e.clientY - rect.top) / rect.height) * 100;
+                  setZoomOrigin({ x, y });
+                }}
+                onClick={() => setOpenFullscreenGallery(true)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setOpenFullscreenGallery(true);
+                  }
+                }}
               >
               <Image 
                 src={displayImage} 
                 alt={product.name} 
                 fill 
-                className="object-contain p-2"
+                className="object-contain p-2 transition-transform duration-200 ease-out"
+                style={{
+                  transform: isZoomed ? "scale(2)" : "scale(1)",
+                  transformOrigin: `${zoomOrigin.x}% ${zoomOrigin.y}%`,
+                }}
               />
+              {!isZoomed && (
+                <div className="pointer-events-none absolute bottom-4 right-4 flex items-center gap-1 rounded-full bg-black/45 px-3 py-1 text-xs font-medium text-white backdrop-blur">
+                  <ZoomIn className="h-3.5 w-3.5" /> {hoverZoomEnabled ? "Hover to zoom · rest to enlarge" : "Tap to enlarge"}
+                </div>
+              )}
               </div>
               {visualizedImg && (
                 <div className="absolute top-6 left-6">
@@ -975,11 +1138,19 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
                   type="button"
                   title={`Preview image ${i + 1}`}
                   aria-label={`Preview image ${i + 1}`}
+                  onMouseEnter={() => {
+                    setVisualizedImg(null);
+                    setSelectedGalleryImage(img);
+                  }}
+                  onFocus={() => {
+                    setVisualizedImg(null);
+                    setSelectedGalleryImage(img);
+                  }}
                   onClick={() => {
                     setVisualizedImg(null);
                     setSelectedGalleryImage(img);
                   }}
-                  className={`relative aspect-square rounded-2xl overflow-hidden border-2 transition-all ${activeImage === img ? "border-primary opacity-100" : "border-transparent opacity-80 hover:border-primary hover:opacity-100"}`}
+                  className={`relative aspect-square rounded-2xl overflow-hidden border-2 transition-all ${activeImage === img ? "border-primary opacity-100 ring-2 ring-primary/30" : "border-transparent opacity-80 hover:border-primary hover:opacity-100"}`}
                 >
                   <Image src={img} alt={`${product.name} ${i}`} fill className="object-cover" />
                 </button>
@@ -992,18 +1163,28 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <Badge variant="secondary" className="bg-primary/10 text-primary border-none uppercase tracking-widest px-4 py-1 font-bold">{product.category}</Badge>
-                <div className="flex items-center gap-1.5 text-accent">
-                  <Star className="h-5 w-5 fill-current" />
-                  <span className="font-bold text-foreground text-lg">{displayRating.toFixed(1)}</span>
-                  <span className="text-muted-foreground text-sm">({displayReviewCount} reviews)</span>
+                <div
+                  className="flex items-center gap-1.5 text-amber-500"
+                  role="img"
+                  aria-label={`Rated ${displayRating.toFixed(1)} out of 5 stars from ${displayReviewCount} reviews`}
+                >
+                  <Star className="h-5 w-5 fill-current" aria-hidden="true" />
+                  <span className="font-bold text-foreground text-lg" aria-hidden="true">{displayRating.toFixed(1)}</span>
+                  <span className="text-muted-foreground text-sm" aria-hidden="true">({displayReviewCount} reviews)</span>
                 </div>
               </div>
               
               <h1 className="text-3xl lg:text-4xl font-bold font-headline leading-tight">{product.name}</h1>
               
-              <div className="flex items-center gap-4">
-                <span className="text-3xl font-bold text-primary">{formatINR(normalizeCatalogPriceToINR(Number(product.price || 0)))}</span>
-                <Badge className={`border-none px-4 py-1 text-sm font-bold ${
+              <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
+                <span className="text-4xl font-extrabold text-foreground">{formatINR(sellingPrice)}</span>
+                {hasDiscount && (
+                  <>
+                    <span className="text-xl font-medium text-muted-foreground line-through">{formatINR(mrpValue)}</span>
+                    <span className="rounded-md bg-green-700 px-2 py-0.5 text-sm font-bold text-white">{discountPercent}% OFF</span>
+                  </>
+                )}
+                <Badge className={`border-none px-3 py-1 text-xs font-bold ${
                   isOutOfStock
                     ? "bg-red-500/10 text-red-700"
                     : isLowStock
@@ -1011,6 +1192,9 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
                     : "bg-green-500/10 text-green-600"
                 }`}>{stockBadgeLabel}</Badge>
               </div>
+              {hasDiscount && (
+                <p className="text-sm font-medium text-green-700">You save {formatINR(mrpValue - sellingPrice)} · inclusive of all taxes</p>
+              )}
               <div className="flex flex-wrap items-center gap-2">
                 {product.stock === 0 ? (
                   <Badge className="rounded-full bg-red-500/10 text-red-700 border-none px-4 py-1 font-bold">Out of stock</Badge>
@@ -1045,18 +1229,21 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
                     <span className="text-xs text-muted-foreground">Selected: <span className="font-semibold text-foreground">{selectedVariantSku}</span></span>
                   )}
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2" role="group" aria-label="Choose a product variant">
                   {productVariants.map((variant) => {
                     const parts = [variant.size, variant.color, variant.gender, variant.neckType, variant.pattern].filter(Boolean);
                     const outOfStock = Number(variant.stock) <= 0;
                     const active = selectedVariantSku === variant.sku;
+                    const variantLabel = parts.length > 0 ? parts.join(", ") : (variant.sku || "Variant");
                     return (
                       <button
                         key={variant.sku}
                         type="button"
                         disabled={outOfStock}
+                        aria-pressed={active}
+                        aria-label={`${variantLabel}${outOfStock ? " — out of stock" : `, ${variant.stock} in stock`}${active ? " (selected)" : ""}`}
                         onClick={() => setSelectedVariantSku(active ? "" : (variant.sku || ""))}
-                        className={`px-3 py-2 rounded-xl border text-sm font-medium transition-all text-left ${
+                        className={`px-3 py-2 rounded-xl border text-sm font-medium transition-all text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ${
                           active
                             ? "border-primary bg-primary/10 text-primary"
                             : outOfStock
@@ -1101,6 +1288,21 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
                 >
                   <Heart className={`h-6 w-6 ${isWishlisted ? "fill-current" : ""}`} />
                 </Button>
+              </div>
+
+              {/* Trust & assurance badges */}
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { icon: ShieldCheck, title: "Secure Checkout", sub: "256-bit encrypted" },
+                  { icon: Truck, title: "Fast Delivery", sub: expectedDeliveryRange },
+                  { icon: RotateCcw, title: "Easy Returns", sub: "7-day policy" },
+                ].map((item) => (
+                  <div key={item.title} className="flex flex-col items-center gap-1.5 rounded-2xl border border-border/40 bg-muted/20 px-2 py-3 text-center">
+                    <item.icon className="h-5 w-5 text-primary" />
+                    <span className="text-xs font-bold leading-tight">{item.title}</span>
+                    <span className="text-[10px] text-muted-foreground leading-tight">{item.sub}</span>
+                  </div>
+                ))}
               </div>
 
               {isApparelProduct && (
@@ -1190,7 +1392,7 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
                   )}
                 </Button>
 
-                <div className={`rounded-2xl border px-4 py-3 text-sm ${deliveryResult.status === "available" ? "border-green-200 bg-green-50 text-green-800" : deliveryResult.status === "unavailable" || deliveryResult.status === "invalid" ? "border-amber-200 bg-amber-50 text-amber-900" : "border-border bg-background text-muted-foreground"}`}>
+                <div role="status" aria-live="polite" className={`rounded-2xl border px-4 py-3 text-sm ${deliveryResult.status === "available" ? "border-green-200 bg-green-50 text-green-800" : deliveryResult.status === "unavailable" || deliveryResult.status === "invalid" ? "border-amber-200 bg-amber-50 text-amber-900" : "border-border bg-background text-muted-foreground"}`}>
                   <p className="font-medium">{deliveryResult.message}</p>
                   {deliveryResult.status === "available" && (
                     <div className="mt-3 space-y-3">
@@ -1374,8 +1576,13 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
                   { label: "Category", value: product.category },
                   { label: "Dealer Location", value: "Surat, India" },
                   { label: "Compatibility", value: product.category === "Embroidery Designs" ? "Digital download" : "Industrial & Home Machines" },
-                  { label: "Availability", value: product.stock > 0 ? "In stock" : "Out of stock" },
+                  { label: "Availability", value: product.stock > 0 ? `In stock (${product.stock} units)` : "Out of stock" },
                   { label: "Customization", value: product.customizable ? "Available" : "Not available" },
+                  ...(product.gender ? [{ label: "Gender", value: product.gender }] : []),
+                  ...(hasVariants ? [{ label: "Variants", value: `${productVariants.length} options` }] : []),
+                  ...(hasDiscount ? [{ label: "You Save", value: `${formatINR(mrpValue - sellingPrice)} (${discountPercent}% off)` }] : []),
+                  { label: "Seller", value: sellerName },
+                  { label: "Dispatch", value: "Ships in 1-2 business days" },
                   ...(product.customizable && product.customizationConfig ? [
                     ...(product.customizationConfig.maxWidth || product.customizationConfig.maxHeight ? [{ label: "Max Print Size", value: `${product.customizationConfig.maxWidth || "—"} × ${product.customizationConfig.maxHeight || "—"} ${product.customizationConfig.sizeUnit || "inches"}` }] : []),
                     ...(product.customizationConfig.extraCharge > 0 ? [{ label: "Customization Fee", value: `+₹${product.customizationConfig.extraCharge.toLocaleString("en-IN")}` }] : []),
@@ -1432,6 +1639,33 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
                       </div>
                     </div>
                   </div>
+
+                  {/* Rating distribution bars */}
+                  {reviewSummary.reviewCount > 0 && (
+                    <div className="rounded-2xl border border-border/50 p-4 space-y-2">
+                      <p className="text-sm font-semibold mb-1">Rating breakdown</p>
+                      {([5, 4, 3, 2, 1] as ReviewRatingFilter[]).map((star) => {
+                        const count = reviewSummary.ratingBreakdown?.[String(star)] || 0;
+                        const pct = reviewSummary.reviewCount > 0 ? Math.round((count / reviewSummary.reviewCount) * 100) : 0;
+                        return (
+                          <button
+                            key={star}
+                            type="button"
+                            onClick={() => setReviewRatingFilter(reviewRatingFilter === star ? "All" : star)}
+                            className={`flex w-full items-center gap-3 rounded-lg px-2 py-1 text-left transition-colors hover:bg-muted/50 ${reviewRatingFilter === star ? "bg-primary/5" : ""}`}
+                          >
+                            <span className="flex w-12 shrink-0 items-center gap-1 text-xs font-medium">
+                              {star} <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                            </span>
+                            <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                              <div className="h-full rounded-full bg-amber-400 transition-all" style={{ width: `${pct}%` }} />
+                            </div>
+                            <span className="w-10 shrink-0 text-right text-xs text-muted-foreground">{count}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-1 lg:grid-cols-[1.15fr_0.85fr] gap-4">
                     <div className="rounded-2xl border border-border/50 p-4 space-y-4">
@@ -1736,6 +1970,23 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
               </CardContent>
             </Card>
           </div>
+
+          {/* Related products */}
+          {relatedProducts.length > 0 && (
+            <div className="mt-16">
+              <div className="mb-6 flex items-center justify-between">
+                <h2 className="text-2xl lg:text-3xl font-bold font-headline">You may also like</h2>
+                <Link href="/marketplace" className="text-sm font-semibold text-primary hover:underline">View all</Link>
+              </div>
+              <div className="flex gap-5 overflow-x-auto pb-4 snap-x snap-mandatory [scrollbar-width:thin]">
+                {relatedProducts.map((related) => (
+                  <div key={related.id} className="w-[260px] shrink-0 snap-start">
+                    <ProductCard product={related} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <Dialog open={openCustomizer} onOpenChange={setOpenCustomizer}>
@@ -2049,6 +2300,47 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
           </DialogContent>
         </Dialog>
       </main>
+
+      {/* Sticky buy bar — appears on scroll */}
+      <div
+        className={`fixed inset-x-0 bottom-0 z-40 border-t border-border/60 bg-background/95 backdrop-blur shadow-[0_-4px_20px_rgba(0,0,0,0.08)] transition-transform duration-300 ${
+          showStickyBar ? "translate-y-0" : "translate-y-full"
+        }`}
+      >
+        <div className="mx-auto flex max-w-[1760px] items-center gap-4 px-4 py-3">
+          <div className="hidden sm:block h-12 w-12 shrink-0 overflow-hidden rounded-xl border bg-muted">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={displayImage} alt={product.name} className="h-full w-full object-cover" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-bold">{product.name}</p>
+            <div className="flex items-center gap-2">
+              <span className="text-base font-extrabold text-foreground">{formatINR(sellingPrice)}</span>
+              {hasDiscount && (
+                <>
+                  <span className="text-xs text-muted-foreground line-through">{formatINR(mrpValue)}</span>
+                  <span className="text-xs font-bold text-green-700">{discountPercent}% OFF</span>
+                </>
+              )}
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            disabled={isOutOfStock}
+            className="hidden sm:inline-flex h-11 rounded-xl border-primary/40 px-5 font-bold text-primary hover:bg-primary/5"
+            onClick={handleAddToCart}
+          >
+            <ShoppingCart className="mr-2 h-4 w-4" /> Add to Cart
+          </Button>
+          <Button
+            disabled={isOutOfStock}
+            className="h-11 rounded-xl px-6 font-bold shadow-lg shadow-primary/20"
+            onClick={handleBuyNow}
+          >
+            {isOutOfStock ? "Unavailable" : "Buy Now"}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

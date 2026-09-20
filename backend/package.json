@@ -17,6 +17,7 @@
     "db:backfill-profiles": "node scripts/backfill-customer-profiles.js",
     "db:reconcile-finance": "node scripts/reconcile-finance-pos.js",
     "db:generate-barcodes": "node scripts/generate-barcodes.js",
+    "db:backfill-mrp": "node scripts/backfill-mrp.js",
     "export:merchant-feed": "node scripts/export-merchant-feed.js"
   },
   "dependencies": {

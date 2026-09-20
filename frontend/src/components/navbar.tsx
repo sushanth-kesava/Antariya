@@ -23,13 +23,17 @@ import { ProfileSidebar } from "@/components/profile-sidebar";
 
 type NavbarProps = {
   /**
-   * Keep the navbar in normal document flow until it reaches the viewport top.
-   * This lets a page place a banner above it without the navbar overlapping it.
+   * Controls navbar positioning.
+   *   sticky=true  (DEFAULT) — stays in normal document flow, occupying space so
+   *                page content is never hidden underneath the header. This is the
+   *                consistent site-wide behavior.
+   *   sticky=false — position:fixed (removed from flow). Only use when a page
+   *                deliberately manages its own top offset.
    */
   sticky?: boolean;
 };
 
-export function Navbar({ sticky = false }: NavbarProps) {
+export function Navbar({ sticky = true }: NavbarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { user, loading, setUser } = useAuth();
@@ -90,8 +94,6 @@ export function Navbar({ sticky = false }: NavbarProps) {
 
   const navLinks = [
     { href: "/shop", label: "Shop" },
-    { href: "/marketplace?sort=newest", label: "New Arrivals" },
-    { href: "/marketplace?sort=bestsellers", label: "Best Sellers" },
     { href: "/marketplace", label: "Collections" },
     { href: "/about", label: "About" },
   ];

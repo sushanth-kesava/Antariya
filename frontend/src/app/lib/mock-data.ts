@@ -24,6 +24,7 @@ export interface Product {
   name: string;
   description: string;
   price: number;
+  mrp?: number;
   category: string;
   subCategory?: string;
   size?: string;

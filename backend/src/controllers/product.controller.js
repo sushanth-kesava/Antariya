@@ -104,6 +104,7 @@ function normalizeProduct(doc) {
     name: doc.name,
     description: doc.description,
     price: doc.price,
+    mrp: Number(doc.mrp) || 0,
     category: doc.category,
     subCategory: doc.subCategory || "",
     categoryId: doc.categoryId ? doc.categoryId.toString() : null,
@@ -759,7 +760,7 @@ async function createProduct(req, res, next) {
       });
     }
 
-    const { name, description, price, category, subCategory, size, color, gender, neckType, pattern, sizes, colors, genders, neckTypes, patterns, variants, image, images, galleryImages, stock, rating, customizable, customizationConfig, fileDownloadLink } = req.body;
+    const { name, description, price, mrp, category, subCategory, size, color, gender, neckType, pattern, sizes, colors, genders, neckTypes, patterns, variants, image, images, galleryImages, stock, rating, customizable, customizationConfig, fileDownloadLink } = req.body;
 
     const normalizedGallery = (Array.isArray(images) ? images : Array.isArray(galleryImages) ? galleryImages : [image])
       .filter((item) => typeof item === "string")
@@ -849,6 +850,7 @@ async function createProduct(req, res, next) {
       name,
       description,
       price: Number(price),
+      mrp: Number.isFinite(Number(mrp)) ? Math.max(0, Number(mrp)) : 0,
       category: category || "",
       subCategory: subCategory || "",
       categoryId: resolvedCategoryId,

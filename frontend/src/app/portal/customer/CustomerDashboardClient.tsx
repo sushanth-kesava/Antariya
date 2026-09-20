@@ -529,7 +529,17 @@ export default function CustomerDashboardClient() {
                                         </p>
                                         <p className="text-xs text-muted-foreground">Qty {item.quantity} · {formatINR(Number(item.price || 0))}</p>
                                       </div>
-                                      <Link href={`/product/${item.productId}`} className="text-xs font-semibold text-primary hover:underline shrink-0">View</Link>
+                                      <div className="flex flex-col items-end gap-1.5 shrink-0">
+                                        <Link href={`/product/${item.productId}`} className="text-xs font-semibold text-primary hover:underline">View</Link>
+                                        {order.status === "Delivered" && (
+                                          <Link
+                                            href={`/product/${item.productId}/review`}
+                                            className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-100"
+                                          >
+                                            <Star className="h-3 w-3 fill-amber-400 text-amber-400" /> Review
+                                          </Link>
+                                        )}
+                                      </div>
                                     </div>
                                     );
                                   })}

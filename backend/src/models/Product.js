@@ -64,6 +64,10 @@ const productSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true },
     description: { type: String, required: true, trim: true },
     price: { type: Number, required: true, min: 0 },
+    // Optional "Maximum Retail Price" / compare-at price. When set and greater
+    // than `price`, the storefront shows it struck through with a computed
+    // discount %. 0 means "no MRP" — no fake discount is ever displayed.
+    mrp: { type: Number, default: 0, min: 0 },
     category: { type: String, default: "", trim: true },
     subCategory: { type: String, default: "", trim: true },
     // Authoritative category references (nested category tree). The string
