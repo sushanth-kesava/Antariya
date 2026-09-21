@@ -4,6 +4,7 @@ import { useRef, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import type { Product } from "@/app/lib/mock-data";
 import { formatINR, normalizeCatalogPriceToINR } from "@/lib/india";
+import { onImgError } from "@/lib/image-fallback";
 
 /**
  * Apple.com homepage-style showcase with parallax:
@@ -133,6 +134,7 @@ export function ShowcaseScroller({ products }: { products: Product[] }) {
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={product.image}
+                    onError={onImgError}
                     alt={product.name}
                     className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                   />
@@ -188,6 +190,7 @@ export function ShowcaseScroller({ products }: { products: Product[] }) {
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={btmProduct.image}
+                      onError={onImgError}
                       alt={btmProduct.name}
                       className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />

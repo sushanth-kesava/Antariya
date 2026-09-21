@@ -5,7 +5,7 @@ export interface SupportTicket { _id: string; ticketNumber: string; source: stri
 export interface SupportDashboard { openTickets: number; inProgress: number; resolved: number; totalThisMonth: number; todayNew: number; resolutionRate: number; avgResponseHours: string | number; topCategories: { _id: string; count: number }[]; }
 
 async function apiFetch<T>(path: string, token: string, options: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, ...(options.headers || {}) } });
+  const res = await fetch(`${API_BASE}${path}`, { credentials: "include", ...options, headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, ...(options.headers || {}) } });
   const data = await res.json(); if (!res.ok || !data.success) throw new Error(data.message || `Error`); return data.data;
 }
 

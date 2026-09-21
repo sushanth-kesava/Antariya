@@ -14,37 +14,43 @@ DirectorySlash Off
 # 0. Force HTTPS + redirect www → non-www (canonical URL)
 # ══════════════════════════════════════════════════════════════════════════════
 RewriteCond %{HTTPS} off
-RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+RewriteRule ^ https://antariyaofficial.com%{REQUEST_URI} [L,R=301]
 
-RewriteCond %{HTTP_HOST} ^www\.antariyaofficial\.com$ [NC]
+RewriteCond %{HTTP_HOST} !^antariyaofficial\.com$ [NC]
 RewriteRule ^ https://antariyaofficial.com%{REQUEST_URI} [L,R=301]
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 0b. Strip .html extensions → clean URLs (301 redirect for SEO)
+# 0c. Legacy URL redirects — dead/ghost URLs found by crawlers
+# ══════════════════════════════════════════════════════════════════════════════
+RewriteRule ^index/?$ / [R=301,L]
+RewriteRule ^story\.html$ /about/ [R=301,L]
+RewriteRule ^story/?$ /about/ [R=301,L]
+RewriteRule ^contact\.html$ /contact-support/ [R=301,L]
+RewriteRule ^contactus/?$ /contact-support [R=301,L]
+RewriteRule ^contact/?$ /contact-support/ [R=301,L]
+RewriteRule ^appointment/?$ / [R=301,L]
+RewriteRule ^products/?$ /shop/ [R=301,L]
+RewriteRule ^legal/privacy/?$ /legal/policies/ [R=301,L]
+RewriteRule ^legal/terms/?$ /legal/policies/ [R=301,L]
+RewriteRule ^legal/shipping/?$ /legal/policies/ [R=301,L]
+RewriteRule ^legal/returns/?$ /legal/policies/ [R=301,L]
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 0d. Strip .html extensions → clean URLs (301 redirect for SEO)
 # ══════════════════════════════════════════════════════════════════════════════
 RewriteCond %{THE_REQUEST} \s/+(.*?)\.html[\s?] [NC]
 RewriteCond %{REQUEST_URI} !^/404\.html$
 RewriteRule ^ /%1 [R=301,L]
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 0c. Legacy URL redirects — dead/ghost URLs found by crawlers
+# 0e. Canonicalize directory URLs to the trailing-slash form used by the sitemap
 # ══════════════════════════════════════════════════════════════════════════════
-RewriteRule ^index/?$ / [R=301,L]
-RewriteRule ^story\.html$ /about [R=301,L]
-RewriteRule ^story/?$ /about [R=301,L]
-RewriteRule ^contact\.html$ /contact-support [R=301,L]
-RewriteRule ^contactus/?$ /contact-support [R=301,L]
-RewriteRule ^contact/?$ /contact-support [R=301,L]
-RewriteRule ^appointment/?$ / [R=301,L]
-RewriteRule ^products/?$ /shop [R=301,L]
-RewriteRule ^legal/privacy/?$ /legal/policies [R=301,L]
-RewriteRule ^legal/terms/?$ /legal/policies [R=301,L]
-RewriteRule ^legal/shipping/?$ /legal/policies [R=301,L]
-RewriteRule ^legal/returns/?$ /legal/policies [R=301,L]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteCond %{REQUEST_URI} !/$
+RewriteRule ^ %{REQUEST_URI}/ [R=301,L,NE]
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 0d. Serve directory index.html without trailing-slash redirect
-#     (DirectorySlash Off prevents Apache's auto 301 /path → /path/)
+# 0f. Serve directory index.html after canonicalization
 # ══════════════════════════════════════════════════════════════════════════════
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME}/index.html -f
@@ -92,7 +98,9 @@ RewriteRule ^order-status/(.*)$ /order-status/index.html [L]
 # ──────────────────────────────────────────────────────────────────────────────
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule . /404.html [L]
+RewriteRule . - [R=404,L]
+
+ErrorDocument 404 /404.html
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Performance & security headers

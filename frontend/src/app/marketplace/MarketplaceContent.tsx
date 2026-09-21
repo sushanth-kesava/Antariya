@@ -97,7 +97,7 @@ export default function MarketplaceContent() {
   const sortRef = useRef<HTMLDivElement>(null);
   const ITEMS_PER_PAGE = 20;
 
-  const { user: authUser } = useAuth();
+  const { user: authUser, loading: authLoading } = useAuth();
   const [role, setRole] = useState<MarketplaceRole>("customer");
   const [marketplaceLayout, setMarketplaceLayout] = useState<MarketplaceLayoutResponse | null>(null);
 
@@ -120,6 +120,10 @@ export default function MarketplaceContent() {
           ? "admin"
           : "customer";
 
+      if (pathRole === "customer" && authLoading) {
+        return;
+      }
+
       if (pathRole !== "customer") {
         setRole(pathRole);
         setRoleResolved(true);
@@ -132,7 +136,7 @@ export default function MarketplaceContent() {
       setRole("customer");
       setRoleResolved(true);
     }
-  }, [pathname, authUser]);
+  }, [pathname, authUser, authLoading]);
 
   useEffect(() => {
     if (!roleResolved) {
@@ -168,7 +172,12 @@ export default function MarketplaceContent() {
   }, [searchParams]);
 
   useEffect(() => {
-    if (!roleResolved || role === "superadmin") {
+    if (!roleResolved) {
+      return;
+    }
+
+    if (role === "superadmin") {
+      setLoading(false);
       return;
     }
 

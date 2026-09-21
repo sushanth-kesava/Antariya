@@ -554,6 +554,17 @@ export async function exportInventoryCsvFromBackend(token: string): Promise<stri
   return await response.text();
 }
 
+export async function exportGoogleMerchantCsvFromBackend(token: string): Promise<string> {
+  const response = await fetch(`${API_BASE_URL}/products/admin/inventory/export-google`, {
+    credentials: "include",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    throw new Error("Failed to export Google Merchant feed");
+  }
+  return await response.text();
+}
+
 export async function importInventoryCsvToBackend(
   token: string,
   csv: string

@@ -27,6 +27,7 @@ export const metadata: Metadata = {
   title: 'Antariya | Premium Embroidered Streetwear',
   description: 'Crafted with precision. Designed for individuality. Premium streetwear that blends modern Indian artistry with bold, everyday confidence.',
   metadataBase: new URL(siteUrl),
+  alternates: { canonical: '/' },
   icons: {
     icon: [{ url: BRAND_ICON_URL, href: BRAND_ICON_URL }],
     shortcut: [BRAND_ICON_URL],

@@ -6,7 +6,7 @@ export interface POSDashboard { todayRevenue: number; todayOrders: number; month
 export interface POSProduct { _id: string; name: string; price: number; sku: string; stock: number; images: string[]; category: string; variants: { sku: string; size: string; color: string; price: number; stock: number }[]; }
 
 async function apiFetch<T>(path: string, token: string, options: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, ...(options.headers || {}) } });
+  const res = await fetch(`${API_BASE}${path}`, { credentials: "include", ...options, headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, ...(options.headers || {}) } });
   const data = await res.json(); if (!res.ok || !data.success) throw new Error(data.message || 'Error'); return data.data;
 }
 

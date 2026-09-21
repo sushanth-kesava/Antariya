@@ -38,7 +38,7 @@ export interface HRDashboard {
 }
 
 async function apiFetch<T>(path: string, token: string, options: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, ...(options.headers || {}) } });
+  const res = await fetch(`${API_BASE}${path}`, { credentials: "include", ...options, headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, ...(options.headers || {}) } });
   const data = await res.json();
   if (!res.ok || !data.success) throw new Error(data.message || `API error: ${res.status}`);
   return data.data;

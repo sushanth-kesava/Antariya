@@ -95,6 +95,7 @@ export interface BarcodeDashboardStats {
 
 async function apiFetch<T>(path: string, token: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
+    credentials: "include",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -290,6 +291,7 @@ export async function downloadProductLabel(token: string, productId: string, var
   if (labelSize) qs.set("labelSize", labelSize);
 
   const res = await fetch(`${API_BASE}/barcode/label/${productId}?${qs}`, {
+    credentials: "include",
     headers: { Authorization: `Bearer ${token}` },
   });
 
@@ -305,6 +307,7 @@ export async function downloadProductLabel(token: string, productId: string, var
 
 export async function downloadBulkLabels(token: string, productIds: string[], labelSize?: string) {
   const res = await fetch(`${API_BASE}/barcode/labels/bulk`, {
+    credentials: "include",
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({ productIds, labelSize }),

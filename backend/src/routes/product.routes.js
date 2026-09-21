@@ -19,6 +19,7 @@ const {
   getStockHistory,
   updateInventorySettings,
   exportInventoryCsv,
+  exportGoogleMerchantCsv,
   importInventoryCsv,
 } = require("../controllers/product.controller");
 const { requireAuth, requireRole } = require("../middleware/auth.middleware");
@@ -31,6 +32,7 @@ router.get("/marketplace", getMarketplaceLayout);
 router.get("/admin/inventory", requireAuth, requireRole("admin", "superadmin"), getInventoryReport);
 router.get("/admin/stock-history", requireAuth, requireRole("admin", "superadmin"), getStockHistory);
 router.get("/admin/inventory/export", requireAuth, requireRole("admin", "superadmin"), exportInventoryCsv);
+router.get("/admin/inventory/export-google", requireAuth, requireRole("admin", "superadmin"), exportGoogleMerchantCsv);
 router.post("/admin/inventory/import", requireAuth, requireRole("admin", "superadmin"), importInventoryCsv);
 router.post("/:productId/adjust-stock", requireAuth, requireRole("admin", "superadmin"), adjustStock);
 router.patch("/:productId/inventory-settings", requireAuth, requireRole("admin", "superadmin"), updateInventorySettings);

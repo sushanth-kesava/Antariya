@@ -227,7 +227,7 @@ function InvoicesPanel({ token }: { token: string }) {
   const fmt = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 
   const downloadPdf = async (invoiceId: string, invoiceNumber: string) => {
-    const res = await fetch(`${API_BASE}/pos/invoices/${invoiceId}/pdf`, { headers: { Authorization: `Bearer ${token}` } });
+    const res = await fetch(`${API_BASE}/pos/invoices/${invoiceId}/pdf`, { credentials: "include", headers: { Authorization: `Bearer ${token}` } });
     if (!res.ok) return;
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);

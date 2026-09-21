@@ -36,6 +36,7 @@ export interface QCDashboardStats {
 
 async function apiFetch<T>(path: string, token: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
+    credentials: "include",
     ...options,
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, ...(options.headers || {}) },
   });

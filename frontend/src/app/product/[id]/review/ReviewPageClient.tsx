@@ -27,6 +27,7 @@ import {
   ReviewEligibility,
 } from "@/lib/api/products";
 import { Product } from "@/app/lib/mock-data";
+import { onImgError } from "@/lib/image-fallback";
 
 const REVIEW_TAGS: ProductReviewTag[] = ["Quality", "Fit", "Delivery", "Customization"];
 const MAX_IMAGES = 4;
@@ -243,6 +244,7 @@ export default function ReviewPageClient({ id }: { id: string }) {
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={product.image}
+                onError={onImgError}
                 alt={product.name}
                 className="h-20 w-20 rounded-lg border object-cover"
               />

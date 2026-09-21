@@ -30,6 +30,7 @@ import { createSupportTicket } from "@/lib/api/support";
 import { Input } from "@/components/ui/input";
 import { generateInvoicePdf } from "@/lib/invoice";
 import { useAuth } from "@/context/AuthContext";
+import { onImgError } from "@/lib/image-fallback";
 
 type RecommendationCard = {
   product: Product;
@@ -513,7 +514,7 @@ export default function CustomerDashboardClient() {
                                     <div key={idx} className="flex items-center gap-3 rounded-xl border border-gray-100 bg-white p-3">
                                       {item.image ? (
                                         // eslint-disable-next-line @next/next/no-img-element
-                                        <img src={item.image} alt={item.name} className="h-14 w-14 rounded-lg object-cover border shrink-0" />
+                                        <img src={item.image} alt={item.name} onError={onImgError} className="h-14 w-14 rounded-lg object-cover border shrink-0" />
                                       ) : (
                                         <div className="h-14 w-14 rounded-lg bg-gray-100 flex items-center justify-center shrink-0"><Package className="h-5 w-5 text-gray-400" /></div>
                                       )}

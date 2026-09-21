@@ -720,7 +720,9 @@ export default function ProductDetailsClient({ id }: ProductDetailsClientProps) 
 
   const handleShare = async () => {
     if (!product) return;
-    const url = typeof window !== "undefined" ? window.location.href : "";
+    const url = typeof window !== "undefined"
+      ? new URL(`/product/${encodeURIComponent(productId)}/`, window.location.origin).toString()
+      : "";
     const shareData = {
       title: product.name,
       text: `Check out ${product.name} on Antariya`,

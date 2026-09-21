@@ -12,7 +12,7 @@ export interface ForecastDashboard {
 }
 
 async function apiFetch<T>(path: string, token: string): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, { headers: { Authorization: `Bearer ${token}` } });
+  const res = await fetch(`${API_BASE}${path}`, { credentials: "include", headers: { Authorization: `Bearer ${token}` } });
   const data = await res.json(); if (!res.ok || !data.success) throw new Error(data.message || 'Error'); return data.data;
 }
 

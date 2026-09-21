@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { getHeroCoupons, HeroCoupon } from "@/lib/api/coupons";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
+import { onImgError } from "@/lib/image-fallback";
 
 /**
  * Animated sliding offers banner for the homepage.
@@ -92,6 +93,7 @@ export function HeroCouponBanner() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={coupon.heroImage}
+            onError={onImgError}
             alt={coupon.title || `Offer ${coupon.code}`}
             className="w-full h-28 sm:h-40 md:h-52 object-cover"
           />

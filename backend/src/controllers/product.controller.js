@@ -1702,6 +1702,135 @@ async function exportInventoryCsv(req, res, next) {
   }
 }
 
+// ─── Google Merchant Center feed export ──────────────────────────────────────
+// Emits the exact 40-column "Products source" schema Google Merchant Center
+// expects. Products with variants expand into one row per variant, grouped via
+// item_group_id (parent product id) — Google's required pattern for apparel
+// size/color variants. Descriptions are stripped of HTML and clamped.
+const GMC_HEADERS = [
+  "id", "title", "description", "availability", "availability_date",
+  "expiration_date", "link", "mobile_link", "image_link", "price",
+  "sale_price", "sale_price_effective_date", "identifier_exists", "gtin",
+  "mpn", "brand", "product_highlight", "product_detail",
+  "additional_image_link", "condition", "adult", "color", "size",
+  "size_type", "size_system", "gender", "material", "pattern", "age_group",
+  "multipack", "is bundle", "unit_pricing_measure", "unit_pricing_base_measure",
+  "energy_efficiency_class", "min_energy_efficiency_class",
+  "max_energy_efficiency", "item_group_id", "video_link",
+  "virtual_model_link", "cost_of_goods_sold",
+];
+
+function gmcStripHtml(html) {
+  return String(html || "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function gmcClamp(str, max) {
+  const s = String(str || "").trim();
+  return s.length > max ? s.slice(0, max - 1).trimEnd() + "\u2026" : s;
+}
+
+function gmcFirst(...vals) {
+  for (const v of vals) {
+    if (Array.isArray(v) && v.length) return v[0];
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  return "";
+}
+
+async function exportGoogleMerchantCsv(req, res, next) {
+  try {
+    if (req.auth?.role !== "admin" && req.auth?.role !== "superadmin") {
+      return res.status(403).json({ success: false, message: "Admin access required" });
+    }
+
+    const isSuperAdmin = req.auth?.role === "superadmin";
+    const scopeFilter = isSuperAdmin ? {} : { dealerId: req.auth.sub };
+    const products = await Product.find(scopeFilter).sort({ name: 1 });
+
+    const BRAND = "Antariya";
+    const CURRENCY = "INR";
+    const SITE_URL = String(process.env.NEXT_PUBLIC_SITE_URL || "https://antariyaofficial.com").replace(/\/+$/, "");
+
+    const money = (amount) => {
+      const n = Number(amount);
+      return Number.isFinite(n) && n > 0 ? `${n.toFixed(2)} ${CURRENCY}` : "";
+    };
+
+    const buildRow = (product, variant) => {
+      const hasVariant = Boolean(variant);
+      const id = hasVariant
+        ? (variant.sku || `${product._id}-${variant.size || ""}-${variant.color || ""}`)
+        : String(product._id);
+      const price = hasVariant && Number(variant.price) > 0 ? variant.price : product.price;
+      const mrp = Number(product.mrp) || 0;
+      const stock = hasVariant ? variant.stock : product.stock;
+      const color = hasVariant ? variant.color : gmcFirst(product.color, product.colors);
+      const size = hasVariant ? variant.size : gmcFirst(product.size, product.sizes);
+      const gender = (hasVariant ? variant.gender : gmcFirst(product.gender, product.genders)) || "unisex";
+      const pattern = (hasVariant ? variant.pattern : gmcFirst(product.pattern, product.patterns)) || "Solid";
+      const image = gmcFirst(product.image, product.images, product.galleryImages);
+      const extraImages = [...(product.images || []), ...(product.galleryImages || [])]
+        .filter((u) => u && u !== image).slice(0, 10).join(",");
+      const titleBits = [product.name, color, size].filter(Boolean).join(" ");
+
+      const row = {};
+      GMC_HEADERS.forEach((h) => { row[h] = ""; });
+      row.id = id;
+      row.title = gmcClamp(titleBits, 150);
+      row.description = gmcClamp(gmcStripHtml(product.description) || product.name, 5000);
+      row.availability = Number(stock) > 0 ? "in_stock" : "out_of_stock";
+      row.link = `${SITE_URL}/product/${product._id}/`;
+      row.image_link = image;
+      row.price = mrp > Number(price) ? money(mrp) : money(price);
+      // When an MRP exists above price, the selling price is the sale_price.
+      row.sale_price = mrp > Number(price) ? money(price) : "";
+      row.identifier_exists = "no";
+      row.brand = BRAND;
+      row.additional_image_link = extraImages;
+      row.condition = "new";
+      row.adult = "no";
+      row.color = color;
+      row.size = size;
+      row.size_system = "IN";
+      row.gender = gender;
+      row.pattern = pattern;
+      row.age_group = "adult";
+      row.item_group_id = hasVariant ? String(product._id) : "";
+      return row;
+    };
+
+    const rows = [];
+    for (const product of products) {
+      const variants = Array.isArray(product.variants) ? product.variants : [];
+      if (variants.length > 0) {
+        for (const v of variants) rows.push(buildRow(product, v));
+      } else {
+        rows.push(buildRow(product, null));
+      }
+    }
+
+    const lines = [GMC_HEADERS.join(",")];
+    for (const row of rows) {
+      lines.push(GMC_HEADERS.map((h) => csvEscape(row[h])).join(","));
+    }
+    // UTF-8 BOM so Excel and the \u20b9 rupee sign render correctly.
+    const csv = "\uFEFF" + lines.join("\r\n") + "\r\n";
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", 'attachment; filename="antariya-google-merchant-feed.csv"');
+    return res.status(200).send(csv);
+  } catch (error) {
+    return next(error);
+  }
+}
+
 function parseCsv(text) {
   // Minimal CSV parser handling quoted fields and commas/newlines within quotes.
   const rows = [];
@@ -1850,5 +1979,6 @@ module.exports = {
   getStockHistory,
   updateInventorySettings,
   exportInventoryCsv,
+  exportGoogleMerchantCsv,
   importInventoryCsv,
 };

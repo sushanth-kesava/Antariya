@@ -46,6 +46,7 @@ import {
   getStockHistoryFromBackend,
   StockAdjustmentEntry,
   exportInventoryCsvFromBackend,
+  exportGoogleMerchantCsvFromBackend,
   importInventoryCsvToBackend,
   getReviewModerationActivityFromBackend,
   getReviewModerationQueueFromBackend,
@@ -611,6 +612,22 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
       URL.revokeObjectURL(url);
     } catch (err) {
       setAdjustMessage({ type: "error", text: err instanceof Error ? err.message : "Failed to export CSV." });
+    }
+  };
+
+  const handleExportGoogleCsv = async () => {
+    if (!authToken) return;
+    try {
+      const csv = await exportGoogleMerchantCsvFromBackend(authToken);
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "antariya-google-merchant-feed.csv";
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setAdjustMessage({ type: "error", text: err instanceof Error ? err.message : "Failed to export Google feed." });
     }
   };
 
@@ -1384,6 +1401,9 @@ export default function AdminPortalClient({ activeView }: { activeView: AdminVie
                     <div className="flex items-center gap-2">
                       <Button type="button" variant="outline" className="h-9 rounded-xl" onClick={handleExportCsv}>
                         Export CSV
+                      </Button>
+                      <Button type="button" variant="outline" className="h-9 rounded-xl" onClick={handleExportGoogleCsv} title="Download a Google Merchant Center product feed">
+                        Google CSV
                       </Button>
                       <label className="h-9 rounded-xl border border-border bg-background px-3 flex items-center text-sm font-medium cursor-pointer hover:bg-muted">
                         Import CSV

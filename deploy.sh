@@ -63,7 +63,7 @@ echo ""
 echo "[4/4] Creating deployment zip..."
 cd "$OUT_DIR"
 rm -f "$OUTPUT_ZIP"
-zip -rq "$OUTPUT_ZIP" . -x '*.txt' '*.map'
+zip -rq "$OUTPUT_ZIP" . -x '*.map'
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
