@@ -171,11 +171,13 @@ async function createOrder(req, res, next) {
       });
     }
     if (!isValidRazorpaySignature({ razorpayOrderId, razorpayPaymentId, razorpaySignature })) {
+      console.error(`[createOrder] SIGNATURE FAILED | razorpayOrderId=${razorpayOrderId} | paymentId=${razorpayPaymentId} | user=${req.auth?.email}`);
       return res.status(400).json({
         success: false,
         message: "Payment could not be verified. Order was not created.",
       });
     }
+    console.log(`[createOrder] Signature OK | razorpayOrderId=${razorpayOrderId} | user=${req.auth?.email}`);
 
     // Delegate to the shared fulfilment service — the SAME idempotent path the
     // Razorpay webhook and the reconciliation script use. If the webhook has
@@ -197,6 +199,7 @@ async function createOrder(req, res, next) {
       order,
     });
   } catch (error) {
+    console.error(`[createOrder] UNHANDLED ERROR | user=${req.auth?.email}:`, error.message);
     return next(error);
   }
 }

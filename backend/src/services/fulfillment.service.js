@@ -93,6 +93,7 @@ function normalizeOrder(order) {
  * @returns {Promise<{order: object, created: boolean}>}
  */
 async function fulfillPaidOrder({ auth, items, couponCode = "", razorpayOrderId, razorpayPaymentId, source = "browser" }) {
+  console.log(`[Fulfill:${source}] START razorpayOrderId=${razorpayOrderId} paymentId=${razorpayPaymentId} user=${auth?.email} items=${Array.isArray(items) ? items.length : 0}`);
   if (!razorpayOrderId) {
     const e = new Error("razorpayOrderId is required to fulfill an order");
     e.statusCode = 400;
@@ -231,6 +232,7 @@ async function fulfillPaidOrder({ auth, items, couponCode = "", razorpayOrderId,
   const userRole = auth.role === "admin" || auth.role === "superadmin" ? "admin" : "customer";
 
   // ---- Persist the paid order ----
+  console.log(`[Fulfill:${source}] Reached Order.create | razorpayOrderId=${razorpayOrderId} | subtotal=${subtotal} | shipping=${shipping} | total=${total} | items=${orderItems.length}`);
   // NOTE: we set razorpayOrderId so the idempotency guard above catches any
   // concurrent second caller (browser + webhook racing). A unique index on
   // razorpayOrderId (added in Order model) turns a race into a safe duplicate-key.
@@ -259,11 +261,15 @@ async function fulfillPaidOrder({ auth, items, couponCode = "", razorpayOrderId,
   } catch (err) {
     // Duplicate key => another path fulfilled it a millisecond ago. Return that.
     if (err && err.code === 11000) {
+      console.log(`[Fulfill:${source}] Duplicate key (race) — returning existing order for ${razorpayOrderId}`);
       const winner = await Order.findOne({ razorpayOrderId });
       if (winner) return { order: normalizeOrder(winner), created: false };
     }
+    console.error(`[Fulfill:${source}] Order.create FAILED for ${razorpayOrderId}:`, err.message, err.stack ? err.stack.split("\n").slice(0,4).join(" | ") : "");
     throw err;
   }
+
+  console.log(`[Fulfill:${source}] ✅ Order created: ${order._id} for ${auth.email} | razorpayOrderId=${razorpayOrderId}`);
 
   // ---- Reserve inventory (paid orders are retained even if reservation fails) ----
   try {
