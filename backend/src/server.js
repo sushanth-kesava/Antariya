@@ -32,10 +32,12 @@ const supportRoutes = require("./routes/support.routes");
 const forecastRoutes = require("./routes/forecast.routes");
 const posRoutes = require("./routes/pos.routes");
 const mailTestRoutes = require("./routes/mailTest.routes");
+const { handleRazorpayWebhook } = require("./controllers/payment.controller");
 const { notFound, errorHandler } = require("./middleware/error.middleware");
 const { attachRealtime } = require("./services/realtime.service");
 const { extractCookieToken } = require("./middleware/cookie-auth.middleware");
 const { startInventoryJobs } = require("./services/inventory.jobs");
+const { startPaymentJobs } = require("./services/payment.jobs");
 const { ensureDefaultRoles } = require("./services/rbac.service");
 const { ensureDefaultRateLimits } = require("./services/ratelimit.service");
 const { ensureDefaultWarehouse } = require("./services/inventory.service");
@@ -84,6 +86,12 @@ app.use(
     credentials: true,
   })
 );
+// --- Razorpay webhook (RAW body, must precede express.json) ---------------
+// Razorpay signs the raw request body; parsing it as JSON first would break
+// the HMAC check. This single route uses express.raw; everything else uses
+// the JSON parser mounted just below.
+app.post("/api/payment/webhook", express.raw({ type: "application/json" }), handleRazorpayWebhook);
+
 app.use(express.json({ limit: "2mb" }));
 app.use(cookieParser());
 app.use(extractCookieToken);
@@ -171,6 +179,10 @@ async function startServer() {
 
     // Start inventory background jobs (expiry sweeper, verification, low-stock).
     startInventoryJobs();
+
+    // Start payment reconciliation: hourly scan that back-fills any orders
+    // that were captured by Razorpay but not persisted (browser died, etc.).
+    startPaymentJobs();
   } catch (error) {
     console.error("Failed to start backend:", error.message);
     process.exit(1);

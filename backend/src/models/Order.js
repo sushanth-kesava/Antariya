@@ -82,4 +82,17 @@ const orderSchema = new mongoose.Schema(
 
 orderSchema.index({ userId: 1, createdAt: -1 });
 
+// Guarantee at most ONE order per Razorpay order id. This turns a race between
+// the browser success handler and the Razorpay webhook (both trying to create
+// the same order) into a safe duplicate-key error the fulfilment service
+// catches. Partial filter so legacy/POS orders with an empty razorpayOrderId
+// are not forced unique.
+orderSchema.index(
+  { razorpayOrderId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { razorpayOrderId: { $type: "string", $gt: "" } },
+  }
+);
+
 module.exports = mongoose.models.Order || mongoose.model("Order", orderSchema);

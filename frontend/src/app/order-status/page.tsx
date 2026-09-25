@@ -5,13 +5,13 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Navbar } from "@/components/navbar";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, XCircle, AlertTriangle, ShoppingBag, Package } from "lucide-react";
+import { CheckCircle2, XCircle, AlertTriangle, ShoppingBag, Package, Clock } from "lucide-react";
 import { formatINR } from "@/lib/india";
 
-type TransactionStatus = "success" | "failed" | "cancelled";
+type TransactionStatus = "success" | "failed" | "cancelled" | "processing";
 
 function normalizeStatus(value: string | null): TransactionStatus {
-  if (value === "success" || value === "failed" || value === "cancelled") {
+  if (value === "success" || value === "failed" || value === "cancelled" || value === "processing") {
     return value;
   }
   // Any unknown / missing status is treated as a failure so users are never
@@ -52,10 +52,18 @@ function OrderStatusContent() {
       title: "Payment Cancelled",
       message: "You cancelled the payment before it completed. Your order has not been placed.",
     },
+    processing: {
+      icon: Clock,
+      iconClass: "text-blue-600",
+      ringClass: "bg-blue-100",
+      title: "Payment Received — Confirming Your Order",
+      message:
+        "Your payment was successful. We're finalizing your order now — it will appear in \"My Orders\" shortly, and a confirmation email is on its way. No need to pay again.",
+    },
   }[status];
 
   const Icon = config.icon;
-  const showDetails = status === "success" && (paymentId || orderId || amount !== null);
+  const showDetails = (status === "success" || status === "processing") && (paymentId || orderId || amount !== null);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -93,7 +101,7 @@ function OrderStatusContent() {
           )}
 
           <div className="flex flex-col gap-3">
-            {status === "success" && (
+            {(status === "success" || status === "processing") && (
               <Button asChild size="lg" className="w-full rounded-full">
                 <Link href="/portal/customer">
                   <Package className="w-4 h-4 mr-2" />

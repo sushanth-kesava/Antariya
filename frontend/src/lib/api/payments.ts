@@ -2,10 +2,21 @@ import { getApiBaseUrl } from "@/lib/api/base-url";
 
 const API_BASE_URL = getApiBaseUrl();
 
+export type RazorpaySnapshotItem = {
+  productId: string;
+  quantity: number;
+  variantSku?: string;
+  customization?: unknown;
+};
+
 export type CreateRazorpayOrderInput = {
   amount: number;
   currency?: string;
   receipt?: string;
+  // Cart snapshot persisted server-side so a captured payment is recoverable
+  // by the webhook / reconciliation even if this browser never finishes.
+  items?: RazorpaySnapshotItem[];
+  couponCode?: string;
 };
 
 export type CreateRazorpayOrderResponse = {

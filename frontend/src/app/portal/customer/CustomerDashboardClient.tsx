@@ -120,6 +120,7 @@ export default function CustomerDashboardClient() {
   const [recommendations, setRecommendations] = useState<RecommendationCard[]>([]);
   const [availableCoupons, setAvailableCoupons] = useState<HeroCoupon[]>([]);
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [ordersError, setOrdersError] = useState<string | null>(null);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [supportOpen, setSupportOpen] = useState(false);
   const [ticketFormOpen, setTicketFormOpen] = useState(false);
@@ -199,13 +200,18 @@ export default function CustomerDashboardClient() {
     const token = localStorage.getItem("app_auth_token") || "";
 
     const loadData = async () => {
-      const [backendOrders] = await Promise.all([
-        getMyOrdersFromBackend(token),
-        getCustomerProfileFromBackend(token)
-          .then((profile) => setCustomerProfile(profile))
-          .catch(() => null),
-      ]);
-      setOrders(backendOrders);
+      setOrdersError(null);
+      let backendOrders: any[] = [];
+      try {
+        backendOrders = await getMyOrdersFromBackend(token);
+        setOrders(backendOrders);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Orders could not be loaded.";
+        setOrdersError(message);
+      }
+      await getCustomerProfileFromBackend(token)
+        .then((profile) => setCustomerProfile(profile))
+        .catch(() => null);
       // Load coupons this customer is eligible for (public + their restricted offers).
       getAvailableCoupons(token).then(setAvailableCoupons).catch(() => {});
       try {
@@ -452,6 +458,14 @@ export default function CustomerDashboardClient() {
                   <Link href="/shop">Shop More</Link>
                 </Button>
               </div>
+              {ordersError && (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+                  <span>{ordersError}</span>
+                  <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+                    Retry
+                  </Button>
+                </div>
+              )}
               <Card className="overflow-hidden shadow-sm border-gray-100">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm text-left whitespace-nowrap">

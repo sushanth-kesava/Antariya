@@ -209,7 +209,15 @@ export default function CheckoutPage() {
     try {
       setPlacingOrder(true);
       const receipt = `antariya_${Date.now()}`;
-      const order = await createRazorpayOrderOnBackend(token, { amount: amountInPaise, currency: "INR", receipt });
+      const order = await createRazorpayOrderOnBackend(token, {
+        amount: amountInPaise,
+        currency: "INR",
+        receipt,
+        // Snapshot the cart server-side so this payment is recoverable even if
+        // this browser never completes the order-creation call below.
+        items: orderItems,
+        couponCode: appliedCoupon?.code || undefined,
+      });
 
       const paymentObject = new window.Razorpay({
         key: razorpayKeyId,
@@ -221,17 +229,38 @@ export default function CheckoutPage() {
         prefill: { name: customerName, email: customerEmail },
         notes: { source: "checkout_upi", items: String(items.length) },
         handler: async (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
-          try {
-            await verifyRazorpayPaymentOnBackend(token, {
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_signature: response.razorpay_signature,
-            });
-            await createOrderOnBackend(token, orderItems, "upi", {
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-            }, appliedCoupon?.code || undefined);
+          // Payment is ALREADY captured by the time this fires. Our job now is
+          // to make sure the order is persisted. If this fails transiently we
+          // retry; if it still fails, the server-side webhook / reconciliation
+          // will create the order from the snapshot — so we must NOT show a
+          // scary "failed" screen or clear anything that implies no order.
+          const payment = {
+            razorpay_order_id: response.razorpay_order_id,
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_signature: response.razorpay_signature,
+          };
+
+          const attempt = async () => {
+            await verifyRazorpayPaymentOnBackend(token, payment);
+            await createOrderOnBackend(token, orderItems, "upi", payment, appliedCoupon?.code || undefined);
+          };
+
+          const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+          let persisted = false;
+          let lastErr: unknown = null;
+          for (let i = 0; i < 3; i++) {
+            try {
+              await attempt();
+              persisted = true;
+              break;
+            } catch (err) {
+              lastErr = err;
+              await sleep(1000 * (i + 1)); // 1s, 2s backoff
+            }
+          }
+
+          if (persisted) {
+            // Only now is it safe to clear the cart — the order exists.
             clearCart();
             const params = new URLSearchParams({
               status: "success",
@@ -240,12 +269,22 @@ export default function CheckoutPage() {
               amount: String(total),
             });
             router.push(`/order-status?${params.toString()}`);
-          } catch (error) {
-            const reason = error instanceof Error ? error.message : "Payment verification failed.";
-            router.push(`/order-status?status=failed&reason=${encodeURIComponent(reason)}`);
-          } finally {
-            setPlacingOrder(false);
+          } else {
+            // Payment captured but we could not confirm the order from the
+            // browser. The webhook / reconciliation will finish it server-side.
+            // Reassure the customer instead of alarming them, and preserve the
+            // payment id so support can trace it. Do NOT clear the cart here —
+            // if the order truly never lands, the items are still recoverable.
+            console.error("Order confirmation failed after capture; server will reconcile.", lastErr);
+            const params = new URLSearchParams({
+              status: "processing",
+              paymentId: response.razorpay_payment_id,
+              orderId: response.razorpay_order_id,
+              amount: String(total),
+            });
+            router.push(`/order-status?${params.toString()}`);
           }
+          setPlacingOrder(false);
         },
         modal: {
           ondismiss: () => {

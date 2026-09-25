@@ -15,6 +15,12 @@ const optional = [
   'EMAIL_PASSWORD',
   'NEXT_PUBLIC_API_BASE_URL',
   'NEXT_PUBLIC_GOOGLE_CLIENT_ID',
+  'RAZORPAY_KEY_ID',
+  'RAZORPAY_KEY_SECRET',
+  // Required for the payment webhook (safety net that creates orders when
+  // the customer's browser dies after paying). Without it the
+  // /api/payment/webhook endpoint rejects all calls.
+  'RAZORPAY_WEBHOOK_SECRET',
 ];
 
 function missing(keys) {

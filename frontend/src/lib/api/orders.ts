@@ -112,7 +112,8 @@ export async function getMyOrdersFromBackend(token: string): Promise<Order[]> {
   const data = await response.json();
 
   if (!response.ok || !data?.success) {
-    throw new Error(data?.message || "Failed to fetch orders");
+    const detail = data?.message || `Request failed with HTTP ${response.status}`;
+    throw new Error(`Orders could not be loaded: ${detail}`);
   }
 
   return (data.orders || []) as Order[];

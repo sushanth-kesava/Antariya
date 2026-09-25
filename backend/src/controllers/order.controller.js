@@ -5,6 +5,7 @@ const Review = require("../models/Review");
 const WishlistItem = require("../models/WishlistItem");
 const CustomerProfile = require("../models/CustomerProfile");
 const { isValidRazorpaySignature, isRazorpayConfigured } = require("./payment.controller");
+const { fulfillPaidOrder } = require("../services/fulfillment.service");
 const { sendOrderInvoiceEmail, sendAdminOrderNotificationEmail } = require("../services/mail.service");
 const {
   reserveForOrder,
@@ -141,19 +142,10 @@ async function createOrder(req, res, next) {
     const { items } = req.body;
 
     if (!Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Order items are required",
-      });
+      return res.status(400).json({ success: false, message: "Order items are required" });
     }
 
-    // --- Payment method + verification gate -------------------------------
-    // An order must never be persisted without a valid payment. For online
-    // (UPI/card/netbanking) payments we re-verify the Razorpay signature
-    // server-side; only Cash-on-Delivery may skip a payment id.
-    // Cash on Delivery has been removed — the store is online-payment only.
-    // Reject any COD request outright so no COD order can be created, even by
-    // a direct API call.
+    // COD is permanently disabled — reject outright.
     const rawMethod = String(req.body?.paymentMethod || "").toLowerCase();
     if (rawMethod === "cod") {
       return res.status(400).json({
@@ -162,377 +154,47 @@ async function createOrder(req, res, next) {
         code: "COD_DISABLED",
       });
     }
-    const paymentMethod = "upi";
+
     const razorpayOrderId = String(req.body?.razorpay_order_id || "").trim();
     const razorpayPaymentId = String(req.body?.razorpay_payment_id || "").trim();
     const razorpaySignature = String(req.body?.razorpay_signature || "").trim();
-    let paymentStatus = "pending";
 
-    if (paymentMethod === "upi") {
-      if (!isRazorpayConfigured()) {
-        return res.status(500).json({
-          success: false,
-          message: "Online payments are not configured",
-        });
-      }
-      if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
-        return res.status(400).json({
-          success: false,
-          message: "Payment verification details are required for online payment",
-        });
-      }
-      if (!isValidRazorpaySignature({ razorpayOrderId, razorpayPaymentId, razorpaySignature })) {
-        return res.status(400).json({
-          success: false,
-          message: "Payment could not be verified. Order was not created.",
-        });
-      }
-      paymentStatus = "paid";
+    // Online-payment only. Re-verify the Razorpay signature server-side so an
+    // order can never be created without a genuine, captured payment.
+    if (!isRazorpayConfigured()) {
+      return res.status(500).json({ success: false, message: "Online payments are not configured" });
     }
-    // --------------------------------------------------------------------
-
-    const quantitiesByProductId = new Map();
-    const requestedItems = [];
-
-    for (const item of items) {
-      if (!item.productId || !Number.isFinite(Number(item.quantity)) || Number(item.quantity) < 1) {
-        return res.status(400).json({
-          success: false,
-          message: "Each order item must include productId and quantity >= 1",
-        });
-      }
-
-      const productId = String(item.productId);
-      const quantity = Number(item.quantity);
-      const variantSku = item.variantSku ? String(item.variantSku).trim() : "";
-      quantitiesByProductId.set(productId, (quantitiesByProductId.get(productId) || 0) + quantity);
-      requestedItems.push({
-        productId,
-        quantity,
-        variantSku,
-        customization: sanitizeCustomization(item.customization),
-      });
-    }
-
-    const productIds = [...quantitiesByProductId.keys()];
-    const products = await Product.find({ _id: { $in: productIds } });
-
-    if (products.length !== productIds.length) {
+    if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
       return res.status(400).json({
         success: false,
-        message: "One or more products no longer exist",
+        message: "Payment verification details are required for online payment",
+      });
+    }
+    if (!isValidRazorpaySignature({ razorpayOrderId, razorpayPaymentId, razorpaySignature })) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment could not be verified. Order was not created.",
       });
     }
 
-    const productMap = new Map(products.map((p) => [p._id.toString(), p]));
-    const orderItems = [];
-    let subtotal = 0;
-
-    for (const [productId, quantity] of quantitiesByProductId.entries()) {
-      const product = productMap.get(productId);
-
-      if (!product) {
-        return res.status(400).json({
-          success: false,
-          message: "Product lookup failed during checkout",
-        });
-      }
-
-      if (product.stock < quantity) {
-        return res.status(409).json({
-          success: false,
-          message: `Insufficient stock for ${product.name}`,
-        });
-      }
-    }
-
-    // Variant-level stock validation: sum requested quantity per (productId, variantSku)
-    // and ensure the matching variant has enough stock.
-    const variantDemand = new Map();
-    for (const item of requestedItems) {
-      if (!item.variantSku) continue;
-      const mapKey = `${item.productId}::${item.variantSku}`;
-      variantDemand.set(mapKey, (variantDemand.get(mapKey) || 0) + item.quantity);
-    }
-    for (const [mapKey, demand] of variantDemand.entries()) {
-      const [productId, sku] = mapKey.split("::");
-      const product = productMap.get(productId);
-      const variant = Array.isArray(product?.variants)
-        ? product.variants.find((entry) => entry.sku === sku)
-        : null;
-      if (variant && Number(variant.stock) < demand) {
-        return res.status(409).json({
-          success: false,
-          message: `Insufficient stock for ${product.name} (${sku})`,
-        });
-      }
-    }
-
-    for (const item of requestedItems) {
-      const product = productMap.get(item.productId);
-
-      if (!product) {
-        return res.status(400).json({
-          success: false,
-          message: "Product lookup failed during checkout",
-        });
-      }
-
-      const matchedVariant = item.variantSku && Array.isArray(product.variants)
-        ? product.variants.find((entry) => entry.sku === item.variantSku)
-        : null;
-
-      const basePrice = matchedVariant && Number(matchedVariant.price) > 0
-        ? Number(matchedVariant.price)
-        : product.price;
-      const unitPriceINR = Number(basePrice);
-
-      orderItems.push({
-        productId: product._id,
-        dealerId: product.dealerId,
-        dealerName: product.dealerName || "Unknown Admin",
-        dealerEmail: product.dealerEmail || "unknown@antariya.local",
-        name: product.name,
-        image: product.image,
-        price: unitPriceINR,
-        quantity: item.quantity,
-        variantSku: matchedVariant ? matchedVariant.sku : "",
-        variant: matchedVariant
-          ? {
-              sku: matchedVariant.sku || "",
-              size: matchedVariant.size || "",
-              color: matchedVariant.color || "",
-              gender: matchedVariant.gender || "",
-              neckType: matchedVariant.neckType || "",
-              pattern: matchedVariant.pattern || "",
-            }
-          : undefined,
-        customization: item.customization,
-      });
-
-      subtotal += unitPriceINR * item.quantity;
-    }
-
-    // --- Coupon validation (server-side re-check) ----------------------------
-    const couponCode = typeof req.body?.couponCode === "string" ? req.body.couponCode.trim().toUpperCase() : "";
-    let couponDiscount = 0;
-    let couponFreeShipping = false;
-    let couponData = { code: "", discountType: "", discountValue: 0, discountAmount: 0, freeShipping: false };
-
-    if (couponCode) {
-      const coupon = await Coupon.findOne({ code: couponCode, active: true });
-      if (coupon) {
-        const now = new Date();
-        const isValid = now >= coupon.validFrom && now <= coupon.validUntil;
-        const subtotalPaise = Math.round(subtotal * 100);
-        const totalQuantity = Array.from(quantitiesByProductId.values()).reduce((s, q) => s + q, 0);
-        const meetsMin = subtotalPaise >= (coupon.minOrderValue || 0);
-        const meetsQty = !coupon.minQuantity || totalQuantity >= coupon.minQuantity;
-
-        // Restricted (private) coupon: the buyer's email MUST be on the
-        // allow-list. Re-checked here (not just at /validate) so a direct
-        // order API call can't bypass the restriction.
-        const buyerEmail = String(req.auth?.email || "").trim().toLowerCase();
-        const isAllowedForUser =
-          coupon.visibility !== "restricted" ||
-          (Array.isArray(coupon.allowedEmails) && buyerEmail && coupon.allowedEmails.includes(buyerEmail));
-
-        // Global usage cap re-check.
-        const underUsageCap = coupon.maxUses === null || coupon.maxUses === undefined || coupon.currentUses < coupon.maxUses;
-
-        // Per-user usage cap re-check.
-        const userUseCount = Array.isArray(coupon.usageLog)
-          ? coupon.usageLog.filter((log) => log.userId === req.auth?.sub || log.email === buyerEmail).length
-          : 0;
-        const underPerUserCap = !coupon.maxUsesPerUser || userUseCount < coupon.maxUsesPerUser;
-
-        if (isValid && meetsMin && meetsQty && isAllowedForUser && underUsageCap && underPerUserCap) {
-          if (coupon.discountType === "percentage") {
-            couponDiscount = Math.round((subtotalPaise * coupon.discountValue) / 100);
-            if (coupon.maxDiscount !== null && couponDiscount > coupon.maxDiscount) {
-              couponDiscount = coupon.maxDiscount;
-            }
-          } else if (coupon.discountType === "flat") {
-            couponDiscount = coupon.discountValue;
-          } else if (coupon.discountType === "free_shipping") {
-            couponFreeShipping = true;
-          }
-          // If coupon has freeDelivery flag, waive shipping regardless of discount type
-          if (coupon.freeDelivery) {
-            couponFreeShipping = true;
-          }
-          // Never discount more than subtotal (paise)
-          if (couponDiscount > subtotalPaise) couponDiscount = subtotalPaise;
-          // Convert discount from paise to rupees
-          couponDiscount = couponDiscount / 100;
-
-          couponData = {
-            code: coupon.code,
-            discountType: coupon.discountType,
-            discountValue: coupon.discountValue,
-            discountAmount: couponDiscount,
-            freeShipping: couponFreeShipping,
-          };
-        }
-      }
-    }
-    // -------------------------------------------------------------------------
-
-    const baseShipping = subtotal >= INDIA_FREE_SHIPPING_THRESHOLD ? 0 : INDIA_STANDARD_SHIPPING;
-    const shipping = couponFreeShipping ? 0 : baseShipping;
-    const tax = subtotal * INDIA_GST_RATE;
-    const total = Math.max(0, subtotal + shipping + tax - couponDiscount);
-
-    // Online-payment only: the full total is paid up front, nothing is due on
-    // delivery. (COD has been removed.)
-    const amountPrepaid = total;
-    const amountDueOnDelivery = 0;
-
-    // Persist the order first (status Processing), then atomically reserve
-    // stock via the inventory service. Reservation is the ONLY thing that
-    // touches physical stock, inside an ACID transaction with row guards that
-    // prevent overselling. If it fails, we roll the order back so no orphan
-    // order is left behind.
-    const order = await Order.create({
-      userId: req.auth.sub,
-      userEmail: req.auth.email,
-      userRole: req.auth.role === "admin" || req.auth.role === "superadmin" ? "admin" : "customer",
-      items: orderItems,
-      subtotal,
-      shipping,
-      discount: couponDiscount,
-      coupon: couponData,
-      tax,
-      total,
-      status: "Processing",
-      paymentMethod,
-      paymentStatus,
-      deliveryPrepaid: false,
-      amountPrepaid,
-      amountDueOnDelivery,
+    // Delegate to the shared fulfilment service — the SAME idempotent path the
+    // Razorpay webhook and the reconciliation script use. If the webhook has
+    // already created this order, fulfillPaidOrder returns it unchanged
+    // (created=false) instead of duplicating it.
+    const couponCode = typeof req.body?.couponCode === "string" ? req.body.couponCode : "";
+    const { order, created } = await fulfillPaidOrder({
+      auth: { sub: req.auth.sub, email: req.auth.email, role: req.auth.role },
+      items,
+      couponCode,
       razorpayOrderId,
       razorpayPaymentId,
+      source: "browser",
     });
 
-    // Unpaid online (UPI) orders get a hold the expiry sweeper releases if
-    // payment never completes. Paid orders and COD do not auto-expire.
-    const shouldExpire = paymentMethod === "upi" && paymentStatus !== "paid";
-    const expiresAt = shouldExpire ? new Date(Date.now() + ORDER_HOLD_MINUTES * 60 * 1000) : null;
-
-    try {
-      await reserveForOrder({
-        orderId: order._id,
-        lines: orderItems.map((item) => ({
-          productId: item.productId,
-          variantSku: item.variantSku || "",
-          quantity: item.quantity,
-          productName: item.name,
-        })),
-        actor: { userId: req.auth.sub, email: req.auth.email, role: req.auth.role },
-        expiresAt,
-      });
-    } catch (reserveError) {
-      // Roll back the just-created order so a failed reservation leaves no trace.
-      await Order.deleteOne({ _id: order._id }).catch(() => {});
-      if (reserveError && reserveError.code === "OUT_OF_STOCK") {
-        return res.status(409).json({
-          success: false,
-          message: "One or more items just went out of stock. Your order was not placed and you were not charged.",
-          code: "OUT_OF_STOCK",
-        });
-      }
-      throw reserveError;
-    }
-
-    // Fire-and-forget: email the customer a branded invoice PDF. Never let an
-    // email failure break order placement, so we don't await the result.
-    (async () => {
-      try {
-        const normalized = normalizeOrder(order);
-        const profile = await CustomerProfile.findOne({ userId: req.auth.sub }).lean();
-        const defaultAddress =
-          (profile?.addresses || []).find((a) => a.isDefault) || (profile?.addresses || [])[0];
-        const addressText = defaultAddress
-          ? [defaultAddress.line1, defaultAddress.line2, `${defaultAddress.city}, ${defaultAddress.state} ${defaultAddress.pincode}`]
-              .filter(Boolean)
-              .join(", ")
-          : null;
-        await sendOrderInvoiceEmail({
-          to: req.auth.email,
-          displayName: profile?.displayName || req.auth.email,
-          order: normalized,
-          buyer: {
-            name: profile?.displayName || "Valued Customer",
-            email: req.auth.email,
-            phone: profile?.phone || null,
-            address: addressText,
-          },
-        });
-        console.log(`[Order] ✅ Order confirmation email SENT to ${req.auth.email} | Order: ${order._id}`);
-      } catch (mailError) {
-        console.error(`[Order] ❌ Order confirmation email FAILED for ${req.auth.email} | Order: ${order._id}`);
-        console.error(`[Order] ❌ Error: ${mailError.message}`);
-        console.error(`[Order] ❌ Stack: ${mailError.stack}`);
-      }
-    })();
-
-    // Record coupon usage (fire-and-forget)
-    if (couponCode && couponDiscount > 0 || couponFreeShipping) {
-      recordCouponUsage({
-        code: couponCode,
-        userId: req.auth.sub,
-        email: req.auth.email,
-        orderId: order._id.toString(),
-      }).catch((err) => console.error("[Order] Failed to record coupon usage:", err.message));
-    }
-
-    // Record as finance transaction so Finance & Reports module captures
-    // marketplace revenue alongside POS revenue (unified view).
-    if (paymentStatus === "paid") {
-      (async () => {
-        try {
-          const count = await FinanceTransaction.countDocuments();
-          await FinanceTransaction.create({
-            transactionNumber: `ORD-${Date.now().toString().slice(-6)}-${(count + 1).toString().padStart(4, "0")}`,
-            type: "payment_received",
-            category: "sales",
-            subCategory: "marketplace_sale",
-            amount: Math.round(order.subtotal),
-            taxAmount: Math.round(order.tax || 0),
-            netAmount: Math.round(order.total),
-            paidAmount: Math.round(order.total),
-            balanceAmount: 0,
-            paymentMethod: paymentMethod === "cod" ? "cash" : "upi",
-            paymentStatus: "paid",
-            accountHead: "income",
-            description: `Online order: ${order._id.toString().slice(-8).toUpperCase()}`,
-            partyType: "customer",
-            partyName: req.auth.email.split("@")[0],
-            partyEmail: req.auth.email,
-            referenceType: "order",
-            referenceId: order._id,
-            referenceNumber: order._id.toString(),
-            createdBy: order.items[0]?.dealerId || req.auth.sub,
-          });
-        } catch (err) {
-          console.warn("[Order] Finance transaction creation failed:", err.message);
-        }
-      })();
-    }
-
-    // Admin notification (fire-and-forget)
-    sendAdminOrderNotificationEmail({
-      order: normalizeOrder(order),
-      customerEmail: req.auth.email,
-      customerName: req.auth.email.split("@")[0],
-    }).catch((err) => {
-      console.error("[Order] Failed to send admin notification:", err.message);
-    });
-
-    return res.status(201).json({
+    return res.status(created ? 201 : 200).json({
       success: true,
-      message: "Order placed successfully",
-      order: normalizeOrder(order),
+      message: created ? "Order placed successfully" : "Order already recorded",
+      order,
     });
   } catch (error) {
     return next(error);

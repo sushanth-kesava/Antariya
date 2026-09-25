@@ -40,6 +40,7 @@ Go to Render Dashboard → **antariya-backend** → Environment:
 | `NODE_ENV` | `production` | ✅ YES |
 | `RAZORPAY_KEY_ID` | Your Razorpay live key | For payments |
 | `RAZORPAY_KEY_SECRET` | Your Razorpay live secret | For payments |
+| `RAZORPAY_WEBHOOK_SECRET` | Your Razorpay webhook secret (same value you paste into Razorpay dashboard) | For lost-order protection |
 | `SUPERADMIN_ALLOWED_EMAILS` | Your admin email(s), comma-separated | For admin access |
 | `SMTP_HOST` | e.g. `smtp.gmail.com` | For order emails |
 | `SMTP_PORT` | e.g. `587` | For order emails |
@@ -48,6 +49,61 @@ Go to Render Dashboard → **antariya-backend** → Environment:
 | `CLOUDINARY_CLOUD_NAME` | Your Cloudinary cloud | For product images |
 | `CLOUDINARY_API_KEY` | Cloudinary API key | For product images |
 | `CLOUDINARY_API_SECRET` | Cloudinary secret | For product images |
+
+
+---
+
+### Step 2b: Set Up the Razorpay Webhook (REQUIRED — Prevents Lost Orders)
+
+> **Why this matters:** Razorpay captures payment at checkout. Your server only
+> creates an order _after_ that. If the customer's browser dies in between
+> (network drop, UPI app-switch, tab close), the money lands with Razorpay but
+> **no order is created** — invisible to you and the customer. The webhook is
+> the server-side safety net that creates the order even when the browser fails.
+
+#### In the Razorpay Dashboard
+
+1. Go to **Settings → Webhooks → Add New Webhook**
+2. **Webhook URL:** `https://antariya-backend.onrender.com/api/payment/webhook`
+3. **Secret:** generate a random string (e.g. `openssl rand -base64 32`) — copy it
+4. **Events to subscribe:** tick `payment.captured` (and optionally `order.paid`)
+5. Click **Save**
+
+#### In Render (Backend Environment Variables)
+
+Add this variable to `antariya-backend`:
+
+| Variable | Value |
+|----------|-------|
+| `RAZORPAY_WEBHOOK_SECRET` | The exact secret you pasted into Razorpay above |
+
+#### Verify it works
+
+After deploying with the new env var, place a test payment. In the Razorpay
+Dashboard → Settings → Webhooks → click your webhook → **Recent Deliveries**.
+You should see a `payment.captured` delivery with HTTP 200. The order should
+also appear in your admin panel immediately, even if you close the browser tab
+right after paying.
+
+---
+
+### Step 2c: Recover Any Already-Lost Orders
+
+If a customer paid but no order appeared, run the reconciliation script once
+against your production database:
+
+```bash
+# Preview — no writes
+HOURS=720 DRY_RUN=1 npm --prefix backend run db:reconcile-razorpay
+
+# Apply
+HOURS=720 npm --prefix backend run db:reconcile-razorpay
+```
+
+- Payments **with** a snapshot → auto-created ✅
+- Payments **without** a snapshot (predating this fix) → printed with amount,
+  email, and contact so you can create them manually or issue a refund from
+  the Razorpay dashboard.
 
 ---
 
@@ -100,6 +156,7 @@ This creates `antariya-deploy.zip`. Upload it to Hostinger:
 | API connection | Open DevTools → Network → check API calls return 200 | ✅ No CORS errors |
 | Login works | Try logging in | ✅ Sets cookie, stays logged in |
 | Payment test | Place a test order with Razorpay test key first | ✅ Payment completes |
+| Webhook fires | Razorpay Dashboard → Webhooks → Recent Deliveries | ✅ HTTP 200, order in admin panel |
 | www redirect | Visit `www.antariyaofficial.com` | ✅ Redirects to non-www |
 | HTTPS | Visit `http://antariyaofficial.com` | ✅ Redirects to https |
 
